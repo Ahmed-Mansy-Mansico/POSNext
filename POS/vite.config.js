@@ -2,6 +2,7 @@ import path from "node:path"
 import vue from "@vitejs/plugin-vue"
 import frappeui from "frappe-ui/vite"
 import { defineConfig } from "vite"
+import { viteStaticCopy } from "vite-plugin-static-copy"
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -18,6 +19,14 @@ export default defineConfig({
 			},
 		}),
 		vue(),
+		viteStaticCopy({
+			targets: [
+				{
+					src: "src/workers",
+					dest: ".",
+				},
+			],
+		}),
 	],
 	build: {
 		chunkSizeWarningLimit: 1500,
@@ -25,6 +34,14 @@ export default defineConfig({
 		emptyOutDir: true,
 		target: "es2015",
 		sourcemap: true,
+	},
+	worker: {
+		format: "es",
+		rollupOptions: {
+			output: {
+				format: "es"
+			}
+		}
 	},
 	resolve: {
 		alias: {
@@ -37,5 +54,19 @@ export default defineConfig({
 	},
 	server: {
 		allowedHosts: true,
+		port: 8080,
+		proxy: {
+			'^/(app|api|assets|files)': {
+				target: 'http://localhost:8000',
+				ws: true,
+				changeOrigin: true,
+				secure: false,
+				cookieDomainRewrite: 'localhost',
+				router: function(req) {
+					const site_name = req.headers.host.split(':')[0];
+					return `http://${site_name}:8000`;
+				}
+			}
+		}
 	},
 })

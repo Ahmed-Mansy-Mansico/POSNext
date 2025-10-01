@@ -3,8 +3,8 @@ import Dexie from 'dexie'
 // Initialize Dexie database
 export const db = new Dexie('pos_next_offline')
 
-// Define database schema
-db.version(1).stores({
+// Current schema definition - modify this when you need to change the schema
+const CURRENT_SCHEMA = {
 	// Key-value store for settings and metadata
 	settings: '&key',
 
@@ -28,7 +28,42 @@ db.version(1).stores({
 
 	// Drafts (already handled by draftManager, but keeping for consistency)
 	drafts: '++id, draft_id, timestamp',
-})
+}
+
+// Generate a hash of the schema for versioning
+function getSchemaHash(schema) {
+	const schemaString = JSON.stringify(schema)
+	let hash = 0
+	for (let i = 0; i < schemaString.length; i++) {
+		const char = schemaString.charCodeAt(i)
+		hash = ((hash << 5) - hash) + char
+		hash = hash & hash // Convert to 32-bit integer
+	}
+	return Math.abs(hash)
+}
+
+// Get or calculate schema version (synchronous using localStorage)
+function getSchemaVersion() {
+	const schemaHash = getSchemaHash(CURRENT_SCHEMA)
+	const storedHash = localStorage.getItem('pos_next_schema_hash')
+	const storedVersion = parseInt(localStorage.getItem('pos_next_schema_version') || '1')
+
+	if (storedHash !== schemaHash.toString()) {
+		// Schema changed, increment version
+		const newVersion = storedVersion + 1
+		console.log(`Schema changed detected. Upgrading from v${storedVersion} to v${newVersion}`)
+		localStorage.setItem('pos_next_schema_hash', schemaHash.toString())
+		localStorage.setItem('pos_next_schema_version', newVersion.toString())
+		return newVersion
+	}
+
+	return storedVersion
+}
+
+// Apply schema with auto-versioning
+const schemaVersion = getSchemaVersion()
+console.log(`Initializing database with schema version: ${schemaVersion}`)
+db.version(schemaVersion).stores(CURRENT_SCHEMA)
 
 // Database initialization
 export const initDB = async () => {
@@ -53,7 +88,7 @@ export const checkDBHealth = async () => {
 		// Try to reopen
 		try {
 			if (db.isOpen()) {
-				await db.close()
+				db.close()
 			}
 			await db.open()
 			console.log('Database reopened successfully')

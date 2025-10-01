@@ -3,7 +3,7 @@ import { createResource } from "frappe-ui"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { isOffline } from "@/utils/offline"
 
-export function useItems(posProfile) {
+export function useItems(posProfile, cartItems = ref([])) {
 	const items = ref([])
 	const searchTerm = ref("")
 	const selectedItemGroup = ref(null)
@@ -54,7 +54,7 @@ export function useItems(posProfile) {
 		auto: false,
 	})
 
-	// Computed
+	// Computed - items with adjusted stock based on cart
 	const filteredItems = computed(() => {
 		if (!items.value || items.value.length === 0) return []
 
@@ -71,7 +71,21 @@ export function useItems(posProfile) {
 			)
 		}
 
-		return filtered
+		// Adjust stock quantities based on cart items
+		return filtered.map(item => {
+			const cartItem = toValue(cartItems).find(ci => ci.item_code === item.item_code)
+			if (cartItem) {
+				const originalStock = item.actual_qty || item.stock_qty || 0
+				const availableStock = originalStock - cartItem.quantity
+				return {
+					...item,
+					actual_qty: availableStock,
+					stock_qty: availableStock,
+					original_stock: originalStock
+				}
+			}
+			return item
+		})
 	})
 
 	// Watch for search term changes and reload items

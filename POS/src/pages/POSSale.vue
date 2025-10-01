@@ -199,7 +199,9 @@
 			<!-- Left: Items Selector (2/3 width) -->
 			<div class="w-2/3 border-r border-gray-200 flex flex-col bg-white">
 				<ItemsSelector
+					ref="itemsSelectorRef"
 					:pos-profile="currentProfile?.name"
+					:cart-items="invoiceItems"
 					@item-selected="handleItemSelected"
 				/>
 			</div>
@@ -425,6 +427,7 @@ const {
 	submitInvoiceResource,
 } = useInvoice()
 
+const itemsSelectorRef = ref(null)
 const showPaymentDialog = ref(false)
 const showCustomerDialog = ref(false)
 const showSuccessDialog = ref(false)
@@ -674,6 +677,11 @@ async function handlePaymentCompleted(paymentData) {
 				// Clear the cart
 				clearCart()
 				customer.value = null
+
+				// Refresh items to get updated stock
+				if (itemsSelectorRef.value) {
+					itemsSelectorRef.value.loadItems()
+				}
 
 				// Show success dialog
 				showSuccessDialog.value = true

@@ -1,7 +1,45 @@
 import { db, getSetting, setSetting } from './db'
+import { call } from 'frappe-ui'
 
-// Cache version - increment when cache structure changes
-export const CACHE_VERSION = 1
+// Cache structure definition - modify this when cache structure changes
+const CACHE_STRUCTURE = {
+	// Define what gets cached
+	items: ['item_code', 'item_name', 'item_group', 'barcodes', 'price', 'stock'],
+	customers: ['name', 'customer_name', 'mobile_no', 'email_id'],
+	item_prices: ['price_list', 'item_code', 'price'],
+	local_stock: ['item_code', 'warehouse', 'actual_qty'],
+}
+
+// Generate cache version from structure hash
+function getCacheStructureHash(structure) {
+	const structureString = JSON.stringify(structure)
+	let hash = 0
+	for (let i = 0; i < structureString.length; i++) {
+		const char = structureString.charCodeAt(i)
+		hash = ((hash << 5) - hash) + char
+		hash = hash & hash
+	}
+	return Math.abs(hash)
+}
+
+// Auto-increment cache version based on structure changes
+function getCacheVersion() {
+	const structureHash = getCacheStructureHash(CACHE_STRUCTURE)
+	const storedHash = localStorage.getItem('pos_next_cache_structure_hash')
+	const storedVersion = parseInt(localStorage.getItem('pos_next_cache_version') || '1')
+
+	if (storedHash !== structureHash.toString()) {
+		const newVersion = storedVersion + 1
+		console.log(`Cache structure changed. Upgrading from v${storedVersion} to v${newVersion}`)
+		localStorage.setItem('pos_next_cache_structure_hash', structureHash.toString())
+		localStorage.setItem('pos_next_cache_version', newVersion.toString())
+		return newVersion
+	}
+
+	return storedVersion
+}
+
+export const CACHE_VERSION = getCacheVersion()
 
 // In-memory cache for fast access
 export const memory = {
@@ -94,13 +132,10 @@ export const cacheItemsFromServer = async (posProfile) => {
 	try {
 		console.log('Fetching items from server...')
 
-		const response = await window.frappe.call({
-			method: 'pos_next.api.invoices.get_items',
-			args: {
-				pos_profile: posProfile,
-				start: 0,
-				limit: 9999 // Get all items
-			}
+		const response = await call('pos_next.api.invoices.get_items', {
+			pos_profile: posProfile,
+			start: 0,
+			limit: 9999 // Get all items
 		})
 
 		if (response.message && Array.isArray(response.message)) {
@@ -132,13 +167,10 @@ export const cacheCustomersFromServer = async (posProfile) => {
 	try {
 		console.log('Fetching customers from server...')
 
-		const response = await window.frappe.call({
-			method: 'pos_next.api.invoices.get_customers',
-			args: {
-				pos_profile: posProfile,
-				start: 0,
-				limit: 9999 // Get all customers
-			}
+		const response = await call('pos_next.api.invoices.get_customers', {
+			pos_profile: posProfile,
+			start: 0,
+			limit: 9999 // Get all customers
 		})
 
 		if (response.message && Array.isArray(response.message)) {

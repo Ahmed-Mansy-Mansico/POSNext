@@ -234,12 +234,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, toRef } from "vue"
 import { Input } from "frappe-ui"
 import { useItems } from "@/composables/useItems"
 
 const props = defineProps({
 	posProfile: String,
+	cartItems: {
+		type: Array,
+		default: () => []
+	}
 })
 
 const emit = defineEmits(["item-selected"])
@@ -254,7 +258,7 @@ const {
 	itemsResource,
 	loadItems,
 	loadItemGroups,
-} = useItems(props.posProfile)
+} = useItems(props.posProfile, toRef(props, 'cartItems'))
 
 onMounted(() => {
 	loadItems()
@@ -268,6 +272,12 @@ function handleItemClick(item) {
 function formatCurrency(amount) {
 	return parseFloat(amount || 0).toFixed(2)
 }
+
+// Expose methods for parent component
+defineExpose({
+	loadItems,
+	loadItemGroups,
+})
 
 function handleImageError(event) {
 	event.target.style.display = "none"
