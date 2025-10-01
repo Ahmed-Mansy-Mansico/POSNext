@@ -199,19 +199,25 @@ def submit_invoice(invoice_data):
 				amount = flt(payment.get("amount", 0))
 
 				if mode_of_payment and amount > 0:
-					# Get payment account from POS Payment Method
+					# Check if payment method is allowed in POS Profile
 					payment_method = frappe.db.get_value(
 						"POS Payment Method",
 						{"parent": pos_profile, "mode_of_payment": mode_of_payment},
-						["default_account", "allow_in_returns"],
-						as_dict=1
+						"allow_in_returns"
 					)
 
-					if payment_method:
+					if payment_method is not None:  # Payment method exists in POS Profile
+						# Get account from Mode of Payment accounts table
+						mop_account = frappe.db.get_value(
+							"Mode of Payment Account",
+							{"parent": mode_of_payment, "company": pos_profile_doc.company},
+							"default_account"
+						)
+
 						invoice.append("payments", {
 							"mode_of_payment": mode_of_payment,
 							"amount": amount,
-							"account": payment_method.get("default_account"),
+							"account": mop_account,
 						})
 
 		# Set paid amount and change

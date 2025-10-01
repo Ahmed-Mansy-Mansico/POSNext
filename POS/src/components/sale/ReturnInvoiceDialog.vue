@@ -17,7 +17,7 @@
 							placeholder="Enter invoice number..."
 							class="flex-1"
 						/>
-						<Button @click="searchInvoice" :loading="searching">
+						<Button @click="searchInvoice" :loading="searchInvoiceResource.loading">
 							Search
 						</Button>
 					</div>
@@ -143,7 +143,7 @@
 					theme="red"
 					@click="handleCreateReturn"
 					:disabled="selectedItems.length === 0"
-					:loading="creating"
+					:loading="createReturnResource.loading"
 				>
 					Create Return
 				</Button>
@@ -154,7 +154,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Dialog, Button, Input, createResource } from 'frappe-ui'
+import { Dialog, Button, Input, createResource, toast } from 'frappe-ui'
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -168,8 +168,80 @@ const invoiceSearch = ref('')
 const originalInvoice = ref(null)
 const returnItems = ref([])
 const returnReason = ref('')
-const searching = ref(false)
-const creating = ref(false)
+
+// Resource for searching invoice
+const searchInvoiceResource = createResource({
+	url: 'frappe.client.get',
+	makeParams() {
+		return {
+			doctype: 'Sales Invoice',
+			name: invoiceSearch.value
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		if (data) {
+			originalInvoice.value = data
+			returnItems.value = data.items.map(item => ({
+				...item,
+				selected: false,
+				return_qty: item.qty,
+			}))
+		}
+	},
+	onError(error) {
+		console.error('Error fetching invoice:', error)
+		toast.create({
+			title: 'Error',
+			text: 'Invoice not found or you do not have permission to access it',
+			icon: 'alert-circle',
+			iconClasses: 'text-red-600',
+		})
+	}
+})
+
+// Resource for creating return invoice
+const createReturnResource = createResource({
+	url: 'pos_next.api.invoices.submit_invoice',
+	makeParams() {
+		return {
+			invoice_data: {
+				pos_profile: props.posProfile,
+				customer: originalInvoice.value.customer,
+				is_return: 1,
+				return_against: originalInvoice.value.name,
+				items: selectedItems.value.map(item => ({
+					item_code: item.item_code,
+					qty: -Math.abs(item.return_qty),
+					rate: item.rate,
+					warehouse: item.warehouse,
+					uom: item.uom,
+				})),
+				remarks: returnReason.value || `Return against ${originalInvoice.value.name}`
+			}
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		emit('return-created', data)
+		show.value = false
+		toast.create({
+			title: 'Success',
+			text: `Return invoice ${data.name} created successfully`,
+			icon: 'check',
+			iconClasses: 'text-green-600',
+		})
+	},
+	onError(error) {
+		console.error('Error creating return:', error)
+		toast.create({
+			title: 'Error',
+			text: error.message || 'Failed to create return invoice',
+			icon: 'alert-circle',
+			iconClasses: 'text-red-600',
+		})
+	}
+})
 
 watch(() => props.modelValue, (val) => {
 	show.value = val
@@ -192,90 +264,14 @@ const returnTotal = computed(() => {
 	}, 0)
 })
 
-async function searchInvoice() {
+function searchInvoice() {
 	if (!invoiceSearch.value) return
-
-	searching.value = true
-	try {
-		const response = await window.frappe.call({
-			method: 'frappe.client.get',
-			args: {
-				doctype: 'Sales Invoice',
-				name: invoiceSearch.value
-			}
-		})
-
-		if (response.message) {
-			originalInvoice.value = response.message
-
-			// Prepare return items
-			returnItems.value = response.message.items.map(item => ({
-				...item,
-				selected: false,
-				return_qty: item.qty,
-			}))
-		}
-	} catch (error) {
-		console.error('Error fetching invoice:', error)
-		window.frappe.msgprint({
-			title: 'Error',
-			message: 'Invoice not found or you do not have permission to access it',
-			indicator: 'red'
-		})
-	} finally {
-		searching.value = false
-	}
+	searchInvoiceResource.reload()
 }
 
-async function handleCreateReturn() {
+function handleCreateReturn() {
 	if (selectedItems.value.length === 0) return
-
-	creating.value = true
-	try {
-		// Prepare return invoice data
-		const returnInvoiceData = {
-			pos_profile: props.posProfile,
-			customer: originalInvoice.value.customer,
-			is_return: 1,
-			return_against: originalInvoice.value.name,
-			items: selectedItems.value.map(item => ({
-				item_code: item.item_code,
-				qty: -Math.abs(item.return_qty), // Negative quantity for return
-				rate: item.rate,
-				warehouse: item.warehouse,
-				uom: item.uom,
-			})),
-			remarks: returnReason.value || `Return against ${originalInvoice.value.name}`
-		}
-
-		// Submit the return invoice
-		const result = await window.frappe.call({
-			method: 'pos_next.api.invoices.submit_invoice',
-			args: {
-				invoice_data: returnInvoiceData
-			}
-		})
-
-		if (result.message) {
-			emit('return-created', result.message)
-			show.value = false
-
-			window.frappe.msgprint({
-				title: 'Success',
-				message: `Return invoice ${result.message.name} created successfully`,
-				indicator: 'green'
-			})
-		}
-	} catch (error) {
-		console.error('Error creating return:', error)
-		window.frappe.msgprint({
-			title: 'Error',
-			message: error.message || 'Failed to create return invoice',
-			indicator: 'red'
-		})
-	} finally {
-		creating.value = false
-	}
+	createReturnResource.submit()
 }
 
 function resetForm() {

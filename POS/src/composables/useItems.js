@@ -1,13 +1,16 @@
 import { ref, computed, watch, toValue } from "vue"
 import { createResource } from "frappe-ui"
+import { offlineWorker } from "@/utils/offline/workerClient"
+import { isOffline } from "@/utils/offline"
 
 export function useItems(posProfile) {
 	const items = ref([])
 	const searchTerm = ref("")
 	const selectedItemGroup = ref(null)
 	const itemGroups = ref([])
+	const loading = ref(false)
 
-	// Resources
+	// Resources (kept for server-side refresh when online)
 	const itemsResource = createResource({
 		url: "pos_next.api.invoices.get_items",
 		makeParams() {
@@ -122,8 +125,49 @@ export function useItems(posProfile) {
 		itemGroupsResource.reload()
 	}
 
-	function loadItems() {
-		itemsResource.reload()
+	// Cache-first loading function using worker
+	async function loadItems() {
+		// Check if cache is ready using worker
+		const cacheReady = await offlineWorker.isCacheReady()
+
+		// If offline or cache is ready, use cache via worker
+		if (isOffline() || cacheReady) {
+			loading.value = true
+			try {
+				const cached = await offlineWorker.searchCachedItems(searchTerm.value, 100)
+				items.value = cached || []
+			} catch (error) {
+				console.error('Error loading from cache:', error)
+				items.value = []
+			} finally {
+				loading.value = false
+			}
+		} else {
+			// If online and cache not ready, use server
+			itemsResource.reload()
+		}
+	}
+
+	// Get item by code (cache-first) using worker
+	async function getItem(itemCode) {
+		try {
+			const cacheReady = await offlineWorker.isCacheReady()
+			if (isOffline() || cacheReady) {
+				const items = await offlineWorker.searchCachedItems(itemCode, 1)
+				return items?.[0] || null
+			} else {
+				// Fallback to server (implement if needed)
+				return null
+			}
+		} catch (error) {
+			console.error('Error getting item:', error)
+			return null
+		}
+	}
+
+	// Check if cache is ready
+	async function checkCacheReady() {
+		return await offlineWorker.isCacheReady()
 	}
 
 	return {
@@ -133,16 +177,22 @@ export function useItems(posProfile) {
 		searchTerm,
 		selectedItemGroup,
 		itemGroups,
+		loading,
 
 		// Methods
 		searchByBarcode,
 		refreshItems,
 		loadItemGroups,
 		loadItems,
+		getItem,
+		checkCacheReady,
 
 		// Resources
 		itemsResource,
 		itemGroupsResource,
 		searchByBarcodeResource,
+
+		// Offline helpers
+		isOffline,
 	}
 }

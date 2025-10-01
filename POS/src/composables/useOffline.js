@@ -1,37 +1,32 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import {
-	isOffline as checkOffline,
-	saveOfflineInvoice,
-	getOfflineInvoiceCount,
-	syncOfflineInvoices,
-	getOfflineInvoices,
-	deleteOfflineInvoice,
-	cacheItems,
-	cacheCustomers,
-	searchCachedItems,
-	searchCachedCustomers,
-	isCacheFresh,
-} from '@/utils/offline'
+import { offlineWorker } from '@/utils/offline/workerClient'
+import { syncOfflineInvoices } from '@/utils/offline'
 
 export function useOffline() {
 	const isOffline = ref(false)
 	const pendingInvoicesCount = ref(0)
 	const isSyncing = ref(false)
 
-	// Check offline status
-	const updateOfflineStatus = () => {
-		isOffline.value = checkOffline()
+	// Check offline status using worker
+	const updateOfflineStatus = async () => {
+		const browserOnline = navigator.onLine
+		const offline = await offlineWorker.checkOffline(browserOnline)
+
+		if (isOffline.value !== offline) {
+			console.log(`Offline status changed: ${isOffline.value} -> ${offline}`)
+			isOffline.value = offline
+		}
 	}
 
-	// Update pending invoices count
+	// Update pending invoices count using worker
 	const updatePendingCount = async () => {
-		pendingInvoicesCount.value = await getOfflineInvoiceCount()
+		pendingInvoicesCount.value = await offlineWorker.getOfflineInvoiceCount()
 	}
 
-	// Save invoice offline
+	// Save invoice offline using worker
 	const saveInvoiceOffline = async (invoiceData) => {
 		try {
-			await saveOfflineInvoice(invoiceData)
+			await offlineWorker.saveOfflineInvoice(invoiceData)
 			await updatePendingCount()
 			return true
 		} catch (error) {
@@ -40,7 +35,7 @@ export function useOffline() {
 		}
 	}
 
-	// Sync pending invoices
+	// Sync pending invoices (this still needs main thread for frappe.call)
 	const syncPending = async () => {
 		if (isOffline.value) {
 			throw new Error('Cannot sync while offline')
@@ -59,25 +54,25 @@ export function useOffline() {
 		}
 	}
 
-	// Get pending invoices
+	// Get pending invoices using worker
 	const getPending = async () => {
-		return await getOfflineInvoices()
+		return await offlineWorker.getOfflineInvoices()
 	}
 
-	// Delete pending invoice
+	// Delete pending invoice using worker
 	const deletePending = async (id) => {
-		await deleteOfflineInvoice(id)
+		await offlineWorker.deleteOfflineInvoice(id)
 		await updatePendingCount()
 	}
 
-	// Cache data for offline use
-	const cacheData = async (items, customers, priceList) => {
+	// Cache data using worker
+	const cacheData = async (items, customers) => {
 		try {
 			if (items && items.length > 0) {
-				await cacheItems(items, priceList)
+				await offlineWorker.cacheItems(items)
 			}
 			if (customers && customers.length > 0) {
-				await cacheCustomers(customers)
+				await offlineWorker.cacheCustomers(customers)
 			}
 			return true
 		} catch (error) {
@@ -86,19 +81,24 @@ export function useOffline() {
 		}
 	}
 
-	// Search cached items
+	// Search cached items using worker
 	const searchItems = async (searchTerm, limit = 50) => {
-		return await searchCachedItems(searchTerm, limit)
+		return await offlineWorker.searchCachedItems(searchTerm, limit)
 	}
 
-	// Search cached customers
+	// Search cached customers using worker
 	const searchCustomers = async (searchTerm, limit = 20) => {
-		return await searchCachedCustomers(searchTerm, limit)
+		return await offlineWorker.searchCachedCustomers(searchTerm, limit)
 	}
 
-	// Check if cache is fresh
-	const checkCacheFreshness = async (type = 'items') => {
-		return await isCacheFresh(type)
+	// Check if cache is ready using worker
+	const checkCacheReady = async () => {
+		return await offlineWorker.isCacheReady()
+	}
+
+	// Get cache stats using worker
+	const getCacheStats = async () => {
+		return await offlineWorker.getCacheStats()
 	}
 
 	// Event listeners
@@ -112,18 +112,28 @@ export function useOffline() {
 		updateOfflineStatus()
 	}
 
+	const handleWorkerStatusChange = (event) => {
+		// Worker detected server status change
+		updateOfflineStatus()
+	}
+
 	onMounted(() => {
+		// Initial check
 		updateOfflineStatus()
 		updatePendingCount()
 
 		// Listen to online/offline events
 		window.addEventListener('online', handleOnline)
 		window.addEventListener('offline', handleOffline)
+
+		// Listen to worker status changes
+		window.addEventListener('offlineStatusChange', handleWorkerStatusChange)
 	})
 
 	onUnmounted(() => {
 		window.removeEventListener('online', handleOnline)
 		window.removeEventListener('offline', handleOffline)
+		window.removeEventListener('offlineStatusChange', handleWorkerStatusChange)
 	})
 
 	return {
@@ -137,7 +147,8 @@ export function useOffline() {
 		cacheData,
 		searchItems,
 		searchCustomers,
-		checkCacheFreshness,
+		checkCacheReady,
+		getCacheStats,
 		updateOfflineStatus,
 		updatePendingCount,
 	}

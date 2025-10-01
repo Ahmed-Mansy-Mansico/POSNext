@@ -392,6 +392,8 @@ import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
 import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
 import { printInvoiceByName } from "@/utils/printInvoice"
 import { saveDraft, getDraftsCount } from "@/utils/draftManager"
+import { offlineWorker } from "@/utils/offline/workerClient"
+import { cacheItemsFromServer, cacheCustomersFromServer } from "@/utils/offline"
 
 const router = useRouter()
 const { currentProfile, currentShift, hasOpenShift, checkOpeningShift } = useShift()
@@ -404,6 +406,7 @@ const {
 	syncPending,
 	cacheData,
 	searchItems: searchCachedItems,
+	getCacheStats,
 } = useOffline()
 
 const {
@@ -459,6 +462,65 @@ onMounted(async () => {
 			// Set POS profile from current shift
 			if (currentProfile.value) {
 				posProfile.value = currentProfile.value.name
+
+				// Pre-load data for offline use if online and needed
+				if (!isOffline.value) {
+					// Check cache status via worker
+					const cacheReady = await offlineWorker.isCacheReady()
+					const stats = await offlineWorker.getCacheStats()
+					const needsRefresh = !stats.lastSync || (Date.now() - stats.lastSync) > (24 * 60 * 60 * 1000)
+
+					if (!cacheReady || needsRefresh) {
+						console.log('Pre-loading data for offline use...')
+						toast.create({
+							title: "Syncing Data",
+							text: "Loading items and customers for offline use...",
+							icon: "download",
+							iconClasses: "text-blue-600",
+						})
+
+						try {
+							// Fetch from server (main thread - uses window.frappe.call)
+							const [itemsData, customersData] = await Promise.all([
+								cacheItemsFromServer(currentProfile.value.name),
+								cacheCustomersFromServer(currentProfile.value.name)
+							])
+
+							// Cache via worker (background thread)
+							await Promise.all([
+								offlineWorker.cacheItems(itemsData.items || []),
+								offlineWorker.cacheCustomers(customersData.customers || [])
+							])
+
+							toast.create({
+								title: "Sync Complete",
+								text: "Data is ready for offline use",
+								icon: "check",
+								iconClasses: "text-green-600",
+							})
+						} catch (error) {
+							console.error('Error pre-loading data:', error)
+							toast.create({
+								title: "Sync Warning",
+								text: "Some data may not be available offline",
+								icon: "alert-circle",
+								iconClasses: "text-orange-600",
+							})
+						}
+					}
+				} else {
+					// Check if cache is available when offline
+					const cacheReady = await offlineWorker.isCacheReady()
+					if (!cacheReady) {
+						// Show warning if offline and no cache
+						toast.create({
+							title: "Limited Functionality",
+							text: "POS is offline without cached data. Please connect to sync.",
+							icon: "alert-circle",
+							iconClasses: "text-orange-600",
+						})
+					}
+				}
 			}
 		}
 

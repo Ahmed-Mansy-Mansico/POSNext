@@ -10,6 +10,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     BatchSerialDialog: typeof import('./src/components/sale/BatchSerialDialog.vue')['default']
     CouponDialog: typeof import('./src/components/sale/CouponDialog.vue')['default']
+    CreateCustomerDialog: typeof import('./src/components/sale/CreateCustomerDialog.vue')['default']
     CustomerDialog: typeof import('./src/components/sale/CustomerDialog.vue')['default']
     DraftInvoicesDialog: typeof import('./src/components/sale/DraftInvoicesDialog.vue')['default']
     InvoiceCart: typeof import('./src/components/sale/InvoiceCart.vue')['default']

@@ -21,13 +21,13 @@
 							</template>
 						</Input>
 					</div>
-					<Button @click="loadInvoices" :loading="loading">
+					<Button @click="loadInvoices" :loading="invoicesResource.loading">
 						Refresh
 					</Button>
 				</div>
 
 				<!-- Invoices List -->
-				<div v-if="loading" class="text-center py-8">
+				<div v-if="invoicesResource.loading" class="text-center py-8">
 					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
 					<p class="mt-3 text-xs text-gray-500">Loading invoices...</p>
 				</div>
@@ -148,7 +148,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Dialog, Button, Input, createResource } from 'frappe-ui'
+import { Dialog, Button, Input, createResource, toast } from 'frappe-ui'
 import { printInvoiceByName } from '@/utils/printInvoice'
 
 const props = defineProps({
@@ -162,15 +162,62 @@ const show = ref(props.modelValue)
 const invoices = ref([])
 const searchTerm = ref('')
 const expandedInvoice = ref(null)
-const loading = ref(false)
 const page = ref(0)
 const pageSize = 20
 const hasMore = ref(true)
 
+// Create resource for loading invoices
+const invoicesResource = createResource({
+	url: 'frappe.client.get_list',
+	makeParams() {
+		return {
+			doctype: 'Sales Invoice',
+			filters: {
+				is_pos: 1,
+				...(props.posProfile && { pos_profile: props.posProfile })
+			},
+			fields: [
+				'name',
+				'customer',
+				'customer_name',
+				'posting_date',
+				'posting_time',
+				'grand_total',
+				'status',
+				'docstatus',
+				'is_return',
+			],
+			order_by: 'creation desc',
+			start: 0,
+			page_length: 100
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		console.log('Invoices loaded:', data)
+		if (data && Array.isArray(data)) {
+			// For simplicity, show item count as 0 initially
+			invoices.value = data.map(inv => ({
+				...inv,
+				items_count: 0
+			}))
+		}
+	},
+	onError(error) {
+		console.error('Error loading invoices:', error)
+		toast.create({
+			title: 'Error',
+			text: 'Failed to load invoices',
+			icon: 'alert-circle',
+			iconClasses: 'text-red-600',
+		})
+	}
+})
+
 watch(() => props.modelValue, (val) => {
 	show.value = val
-	if (val) {
-		loadInvoices()
+	if (val && props.posProfile) {
+		invoicesResource.reload()
 	}
 })
 
@@ -188,65 +235,9 @@ const filteredInvoices = computed(() => {
 	)
 })
 
-async function loadInvoices(append = false) {
-	loading.value = true
-	try {
-		const response = await window.frappe.call({
-			method: 'frappe.client.get_list',
-			args: {
-				doctype: 'Sales Invoice',
-				filters: {
-					is_pos: 1,
-					...(props.posProfile && { pos_profile: props.posProfile })
-				},
-				fields: [
-					'name',
-					'customer',
-					'customer_name',
-					'posting_date',
-					'posting_time',
-					'grand_total',
-					'status',
-					'docstatus',
-					'is_return',
-				],
-				order_by: 'creation desc',
-				start: append ? invoices.value.length : 0,
-				page_length: pageSize
-			}
-		})
-
-		if (response.message) {
-			// Load item counts for each invoice
-			const invoicesWithItems = await Promise.all(
-				response.message.map(async (inv) => {
-					const itemsResponse = await window.frappe.call({
-						method: 'frappe.client.get',
-						args: {
-							doctype: 'Sales Invoice',
-							name: inv.name
-						}
-					})
-					return {
-						...inv,
-						items: itemsResponse.message?.items || [],
-						items_count: itemsResponse.message?.items?.length || 0
-					}
-				})
-			)
-
-			if (append) {
-				invoices.value = [...invoices.value, ...invoicesWithItems]
-			} else {
-				invoices.value = invoicesWithItems
-			}
-
-			hasMore.value = response.message.length === pageSize
-		}
-	} catch (error) {
-		console.error('Error loading invoices:', error)
-	} finally {
-		loading.value = false
+function loadInvoices() {
+	if (props.posProfile) {
+		invoicesResource.reload()
 	}
 }
 

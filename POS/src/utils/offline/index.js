@@ -4,6 +4,7 @@ export { db, initDB, checkDBHealth, getSetting, setSetting } from './db'
 
 export {
 	isOffline,
+	pingServer,
 	saveOfflineInvoice,
 	getOfflineInvoices,
 	getOfflineInvoiceCount,
@@ -17,14 +18,34 @@ export {
 export {
 	cacheItems,
 	getCachedItems,
-	searchCachedItems,
+	searchCachedItems as searchCachedItemsOld,
 	getItemByBarcode,
 	getItemWithPrice,
 	cacheCustomers,
-	searchCachedCustomers,
+	searchCachedCustomers as searchCachedCustomersOld,
 	getItemsLastSync,
 	getCustomersLastSync,
 	isCacheFresh,
 	clearItemsCache,
 	clearCustomersCache,
 } from './items'
+
+// New cache system exports
+export {
+	memory,
+	initMemoryCache,
+	isCacheReady,
+	isStockCacheReady,
+	isManualOffline,
+	setManualOffline,
+	toggleManualOffline,
+	cacheItemsFromServer,
+	cacheCustomersFromServer,
+	searchCachedItems,
+	searchCachedCustomers,
+	getCachedItem,
+	getCachedCustomer,
+	needsCacheRefresh,
+	clearAllCache,
+	getCacheStats,
+} from './cache'

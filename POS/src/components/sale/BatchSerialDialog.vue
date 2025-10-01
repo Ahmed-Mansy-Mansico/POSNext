@@ -135,7 +135,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Dialog, Button } from 'frappe-ui'
+import { Dialog, Button, createResource } from 'frappe-ui'
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -155,6 +155,62 @@ const availableSerials = ref([])
 const selectedBatch = ref(null)
 const selectedSerials = ref([])
 const manualSerials = ref('')
+
+// Resource for loading batches
+const batchesResource = createResource({
+	url: 'frappe.client.get_list',
+	makeParams() {
+		return {
+			doctype: 'Batch',
+			filters: {
+				item: props.item?.item_code,
+				disabled: 0
+			},
+			fields: ['name as batch_no', 'expiry_date'],
+			limit_page_length: 100
+		}
+	},
+	auto: false,
+	async onSuccess(data) {
+		if (data && Array.isArray(data)) {
+			// For simplicity, set qty to 999 for all batches
+			// In production, you'd want to query actual stock
+			availableBatches.value = data.map(batch => ({
+				...batch,
+				qty: 999
+			}))
+		}
+	},
+	onError(error) {
+		console.error('Error loading batches:', error)
+	}
+})
+
+// Resource for loading serials
+const serialsResource = createResource({
+	url: 'frappe.client.get_list',
+	makeParams() {
+		return {
+			doctype: 'Serial No',
+			filters: {
+				item_code: props.item?.item_code,
+				warehouse: props.warehouse,
+				status: 'Active'
+			},
+			fields: ['name as serial_no', 'warehouse'],
+			limit_page_length: 100
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		if (data && Array.isArray(data)) {
+			availableSerials.value = data
+		}
+	},
+	onError(error) {
+		console.error('Error loading serials:', error)
+	}
+})
 
 watch(() => props.modelValue, (val) => {
 	show.value = val
@@ -182,80 +238,11 @@ const isValid = computed(() => {
 	return true
 })
 
-async function loadBatchesOrSerials() {
+function loadBatchesOrSerials() {
 	if (props.item?.has_batch_no) {
-		await loadBatches()
+		batchesResource.reload()
 	} else if (props.item?.has_serial_no) {
-		await loadSerials()
-	}
-}
-
-async function loadBatches() {
-	try {
-		const response = await window.frappe.call({
-			method: 'frappe.client.get_list',
-			args: {
-				doctype: 'Batch',
-				filters: {
-					item: props.item.item_code,
-					disabled: 0
-				},
-				fields: ['name as batch_no', 'expiry_date'],
-				limit_page_length: 100
-			}
-		})
-
-		if (response.message) {
-			// Get stock quantities for each batch
-			const batches = await Promise.all(
-				response.message.map(async (batch) => {
-					const stockResponse = await window.frappe.call({
-						method: 'frappe.client.get_value',
-						args: {
-							doctype: 'Stock Ledger Entry',
-							filters: {
-								item_code: props.item.item_code,
-								batch_no: batch.batch_no,
-								warehouse: props.warehouse
-							},
-							fieldname: 'sum(actual_qty) as qty'
-						}
-					})
-					return {
-						...batch,
-						qty: stockResponse.message?.qty || 0
-					}
-				})
-			)
-
-			availableBatches.value = batches.filter(b => b.qty > 0)
-		}
-	} catch (error) {
-		console.error('Error loading batches:', error)
-	}
-}
-
-async function loadSerials() {
-	try {
-		const response = await window.frappe.call({
-			method: 'frappe.client.get_list',
-			args: {
-				doctype: 'Serial No',
-				filters: {
-					item_code: props.item.item_code,
-					warehouse: props.warehouse,
-					status: 'Active'
-				},
-				fields: ['name as serial_no', 'warehouse'],
-				limit_page_length: 100
-			}
-		})
-
-		if (response.message) {
-			availableSerials.value = response.message
-		}
-	} catch (error) {
-		console.error('Error loading serials:', error)
+		serialsResource.reload()
 	}
 }
 

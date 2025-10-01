@@ -1,5 +1,8 @@
 <template>
 	<Dialog v-model="show" :options="{ title: 'Select Customer', size: 'md' }">
+		<template #body-title>
+			<span class="sr-only">Search and select a customer for the transaction</span>
+		</template>
 		<template #body-content>
 			<div class="space-y-4">
 				<!-- Search Input -->
@@ -30,7 +33,7 @@
 
 				<!-- Customers List -->
 				<div class="max-h-96 overflow-y-auto">
-					<div v-if="customersResource.loading" class="text-center py-8">
+					<div v-if="loading || customersResource.loading" class="text-center py-8">
 						<div
 							class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"
 						></div>
@@ -100,11 +103,24 @@
 			<Button variant="subtle" @click="show = false">Cancel</Button>
 		</template>
 	</Dialog>
+
+	<!-- Create Customer Dialog -->
+	<CreateCustomerDialog
+		v-model="showCreateDialog"
+		:pos-profile="posProfile"
+		@customer-created="handleCustomerCreated"
+	/>
 </template>
 
 <script setup>
 import { ref, computed, watch } from "vue"
 import { Dialog, Input, Button, createResource } from "frappe-ui"
+import CreateCustomerDialog from "./CreateCustomerDialog.vue"
+import {
+	searchCachedCustomers,
+	isOffline,
+	isCacheReady,
+} from "@/utils/offline"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -120,6 +136,8 @@ const show = computed({
 
 const searchTerm = ref("")
 const customers = ref([])
+const showCreateDialog = ref(false)
+const loading = ref(false)
 
 const customersResource = createResource({
 	url: "pos_next.api.invoices.get_customers",
@@ -141,12 +159,32 @@ const customersResource = createResource({
 	},
 })
 
+// Cache-first customer loading
+async function loadCustomers() {
+	// Use cache if offline or cache is ready
+	if (isOffline() || isCacheReady()) {
+		loading.value = true
+		try {
+			const cached = await searchCachedCustomers(searchTerm.value, 50)
+			customers.value = cached || []
+		} catch (error) {
+			console.error('Error loading from cache:', error)
+			customers.value = []
+		} finally {
+			loading.value = false
+		}
+	} else {
+		// Use server if online and cache not ready
+		customersResource.reload()
+	}
+}
+
 // Watch for dialog open/close
 watch(show, (newVal) => {
 	if (newVal) {
 		searchTerm.value = ""
 		if (props.posProfile) {
-			customersResource.reload()
+			loadCustomers()
 		}
 	}
 })
@@ -160,7 +198,7 @@ watch(searchTerm, () => {
 
 	searchTimeout = setTimeout(() => {
 		if (props.posProfile) {
-			customersResource.reload()
+			loadCustomers()
 		}
 	}, 300)
 })
@@ -171,8 +209,31 @@ function selectCustomer(customer) {
 }
 
 function createNewCustomer() {
-	// TODO: Implement create new customer functionality
-	// This could open a new dialog or navigate to a customer creation form
-	console.log("Create new customer")
+	showCreateDialog.value = true
+}
+
+function handleCustomerCreated(customer) {
+	// Reload customers list to include the new customer
+	if (props.posProfile) {
+		customersResource.reload()
+	}
+
+	// Automatically select the newly created customer
+	emit("customer-selected", customer)
+	show.value = false
 }
 </script>
+
+<style scoped>
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border-width: 0;
+}
+</style>

@@ -1,5 +1,36 @@
 import { db, getSetting, setSetting } from './db'
 
+// Server connectivity state
+if (typeof window !== 'undefined') {
+	window.posNextServerOnline = true // Default to online
+	window.posNextManualOffline = false // Default to auto mode
+}
+
+// Ping server to check connectivity
+export const pingServer = async () => {
+	if (typeof window === 'undefined') return true
+
+	try {
+		// Quick ping to check if server is reachable
+		const controller = new AbortController()
+		const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+
+		const response = await fetch('/api/method/ping', {
+			method: 'GET',
+			signal: controller.signal,
+		})
+
+		clearTimeout(timeoutId)
+		const isOnline = response.ok
+		window.posNextServerOnline = isOnline
+		return isOnline
+	} catch (error) {
+		// Server unreachable
+		window.posNextServerOnline = false
+		return false
+	}
+}
+
 // Check if offline
 export const isOffline = () => {
 	if (typeof window === 'undefined') return false
@@ -15,6 +46,19 @@ export const isOffline = () => {
 	const serverOnline = window.posNextServerOnline !== false
 
 	return !browserOnline || !serverOnline
+}
+
+// Start periodic server ping
+if (typeof window !== 'undefined') {
+	// Ping server every 30 seconds
+	setInterval(() => {
+		if (navigator.onLine) {
+			pingServer()
+		}
+	}, 30000)
+
+	// Initial ping
+	pingServer()
 }
 
 // Save invoice to offline queue
@@ -50,9 +94,9 @@ export const saveOfflineInvoice = async (invoiceData) => {
 // Get pending offline invoices
 export const getOfflineInvoices = async () => {
 	try {
+		// Use filter instead of where/equals for boolean values
 		const invoices = await db.invoice_queue
-			.where('synced')
-			.equals(false)
+			.filter(invoice => invoice.synced === false)
 			.toArray()
 		return invoices
 	} catch (error) {
@@ -64,9 +108,9 @@ export const getOfflineInvoices = async () => {
 // Get offline invoice count
 export const getOfflineInvoiceCount = async () => {
 	try {
+		// Use filter instead of where/equals for boolean values
 		const count = await db.invoice_queue
-			.where('synced')
-			.equals(false)
+			.filter(invoice => invoice.synced === false)
 			.count()
 		return count
 	} catch (error) {
@@ -129,9 +173,7 @@ export const syncOfflineInvoices = async () => {
 	// Clean up synced invoices older than 7 days
 	const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
 	await db.invoice_queue
-		.where('synced')
-		.equals(true)
-		.and(item => item.timestamp < weekAgo)
+		.filter(item => item.synced === true && item.timestamp < weekAgo)
 		.delete()
 
 	return { success: successCount, failed: failedCount }
