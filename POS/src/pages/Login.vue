@@ -1,37 +1,124 @@
 <template>
-  <div class="m-3 flex flex-row items-center justify-center">
-    <Card title="Login to your FrappeUI App!" class="w-full max-w-md mt-4">
-      <form class="flex flex-col space-y-2 w-full" @submit.prevent="submit">
-        <Input
-          required
-          name="email"
-          type="text"
-          placeholder="johndoe@email.com"
-          label="User ID"
-        />
-        <Input
-          required
-          name="password"
-          type="password"
-          placeholder="••••••"
-          label="Password"
-        />
-        <Button :loading="session.login.loading" variant="solid"
-          >Login</Button
-        >
-      </form>
-    </Card>
+  <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+      <div class="text-center">
+        <h2 class="mt-6 text-3xl font-extrabold text-gray-900">
+          Sign in to POS Next
+        </h2>
+        <p class="mt-2 text-sm text-gray-600">
+          Access your point of sale system
+        </p>
+      </div>
+
+      <div class="bg-white py-8 px-6 shadow rounded-lg">
+        <form class="space-y-6" @submit.prevent="submit">
+          <div v-if="session.login.error" class="rounded-md bg-red-50 p-4">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">
+                  Login Failed
+                </h3>
+                <div class="mt-2 text-sm text-red-700">
+                  <p>{{ session.login.error }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Input
+              v-model="loginForm.email"
+              required
+              name="email"
+              type="text"
+              placeholder="Enter your username or email"
+              label="User ID / Email"
+              :disabled="session.login.loading"
+            />
+          </div>
+
+          <div>
+            <Input
+              v-model="loginForm.password"
+              required
+              name="password"
+              type="password"
+              placeholder="Enter your password"
+              label="Password"
+              :disabled="session.login.loading"
+            />
+          </div>
+
+          <div>
+            <Button
+              :loading="session.login.loading"
+              variant="solid"
+              class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              type="submit"
+            >
+              {{ session.login.loading ? 'Signing in...' : 'Sign in' }}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Shift Opening Dialog -->
+    <ShiftOpeningDialog
+      v-model="showShiftDialog"
+      @shift-opened="handleShiftOpened"
+    />
   </div>
 </template>
 
-<script lang="ts" setup>
+<script setup>
+import { reactive, watch, ref } from "vue"
+import { useRouter } from "vue-router"
 import { session } from "../data/session"
+import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
 
-function submit(e) {
-	const formData = new FormData(e.target)
+const router = useRouter()
+
+const loginForm = reactive({
+	email: "",
+	password: "",
+})
+
+const showShiftDialog = ref(false)
+
+function submit() {
+	if (!loginForm.email || !loginForm.password) {
+		return
+	}
+
 	session.login.submit({
-		email: formData.get("email"),
-		password: formData.get("password"),
+		email: loginForm.email.trim(),
+		password: loginForm.password,
 	})
 }
+
+// Watch for successful login
+watch(() => session.isLoggedIn, (isLoggedIn) => {
+	if (isLoggedIn) {
+		// Show shift opening dialog after successful login
+		showShiftDialog.value = true
+	}
+})
+
+function handleShiftOpened() {
+	// Navigate to home after shift is opened
+	router.push({ name: "Home" })
+}
+
+// Clear error when user starts typing
+watch([() => loginForm.email, () => loginForm.password], () => {
+	if (session.login.error) {
+		session.login.reset()
+	}
+})
 </script>

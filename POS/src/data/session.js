@@ -28,12 +28,22 @@ export const session = reactive({
 			session.login.reset()
 			router.replace(data.default_route || "/")
 		},
+		onError(error) {
+			console.error("Login error:", error)
+		},
 	}),
 	logout: createResource({
 		url: "logout",
 		onSuccess() {
 			userResource.reset()
 			session.user = sessionUser()
+			router.replace({ name: "Login" })
+		},
+		onError(error) {
+			console.error("Logout error:", error)
+			// Even if logout fails on server, clear local session
+			userResource.reset()
+			session.user = null
 			router.replace({ name: "Login" })
 		},
 	}),

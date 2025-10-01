@@ -10,5 +10,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ShiftClosingDialog: typeof import('./src/components/ShiftClosingDialog.vue')['default']
+    ShiftOpeningDialog: typeof import('./src/components/ShiftOpeningDialog.vue')['default']
   }
 }
