@@ -111,8 +111,8 @@ watch(() => session.isLoggedIn, (isLoggedIn) => {
 })
 
 function handleShiftOpened() {
-	// Navigate to home after shift is opened
-	router.push({ name: "Home" })
+	// Navigate to POS sale after shift is opened
+	router.push({ name: "POSSale" })
 }
 
 // Clear error when user starts typing

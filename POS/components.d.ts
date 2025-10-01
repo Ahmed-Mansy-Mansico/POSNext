@@ -8,6 +8,10 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    CustomerDialog: typeof import('./src/components/sale/CustomerDialog.vue')['default']
+    InvoiceCart: typeof import('./src/components/sale/InvoiceCart.vue')['default']
+    ItemsSelector: typeof import('./src/components/sale/ItemsSelector.vue')['default']
+    PaymentDialog: typeof import('./src/components/sale/PaymentDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ShiftClosingDialog: typeof import('./src/components/ShiftClosingDialog.vue')['default']

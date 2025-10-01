@@ -90,11 +90,11 @@
                     </Button>
                     <Button
                       variant="solid"
-                      theme="green"
+                      theme="blue"
+                      @click="startSale"
                       class="flex-1"
-                      disabled
                     >
-                      Start Sale (Coming Soon)
+                      Start Sale
                     </Button>
                   </div>
                 </div>
@@ -236,10 +236,13 @@
 import { Dialog } from "frappe-ui"
 import { createResource } from "frappe-ui"
 import { ref, onMounted } from "vue"
+import { useRouter } from "vue-router"
 import { session } from "../data/session"
 import { useShift } from "../composables/useShift"
 import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
 import ShiftClosingDialog from "../components/ShiftClosingDialog.vue"
+
+const router = useRouter()
 
 const {
 	hasOpenShift,
@@ -324,5 +327,9 @@ function handleCloseShiftDialogToggle(value) {
 	if (!value && !closingShiftInProgress.value) {
 		logoutAfterClose.value = false
 	}
+}
+
+function startSale() {
+	router.push({ name: "POSSale" })
 }
 </script>

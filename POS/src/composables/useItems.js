@@ -1,0 +1,148 @@
+import { ref, computed, watch, toValue } from "vue"
+import { createResource } from "frappe-ui"
+
+export function useItems(posProfile) {
+	const items = ref([])
+	const searchTerm = ref("")
+	const selectedItemGroup = ref(null)
+	const itemGroups = ref([])
+
+	// Resources
+	const itemsResource = createResource({
+		url: "pos_next.api.invoices.get_items",
+		makeParams() {
+			return {
+				pos_profile: toValue(posProfile),
+				search_term: searchTerm.value || null,
+				item_group: selectedItemGroup.value || null,
+				start: 0,
+				limit: 100,
+			}
+		},
+		auto: false,
+		onSuccess(data) {
+			items.value = data?.message || data || []
+		},
+		onError(error) {
+			console.error("Error fetching items:", error)
+			items.value = []
+		},
+	})
+
+	const itemGroupsResource = createResource({
+		url: "pos_next.api.invoices.get_item_groups",
+		makeParams() {
+			return {
+				pos_profile: toValue(posProfile),
+			}
+		},
+		auto: false,
+		onSuccess(data) {
+			itemGroups.value = data?.message || data || []
+		},
+		onError(error) {
+			console.error("Error fetching item groups:", error)
+			itemGroups.value = []
+		},
+	})
+
+	const searchByBarcodeResource = createResource({
+		url: "pos_next.api.items.search_by_barcode",
+		auto: false,
+	})
+
+	// Computed
+	const filteredItems = computed(() => {
+		if (!items.value || items.value.length === 0) return []
+
+		let filtered = items.value
+
+		// Filter by search term (local filtering for faster response)
+		if (searchTerm.value && searchTerm.value.length > 0) {
+			const term = searchTerm.value.toLowerCase()
+			filtered = filtered.filter(
+				(item) =>
+					item.item_name?.toLowerCase().includes(term) ||
+					item.item_code?.toLowerCase().includes(term) ||
+					item.barcode?.toLowerCase().includes(term)
+			)
+		}
+
+		return filtered
+	})
+
+	// Watch for search term changes and reload items
+	let searchTimeout = null
+	watch(searchTerm, (newVal) => {
+		// Clear existing timeout
+		if (searchTimeout) {
+			clearTimeout(searchTimeout)
+		}
+
+		// Set new timeout for debounced search
+		searchTimeout = setTimeout(() => {
+			if (newVal && newVal.length >= 3) {
+				// Check if it looks like a barcode (numbers only and length > 8)
+				const isBarcode = /^\d{8,}$/.test(newVal)
+				if (isBarcode) {
+					searchByBarcode(newVal)
+				} else {
+					itemsResource.reload()
+				}
+			} else if (!newVal) {
+				itemsResource.reload()
+			}
+		}, 300)
+	})
+
+	// Watch for item group changes and reload items
+	watch(selectedItemGroup, () => {
+		itemsResource.reload()
+	})
+
+	// Methods
+	async function searchByBarcode(barcode) {
+		try {
+			const result = await searchByBarcodeResource.submit({
+				barcode,
+				pos_profile: posProfile,
+			})
+			return result?.message || result
+		} catch (error) {
+			console.error("Error searching by barcode:", error)
+			return null
+		}
+	}
+
+	function refreshItems() {
+		itemsResource.reload()
+	}
+
+	function loadItemGroups() {
+		itemGroupsResource.reload()
+	}
+
+	function loadItems() {
+		itemsResource.reload()
+	}
+
+	return {
+		// State
+		items,
+		filteredItems,
+		searchTerm,
+		selectedItemGroup,
+		itemGroups,
+
+		// Methods
+		searchByBarcode,
+		refreshItems,
+		loadItemGroups,
+		loadItems,
+
+		// Resources
+		itemsResource,
+		itemGroupsResource,
+		searchByBarcodeResource,
+	}
+}

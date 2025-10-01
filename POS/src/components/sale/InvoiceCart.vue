@@ -1,0 +1,305 @@
+<template>
+	<div class="flex flex-col h-full bg-white">
+		<!-- Header with Customer -->
+		<div class="px-3 py-2.5 border-b border-gray-200">
+			<div class="flex items-center justify-between mb-2">
+				<h2 class="text-sm font-semibold text-gray-900">Item Cart</h2>
+				<button
+					@click="$emit('clear-cart')"
+					v-if="items.length > 0"
+					class="text-xs text-red-600 hover:text-red-700 font-medium"
+				>
+					Clear
+				</button>
+			</div>
+
+			<!-- Customer Selection -->
+			<div v-if="customer" class="flex items-center justify-between bg-blue-50 rounded-lg p-2">
+				<div class="flex items-center space-x-2">
+					<div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+						<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+						</svg>
+					</div>
+					<div class="min-w-0 flex-1">
+						<p class="text-xs font-semibold text-gray-900 truncate">
+							{{ customer.customer_name || customer.name }}
+						</p>
+						<p v-if="customer.mobile_no" class="text-[10px] text-gray-600 truncate">
+							ID: {{ customer.mobile_no }}
+						</p>
+					</div>
+				</div>
+				<button
+					@click="$emit('select-customer')"
+					class="text-sm text-red-600 hover:text-red-700 flex-shrink-0"
+				>
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+					</svg>
+				</button>
+			</div>
+			<button
+				v-else
+				@click="$emit('select-customer')"
+				class="w-full bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-2 hover:bg-gray-100 transition-colors flex items-center justify-center space-x-1.5"
+			>
+				<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+				</svg>
+				<span class="text-xs font-medium text-gray-600">Select Customer</span>
+			</button>
+		</div>
+
+		<!-- Cart Items -->
+		<div class="flex-1 overflow-y-auto p-2.5 bg-gray-50">
+			<div v-if="items.length === 0" class="text-center py-12">
+				<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+					<svg
+						class="h-8 w-8 text-gray-400"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+						/>
+					</svg>
+				</div>
+				<p class="text-xs font-medium text-gray-900">Your cart is empty</p>
+				<p class="text-[10px] text-gray-500 mt-1">
+					Select items to start
+				</p>
+			</div>
+
+			<div v-else class="space-y-2">
+				<div
+					v-for="(item, index) in items"
+					:key="index"
+					class="bg-white border border-gray-200 rounded-lg p-2 hover:shadow-sm transition-shadow"
+				>
+					<div class="flex items-start space-x-2 mb-2">
+						<!-- Item Image Thumbnail -->
+						<div class="w-10 h-10 bg-gray-100 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden">
+							<img
+								v-if="item.image"
+								:src="item.image"
+								:alt="item.item_name"
+								class="w-full h-full object-cover"
+							/>
+							<svg
+								v-else
+								class="h-5 w-5 text-gray-400"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+								/>
+							</svg>
+						</div>
+
+						<!-- Item Info -->
+						<div class="flex-1 min-w-0">
+							<div class="flex items-start justify-between">
+								<div class="flex-1 min-w-0">
+									<h4 class="text-xs font-semibold text-gray-900 truncate">
+										{{ item.item_name }}
+									</h4>
+									<p class="text-[10px] text-gray-500">
+										E or {{ formatCurrency(item.rate) }} / {{ item.stock_uom || 'Nos' }}
+									</p>
+								</div>
+								<button
+									@click="$emit('remove-item', item.item_code)"
+									class="text-gray-400 hover:text-red-600 ml-1 transition-colors flex-shrink-0"
+								>
+									<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+									</svg>
+								</button>
+							</div>
+						</div>
+					</div>
+
+					<!-- Quantity Controls and Total -->
+					<div class="flex items-center justify-between">
+						<div class="flex items-center space-x-1.5">
+							<button
+								@click="decrementQuantity(item)"
+								class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-700 text-sm transition-colors"
+							>
+								−
+							</button>
+							<input
+								:value="item.quantity"
+								@input="updateQuantity(item, $event.target.value)"
+								type="number"
+								min="1"
+								step="1"
+								class="w-10 text-center border border-gray-300 rounded px-1 py-0.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+							/>
+							<button
+								@click="incrementQuantity(item)"
+								class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-700 text-sm transition-colors"
+							>
+								+
+							</button>
+						</div>
+						<div class="text-right">
+							<p class="text-xs font-bold text-gray-900">
+								E or {{ formatCurrency(item.amount || item.rate * item.quantity) }}
+							</p>
+						</div>
+					</div>
+
+					<!-- Discount Badge if any -->
+					<div
+						v-if="item.discount_amount && item.discount_amount > 0"
+						class="mt-1.5 inline-flex items-center px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium"
+					>
+						<svg class="w-2.5 h-2.5 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+						</svg>
+						{{ item.discount_percentage }}% off
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Totals Summary -->
+		<div class="p-2.5 bg-white border-t border-gray-200">
+			<!-- Summary Details -->
+			<div v-if="items.length > 0" class="mb-2.5">
+				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
+					<span>Total Quantity</span>
+					<span class="font-medium text-gray-900">{{ totalQuantity }}</span>
+				</div>
+				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
+					<span>Net Total</span>
+					<span class="font-medium text-gray-900">E or {{ formatCurrency(subtotal) }}</span>
+				</div>
+				<div v-if="discountAmount > 0" class="flex items-center justify-between text-[10px] mb-1">
+					<span class="text-green-600 flex items-center">
+						<svg class="w-3 h-3 inline mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+						</svg>
+						Additional 15% discount applied
+					</span>
+					<span class="font-medium text-green-600">E or -{{ formatCurrency(discountAmount) }}</span>
+				</div>
+				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
+					<button class="text-blue-600 hover:text-blue-700 flex items-center">
+						<span>Total Tax</span>
+						<svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+						</svg>
+					</button>
+					<span class="font-medium text-gray-900">E or {{ formatCurrency(taxAmount) }}</span>
+				</div>
+			</div>
+
+			<!-- Grand Total -->
+			<div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-2.5 mb-2.5">
+				<div class="flex items-center justify-between">
+					<span class="text-sm font-bold text-gray-900">Grand Total</span>
+					<span class="text-lg font-bold text-blue-600">
+						E or {{ formatCurrency(grandTotal) }}
+					</span>
+				</div>
+			</div>
+
+			<!-- Action Buttons -->
+			<div class="space-y-1.5">
+				<button
+					@click="$emit('proceed-to-payment')"
+					:disabled="items.length === 0"
+					:class="[
+						'w-full py-2 px-3 rounded-lg font-semibold text-sm text-white transition-all flex items-center justify-center',
+						items.length === 0
+							? 'bg-gray-300 cursor-not-allowed'
+							: 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
+					]"
+				>
+					<span>Checkout</span>
+				</button>
+				<button
+					v-if="items.length > 0"
+					@click="$emit('clear-cart')"
+					class="w-full py-1.5 px-3 rounded-lg font-medium text-xs text-orange-600 bg-orange-50 hover:bg-orange-100 transition-all"
+				>
+					Hold
+				</button>
+			</div>
+		</div>
+	</div>
+</template>
+
+<script setup>
+import { computed } from "vue"
+import { Button } from "frappe-ui"
+
+const props = defineProps({
+	items: {
+		type: Array,
+		default: () => [],
+	},
+	customer: Object,
+	subtotal: {
+		type: Number,
+		default: 0,
+	},
+	taxAmount: {
+		type: Number,
+		default: 0,
+	},
+	discountAmount: {
+		type: Number,
+		default: 0,
+	},
+	grandTotal: {
+		type: Number,
+		default: 0,
+	},
+})
+
+const emit = defineEmits([
+	"update-quantity",
+	"remove-item",
+	"select-customer",
+	"proceed-to-payment",
+	"clear-cart",
+])
+
+const totalQuantity = computed(() => {
+	return props.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
+})
+
+function formatCurrency(amount) {
+	return parseFloat(amount || 0).toFixed(2)
+}
+
+function incrementQuantity(item) {
+	emit("update-quantity", item.item_code, item.quantity + 1)
+}
+
+function decrementQuantity(item) {
+	if (item.quantity > 1) {
+		emit("update-quantity", item.item_code, item.quantity - 1)
+	}
+}
+
+function updateQuantity(item, value) {
+	const qty = parseInt(value) || 1
+	if (qty > 0) {
+		emit("update-quantity", item.item_code, qty)
+	}
+}
+</script>

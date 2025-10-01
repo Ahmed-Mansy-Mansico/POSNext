@@ -1,17 +1,23 @@
 import { userResource } from "@/data/user"
 import { createRouter, createWebHistory } from "vue-router"
 import { session } from "./data/session"
+import { shiftState } from "@/composables/useShift"
 
 const routes = [
 	{
 		path: "/",
-		name: "Home",
-		component: () => import("@/pages/Home.vue"),
+		name: "POSSale",
+		component: () => import("@/pages/POSSale.vue"),
 	},
 	{
 		name: "Login",
 		path: "/account/login",
 		component: () => import("@/pages/Login.vue"),
+	},
+	// Catch-all route
+	{
+		path: "/:pathMatch(.*)*",
+		redirect: "/",
 	},
 ]
 
@@ -29,7 +35,7 @@ router.beforeEach(async (to, from, next) => {
 	}
 
 	if (to.name === "Login" && isLoggedIn) {
-		next({ name: "Home" })
+		next({ name: "POSSale" })
 	} else if (to.name !== "Login" && !isLoggedIn) {
 		next({ name: "Login" })
 	} else {
