@@ -1,5 +1,5 @@
 import { db, getSetting, setSetting } from './db'
-import { call } from 'frappe-ui'
+import { call } from '@/utils/apiWrapper'
 
 // Cache structure definition - modify this when cache structure changes
 const CACHE_STRUCTURE = {

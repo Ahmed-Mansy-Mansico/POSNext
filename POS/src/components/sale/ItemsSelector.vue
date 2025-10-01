@@ -89,17 +89,20 @@
 			</div>
 		</div>
 
-		<!-- Items Grid/List -->
-		<div class="flex-1 overflow-y-auto p-3">
-			<div v-if="itemsResource.loading" class="text-center py-8">
+		<!-- Loading State -->
+		<div v-if="itemsResource.loading" class="flex-1 flex items-center justify-center p-3">
+			<div class="text-center py-8">
 				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
 				<p class="mt-3 text-xs text-gray-500">Loading items...</p>
 			</div>
+		</div>
 
-			<div
-				v-else-if="!filteredItems || filteredItems.length === 0"
-				class="text-center py-8"
-			>
+		<!-- Empty State -->
+		<div
+			v-else-if="!filteredItems || filteredItems.length === 0"
+			class="flex-1 flex items-center justify-center p-3"
+		>
+			<div class="text-center py-8">
 				<svg
 					class="mx-auto h-8 w-8 text-gray-400"
 					fill="none"
@@ -115,9 +118,11 @@
 				</svg>
 				<p class="mt-2 text-xs text-gray-500">No items found</p>
 			</div>
+		</div>
 
-			<!-- Grid View -->
-			<div v-else-if="viewMode === 'grid'" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+		<!-- Grid View -->
+		<div v-else-if="viewMode === 'grid'" class="flex-1 overflow-y-auto p-3">
+			<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
 				<div
 					v-for="item in filteredItems"
 					:key="item.item_code"
@@ -171,63 +176,50 @@
 					</div>
 				</div>
 			</div>
+		</div>
 
-			<!-- List View -->
-			<div v-else class="space-y-1.5">
-				<div
-					v-for="item in filteredItems"
-					:key="item.item_code"
-					@click="handleItemClick(item)"
-					class="bg-white border border-gray-200 rounded-lg p-2 cursor-pointer hover:border-blue-400 hover:shadow-sm transition-all flex items-center space-x-3"
-				>
-					<!-- Item Image -->
-					<div class="w-12 h-12 bg-gray-100 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden">
-						<img
-							v-if="item.image"
-							:src="item.image"
-							:alt="item.item_name"
-							class="w-full h-full object-cover"
-							@error="handleImageError"
-						/>
-						<svg
-							v-else
-							class="h-6 w-6 text-gray-300"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
+		<!-- Table View -->
+		<div v-else class="flex-1 flex flex-col overflow-hidden">
+			<div class="flex-1 overflow-y-auto">
+				<table class="min-w-full divide-y divide-gray-200">
+					<thead class="bg-gray-50 sticky top-0 z-0">
+						<tr>
+							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Image</th>
+							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Name</th>
+							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Code</th>
+							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Rate</th>
+							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Available QTY</th>
+							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">UOM</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white divide-y divide-gray-200">
+						<tr
+							v-for="item in filteredItems"
+							:key="item.item_code"
+							@click="handleItemClick(item)"
+							class="cursor-pointer hover:bg-blue-50 transition-colors"
 						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-							/>
-						</svg>
-					</div>
-
-					<!-- Item Info -->
-					<div class="flex-1 min-w-0">
-						<h3 class="text-xs font-semibold text-gray-900 truncate">
-							{{ item.item_name }}
-						</h3>
-						<p class="text-[10px] text-gray-500">{{ item.item_code }}</p>
-					</div>
-
-					<!-- Price and Stock -->
-					<div class="text-right">
-						<p class="text-xs font-bold text-gray-900">
-							{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
-						</p>
-						<p
-							:class="[
-								'text-[10px] font-medium',
-								(item.actual_qty || item.stock_qty || 0) > 0 ? 'text-green-600' : 'text-red-600'
-							]"
-						>
-							{{ (item.actual_qty || item.stock_qty || 0) > 0 ? Math.floor(item.actual_qty || item.stock_qty || 0) + ' in stock' : 'Out of stock' }}
-						</p>
-					</div>
-				</div>
+							<td class="px-3 py-2 whitespace-nowrap">
+								<div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
+									<img v-if="item.image" :src="item.image" :alt="item.item_name" class="w-full h-full object-cover" @error="handleImageError" />
+									<svg v-else class="h-5 w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+									</svg>
+								</div>
+							</td>
+							<td class="px-3 py-2"><div class="text-sm font-medium text-gray-900">{{ item.item_name }}</div></td>
+							<td class="px-3 py-2 whitespace-nowrap"><div class="text-sm text-gray-500">{{ item.item_code }}</div></td>
+							<td class="px-3 py-2 whitespace-nowrap"><div class="text-sm font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</div></td>
+							<td class="px-3 py-2 whitespace-nowrap">
+								<span :class="['text-sm font-medium', (item.actual_qty || item.stock_qty || 0) > 0 ? 'text-green-600' : 'text-red-600']">
+									{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
+								</span>
+							</td>
+							<td class="px-3 py-2 whitespace-nowrap"><div class="text-sm text-gray-500">{{ item.stock_uom || 'Nos' }}</div></td>
+						</tr>
+					</tbody>
+				</table>
+				<div v-if="filteredItems.length === 0" class="text-center py-8 text-gray-500">No items found</div>
 			</div>
 		</div>
 	</div>

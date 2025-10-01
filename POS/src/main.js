@@ -44,7 +44,7 @@ function getCookie(name) {
 async function initializeCSRFToken() {
 	try {
 		// Make a simple GET request to initialize session and get CSRF token
-		const response = await fetch('/api/method/frappe.auth.get_logged_user', {
+		await fetch('/api/method/frappe.auth.get_logged_user', {
 			method: 'GET',
 			credentials: 'include',
 			headers: {
@@ -58,12 +58,45 @@ async function initializeCSRFToken() {
 		if (csrfToken && csrfToken !== '{{ csrf_token }}') {
 			window.csrf_token = csrfToken
 			console.log('CSRF token initialized:', csrfToken.substring(0, 10) + '...')
+			return true
 		}
 
-		return response.ok
+		console.warn('CSRF token not found in cookies')
+		return false
 	} catch (error) {
 		console.error('Failed to initialize CSRF token:', error)
 		return false
+	}
+}
+
+// Custom request wrapper that handles CSRF token refresh
+function createCSRFAwareRequest(originalRequest) {
+	return async function(options) {
+		try {
+			// Try the original request
+			return await originalRequest(options)
+		} catch (error) {
+			// Check if it's a CSRF error
+			const isCSRFError = error?.exc_type === 'CSRFTokenError' ||
+			                    error?.message?.includes('CSRFTokenError') ||
+			                    error?.messages?.some(m => m?.includes('CSRF'))
+
+			if (isCSRFError) {
+				console.warn('CSRF token error detected, refreshing token...')
+
+				// Refresh the CSRF token
+				const refreshed = await initializeCSRFToken()
+
+				if (refreshed) {
+					console.log('CSRF token refreshed, retrying request...')
+					// Retry the request with new token
+					return await originalRequest(options)
+				}
+			}
+
+			// Re-throw the error if not CSRF or refresh failed
+			throw error
+		}
 	}
 }
 
@@ -80,7 +113,9 @@ async function initializeApp() {
 	// Now set up the app with CSRF token ready
 	const app = createApp(App)
 
-	setConfig("resourceFetcher", frappeRequest)
+	// Wrap frappeRequest with CSRF auto-refresh
+	const csrfAwareFrappeRequest = createCSRFAwareRequest(frappeRequest)
+	setConfig("resourceFetcher", csrfAwareFrappeRequest)
 
 	app.use(router)
 	app.use(resourcesPlugin)
@@ -103,6 +138,12 @@ async function initializeApp() {
 		console.error("Failed to load user data:", error)
 		// App is already mounted, so this won't block the UI
 	}
+
+	// Set up periodic token refresh (every 30 minutes)
+	setInterval(async () => {
+		console.log('Performing scheduled CSRF token refresh...')
+		await initializeCSRFToken()
+	}, 30 * 60 * 1000) // 30 minutes
 }
 
 initializeApp()
