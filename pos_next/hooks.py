@@ -1,7 +1,7 @@
 app_name = "pos_next"
 app_title = "POS Next"
 app_publisher = "BrainWise"
-app_description = "“POS built on ERPNext that brings together real-time billing, stock management, multi-user access, offline mode, and direct ERP integration. Run your store or restaurant with confidence and control, while staying 100% open source."
+app_description = "POS built on ERPNext that brings together real-time billing, stock management, multi-user access, offline mode, and direct ERP integration. Run your store or restaurant with confidence and control, while staying 100% open source."
 app_email = "support@brainwise.me"
 app_license = "agpl-3.0"
 
@@ -242,3 +242,5 @@ app_license = "agpl-3.0"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+
+website_route_rules = [{'from_route': '/pos/<path:app_path>', 'to_route': 'pos'},]
