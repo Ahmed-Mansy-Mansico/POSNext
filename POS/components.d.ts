@@ -8,10 +8,15 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    BatchSerialDialog: typeof import('./src/components/sale/BatchSerialDialog.vue')['default']
+    CouponDialog: typeof import('./src/components/sale/CouponDialog.vue')['default']
     CustomerDialog: typeof import('./src/components/sale/CustomerDialog.vue')['default']
+    DraftInvoicesDialog: typeof import('./src/components/sale/DraftInvoicesDialog.vue')['default']
     InvoiceCart: typeof import('./src/components/sale/InvoiceCart.vue')['default']
+    InvoiceHistoryDialog: typeof import('./src/components/sale/InvoiceHistoryDialog.vue')['default']
     ItemsSelector: typeof import('./src/components/sale/ItemsSelector.vue')['default']
     PaymentDialog: typeof import('./src/components/sale/PaymentDialog.vue')['default']
+    ReturnInvoiceDialog: typeof import('./src/components/sale/ReturnInvoiceDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ShiftClosingDialog: typeof import('./src/components/ShiftClosingDialog.vue')['default']

@@ -1,0 +1,181 @@
+<template>
+	<Dialog
+		v-model="show"
+		:options="{ title: 'Draft Invoices', size: 'lg' }"
+	>
+		<template #body-content>
+			<div class="space-y-3">
+				<!-- Empty State -->
+				<div v-if="drafts.length === 0" class="text-center py-8">
+					<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+						<svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+						</svg>
+					</div>
+					<p class="text-sm font-medium text-gray-900">No draft invoices</p>
+					<p class="text-xs text-gray-500 mt-1">Save invoices as drafts to continue later</p>
+				</div>
+
+				<!-- Drafts List -->
+				<div v-else class="space-y-2 max-h-96 overflow-y-auto">
+					<div
+						v-for="draft in drafts"
+						:key="draft.draft_id"
+						class="bg-white border border-gray-200 rounded-lg p-3 hover:border-blue-400 transition-all cursor-pointer"
+						@click="$emit('load-draft', draft)"
+					>
+						<div class="flex items-start justify-between mb-2">
+							<div class="flex-1">
+								<h4 class="text-sm font-semibold text-gray-900">
+									{{ draft.draft_id }}
+								</h4>
+								<p v-if="draft.customer" class="text-xs text-gray-500 mt-0.5">
+									Customer: {{ draft.customer?.customer_name || draft.customer?.name || draft.customer }}
+								</p>
+								<p class="text-xs text-gray-400 mt-0.5">
+									{{ formatDateTime(draft.created_at) }}
+								</p>
+							</div>
+							<button
+								@click.stop="handleDeleteDraft(draft.draft_id)"
+								class="text-gray-400 hover:text-red-600 transition-colors p-1"
+								title="Delete draft"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+								</svg>
+							</button>
+						</div>
+
+						<!-- Items Preview -->
+						<div class="flex items-center justify-between text-xs">
+							<span class="text-gray-600">
+								{{ draft.items?.length || 0 }} item(s)
+							</span>
+							<span class="font-bold text-blue-600">
+								{{ formatCurrency(calculateTotal(draft.items)) }}
+							</span>
+						</div>
+
+						<!-- Items List (condensed) -->
+						<div v-if="draft.items && draft.items.length > 0" class="mt-2 pt-2 border-t border-gray-100">
+							<div class="flex flex-wrap gap-1">
+								<span
+									v-for="(item, idx) in draft.items.slice(0, 3)"
+									:key="idx"
+									class="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded"
+								>
+									{{ item.item_name }} ({{ item.quantity || item.qty }})
+								</span>
+								<span
+									v-if="draft.items.length > 3"
+									class="text-[10px] text-gray-500 px-1.5 py-0.5"
+								>
+									+{{ draft.items.length - 3 }} more
+								</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</template>
+		<template #actions>
+			<div class="flex justify-between items-center w-full">
+				<Button
+					v-if="drafts.length > 0"
+					variant="subtle"
+					theme="red"
+					@click="handleClearAll"
+				>
+					Clear All
+				</Button>
+				<Button variant="subtle" @click="show = false">
+					Close
+				</Button>
+			</div>
+		</template>
+	</Dialog>
+</template>
+
+<script setup>
+import { ref, watch, onMounted } from 'vue'
+import { Dialog, Button } from 'frappe-ui'
+import { getAllDrafts, deleteDraft, clearAllDrafts } from '@/utils/draftManager'
+
+const props = defineProps({
+	modelValue: Boolean
+})
+
+const emit = defineEmits(['update:modelValue', 'load-draft'])
+
+const show = ref(props.modelValue)
+const drafts = ref([])
+
+watch(() => props.modelValue, (val) => {
+	show.value = val
+	if (val) {
+		loadDrafts()
+	}
+})
+
+watch(show, (val) => {
+	emit('update:modelValue', val)
+})
+
+onMounted(() => {
+	loadDrafts()
+})
+
+async function loadDrafts() {
+	try {
+		drafts.value = await getAllDrafts()
+	} catch (error) {
+		console.error('Error loading drafts:', error)
+	}
+}
+
+async function handleDeleteDraft(draftId) {
+	if (confirm('Are you sure you want to delete this draft?')) {
+		try {
+			await deleteDraft(draftId)
+			await loadDrafts()
+		} catch (error) {
+			console.error('Error deleting draft:', error)
+		}
+	}
+}
+
+async function handleClearAll() {
+	if (confirm('Are you sure you want to delete all drafts?')) {
+		try {
+			await clearAllDrafts()
+			await loadDrafts()
+		} catch (error) {
+			console.error('Error clearing drafts:', error)
+		}
+	}
+}
+
+function formatDateTime(dateStr) {
+	const date = new Date(dateStr)
+	return date.toLocaleString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit'
+	})
+}
+
+function formatCurrency(amount) {
+	return parseFloat(amount || 0).toFixed(2)
+}
+
+function calculateTotal(items) {
+	if (!items || items.length === 0) return 0
+	return items.reduce((sum, item) => {
+		const qty = item.quantity || item.qty || 1
+		const rate = item.rate || 0
+		return sum + (qty * rate)
+	}, 0)
+}
+</script>

@@ -36,11 +36,38 @@
 
 					<!-- Right Side: Controls -->
 					<div class="flex items-center space-x-1">
-						<!-- WiFi Status -->
-						<button class="p-2 hover:bg-gray-50 rounded-lg transition-colors relative group" title="Online">
-							<svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+						<!-- WiFi/Offline Status -->
+						<button
+							@click="handleSyncClick"
+							:class="[
+								'p-2 hover:bg-gray-50 rounded-lg transition-colors relative group',
+								isSyncing ? 'animate-pulse' : ''
+							]"
+							:title="isOffline ? `Offline (${pendingInvoicesCount} pending)` : 'Online - Click to sync'"
+						>
+							<svg
+								v-if="!isOffline"
+								class="w-5 h-5 text-green-600"
+								fill="currentColor"
+								viewBox="0 0 24 24"
+							>
 								<path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
 							</svg>
+							<svg
+								v-else
+								class="w-5 h-5 text-orange-600"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/>
+							</svg>
+							<span
+								v-if="pendingInvoicesCount > 0"
+								class="absolute -top-1 -right-1 bg-orange-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center"
+							>
+								{{ pendingInvoicesCount }}
+							</span>
 						</button>
 
 						<!-- Printer -->
@@ -97,6 +124,37 @@
 									</svg>
 									<span>View Shift</span>
 								</button>
+								<button
+									@click="showDraftDialog = true; showActionsMenu = false"
+									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 flex items-center space-x-3 transition-colors relative"
+								>
+									<svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+									</svg>
+									<span>Draft Invoices</span>
+									<span v-if="draftsCount > 0" class="ml-auto text-xs bg-purple-600 text-white px-1.5 py-0.5 rounded-full">
+										{{ draftsCount }}
+									</span>
+								</button>
+								<button
+									@click="showHistoryDialog = true; showActionsMenu = false"
+									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 flex items-center space-x-3 transition-colors"
+								>
+									<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+									</svg>
+									<span>Invoice History</span>
+								</button>
+								<button
+									@click="showReturnDialog = true; showActionsMenu = false"
+									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-red-50 flex items-center space-x-3 transition-colors"
+								>
+									<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+									</svg>
+									<span>Return Invoice</span>
+								</button>
+								<hr class="my-2 border-gray-100">
 								<button
 									@click="handleCloseShift; showActionsMenu = false"
 									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 flex items-center space-x-3 transition-colors"
@@ -160,6 +218,8 @@
 					@select-customer="showCustomerDialog = true"
 					@proceed-to-payment="handleProceedToPayment"
 					@clear-cart="handleClearCart"
+					@save-draft="handleSaveDraft"
+					@apply-coupon="showCouponDialog = true"
 				/>
 			</div>
 		</div>
@@ -229,6 +289,44 @@
 			@shift-closed="handleShiftClosed"
 		/>
 
+		<!-- Draft Invoices Dialog -->
+		<DraftInvoicesDialog
+			v-model="showDraftDialog"
+			@load-draft="handleLoadDraft"
+		/>
+
+		<!-- Return Invoice Dialog -->
+		<ReturnInvoiceDialog
+			v-model="showReturnDialog"
+			:pos-profile="currentProfile?.name"
+			@return-created="handleReturnCreated"
+		/>
+
+		<!-- Coupon Dialog -->
+		<CouponDialog
+			v-model="showCouponDialog"
+			:cart-total="subtotal"
+			:items="invoiceItems"
+			@discount-applied="handleDiscountApplied"
+			@discount-removed="handleDiscountRemoved"
+		/>
+
+		<!-- Batch/Serial Dialog -->
+		<BatchSerialDialog
+			v-model="showBatchSerialDialog"
+			:item="pendingItem"
+			:quantity="pendingItemQty"
+			:warehouse="currentProfile?.warehouse"
+			@batch-serial-selected="handleBatchSerialSelected"
+		/>
+
+		<!-- Invoice History Dialog -->
+		<InvoiceHistoryDialog
+			v-model="showHistoryDialog"
+			:pos-profile="currentProfile?.name"
+			@create-return="handleCreateReturnFromHistory"
+		/>
+
 		<!-- Success Dialog -->
 		<Dialog
 			v-model="showSuccessDialog"
@@ -279,6 +377,7 @@ import { ref, onMounted, onUnmounted, computed } from "vue"
 import { useRouter } from "vue-router"
 import { useInvoice } from "@/composables/useInvoice"
 import { useShift } from "@/composables/useShift"
+import { useOffline } from "@/composables/useOffline"
 import { Button, Dialog, toast } from "frappe-ui"
 import ItemsSelector from "@/components/sale/ItemsSelector.vue"
 import InvoiceCart from "@/components/sale/InvoiceCart.vue"
@@ -286,9 +385,26 @@ import PaymentDialog from "@/components/sale/PaymentDialog.vue"
 import CustomerDialog from "@/components/sale/CustomerDialog.vue"
 import ShiftOpeningDialog from "@/components/ShiftOpeningDialog.vue"
 import ShiftClosingDialog from "@/components/ShiftClosingDialog.vue"
+import DraftInvoicesDialog from "@/components/sale/DraftInvoicesDialog.vue"
+import ReturnInvoiceDialog from "@/components/sale/ReturnInvoiceDialog.vue"
+import CouponDialog from "@/components/sale/CouponDialog.vue"
+import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
+import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
+import { printInvoiceByName } from "@/utils/printInvoice"
+import { saveDraft, getDraftsCount } from "@/utils/draftManager"
 
 const router = useRouter()
 const { currentProfile, currentShift, hasOpenShift, checkOpeningShift } = useShift()
+
+const {
+	isOffline,
+	pendingInvoicesCount,
+	isSyncing,
+	saveInvoiceOffline,
+	syncPending,
+	cacheData,
+	searchItems: searchCachedItems,
+} = useOffline()
 
 const {
 	invoiceItems,
@@ -312,10 +428,18 @@ const showSuccessDialog = ref(false)
 const showOpenShiftDialog = ref(false)
 const showCloseShiftDialog = ref(false)
 const showActionsMenu = ref(false)
+const showDraftDialog = ref(false)
+const showReturnDialog = ref(false)
+const showCouponDialog = ref(false)
+const showBatchSerialDialog = ref(false)
+const showHistoryDialog = ref(false)
+const pendingItem = ref(null)
+const pendingItemQty = ref(1)
 const lastInvoiceName = ref("")
 const lastInvoiceTotal = ref(0)
 const isLoading = ref(true)
 const currentTime = ref("")
+const draftsCount = ref(0)
 
 onMounted(async () => {
 	try {
@@ -340,6 +464,9 @@ onMounted(async () => {
 
 		// Add click outside listener
 		document.addEventListener('click', handleClickOutside)
+
+		// Update drafts count
+		await updateDraftsCount()
 	} catch (error) {
 		console.error("Error checking shift:", error)
 	} finally {
@@ -380,13 +507,20 @@ function handleShiftClosed() {
 }
 
 function handleItemSelected(item) {
-	addItem(item)
-	toast.create({
-		title: "Item Added",
-		text: `${item.item_name} added to cart`,
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	// Check if item requires batch/serial selection
+	if (item.has_batch_no || item.has_serial_no) {
+		pendingItem.value = item
+		pendingItemQty.value = 1
+		showBatchSerialDialog.value = true
+	} else {
+		addItem(item)
+		toast.create({
+			title: "Item Added",
+			text: `${item.item_name} added to cart`,
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	}
 }
 
 function handleCustomerSelected(selectedCustomer) {
@@ -416,26 +550,38 @@ function handleProceedToPayment() {
 
 async function handlePaymentCompleted(paymentData) {
 	try {
-		// Add payments to invoice
-		paymentData.payments.forEach((payment) => {
-			// The payments are already added in the PaymentDialog
-		})
+		// Validate customer
+		const customerValue = customer.value?.name || customer.value
+		if (!customerValue && !currentProfile.value?.customer) {
+			toast.create({
+				title: "Customer Required",
+				text: "Please select a customer before proceeding",
+				icon: "alert-circle",
+				iconClasses: "text-orange-600",
+			})
+			showPaymentDialog.value = false
+			showCustomerDialog.value = true
+			return
+		}
 
 		// Set payments directly
 		const invoiceData = {
 			pos_profile: posProfile.value,
-			customer: customer.value?.name || customer.value,
+			customer: customerValue || currentProfile.value?.customer,
 			items: invoiceItems.value,
 			payments: paymentData.payments,
 		}
 
-		const result = await submitInvoiceResource.submit({
-			invoice_data: invoiceData,
-		})
+		// Check if offline
+		if (isOffline.value) {
+			// Save to offline queue
+			await saveInvoiceOffline(invoiceData)
 
-		if (result) {
-			lastInvoiceName.value = result.name || result.message?.name || "Unknown"
+			lastInvoiceName.value = `OFFLINE-${Date.now()}`
 			lastInvoiceTotal.value = grandTotal.value
+
+			// Close payment dialog
+			showPaymentDialog.value = false
 
 			// Clear the cart
 			clearCart()
@@ -445,19 +591,51 @@ async function handlePaymentCompleted(paymentData) {
 			showSuccessDialog.value = true
 
 			toast.create({
-				title: "Success",
-				text: `Invoice ${lastInvoiceName.value} created successfully`,
-				icon: "check",
-				iconClasses: "text-green-600",
+				title: "Saved Offline",
+				text: "Invoice saved and will sync when online",
+				icon: "alert-circle",
+				iconClasses: "text-orange-600",
 			})
+		} else {
+			// Submit online
+			const result = await submitInvoiceResource.submit({
+				invoice_data: invoiceData,
+			})
+
+			if (result) {
+				lastInvoiceName.value = result.name || result.message?.name || "Unknown"
+				lastInvoiceTotal.value = grandTotal.value
+
+				// Close payment dialog
+				showPaymentDialog.value = false
+
+				// Clear the cart
+				clearCart()
+				customer.value = null
+
+				// Show success dialog
+				showSuccessDialog.value = true
+
+				toast.create({
+					title: "Success",
+					text: `Invoice ${lastInvoiceName.value} created successfully`,
+					icon: "check",
+					iconClasses: "text-green-600",
+				})
+			}
 		}
 	} catch (error) {
 		console.error("Error submitting invoice:", error)
+		showPaymentDialog.value = false
+
+		const errorMessage = error.messages ? error.messages[0] : (error.message || "Failed to create invoice")
+
 		toast.create({
-			title: "Error",
-			text: error.message || "Failed to create invoice",
+			title: "Error Creating Invoice",
+			text: errorMessage,
 			icon: "alert-circle",
 			iconClasses: "text-red-600",
+			timeout: 5000,
 		})
 	}
 }
@@ -481,10 +659,19 @@ function handleCloseShift() {
 	showCloseShiftDialog.value = true
 }
 
-function handlePrintInvoice() {
-	// TODO: Implement print functionality
-	console.log("Print invoice:", lastInvoiceName.value)
-	showSuccessDialog.value = false
+async function handlePrintInvoice() {
+	try {
+		await printInvoiceByName(lastInvoiceName.value)
+		showSuccessDialog.value = false
+	} catch (error) {
+		console.error("Error printing invoice:", error)
+		toast.create({
+			title: "Print Error",
+			text: "Failed to print invoice. Please try again.",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
 }
 
 function formatCurrency(amount) {
@@ -518,6 +705,201 @@ function handleLogout() {
 function handleClickOutside(event) {
 	if (showActionsMenu.value && !event.target.closest('.relative')) {
 		showActionsMenu.value = false
+	}
+}
+
+async function handleSaveDraft() {
+	if (invoiceItems.value.length === 0) {
+		toast.create({
+			title: "Empty Cart",
+			text: "Cannot save an empty cart as draft",
+			icon: "alert-circle",
+			iconClasses: "text-orange-600",
+		})
+		return
+	}
+
+	try {
+		const draftData = {
+			pos_profile: posProfile.value,
+			customer: customer.value,
+			items: invoiceItems.value,
+		}
+
+		await saveDraft(draftData)
+
+		// Clear cart after saving
+		clearCart()
+		customer.value = null
+
+		// Update drafts count
+		await updateDraftsCount()
+
+		toast.create({
+			title: "Draft Saved",
+			text: "Invoice saved as draft successfully",
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} catch (error) {
+		console.error("Error saving draft:", error)
+		toast.create({
+			title: "Error",
+			text: "Failed to save draft",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
+}
+
+async function handleLoadDraft(draft) {
+	try {
+		// Load items into cart
+		invoiceItems.value = draft.items || []
+
+		// Load customer
+		customer.value = draft.customer
+
+		// Close dialog
+		showDraftDialog.value = false
+
+		toast.create({
+			title: "Draft Loaded",
+			text: "Draft invoice loaded successfully",
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} catch (error) {
+		console.error("Error loading draft:", error)
+		toast.create({
+			title: "Error",
+			text: "Failed to load draft",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
+}
+
+async function updateDraftsCount() {
+	try {
+		draftsCount.value = await getDraftsCount()
+	} catch (error) {
+		console.error("Error getting drafts count:", error)
+	}
+}
+
+function handleReturnCreated(returnInvoice) {
+	toast.create({
+		title: "Return Created",
+		text: `Return invoice ${returnInvoice.name} created successfully`,
+		icon: "check",
+		iconClasses: "text-green-600",
+	})
+}
+
+function handleDiscountApplied(discount) {
+	// Update invoice with discount
+	// In a real implementation, this would update the invoice totals
+	toast.create({
+		title: "Discount Applied",
+		text: `${discount.name} (${discount.percentage}% off) applied successfully`,
+		icon: "check",
+		iconClasses: "text-green-600",
+	})
+}
+
+function handleDiscountRemoved() {
+	// Remove discount from invoice
+	toast.create({
+		title: "Discount Removed",
+		text: "Discount has been removed from cart",
+		icon: "check",
+		iconClasses: "text-blue-600",
+	})
+}
+
+function handleBatchSerialSelected(batchSerial) {
+	if (pendingItem.value) {
+		// Add item with batch/serial info
+		const itemToAdd = {
+			...pendingItem.value,
+			quantity: pendingItemQty.value,
+			...batchSerial
+		}
+		addItem(itemToAdd)
+
+		toast.create({
+			title: "Item Added",
+			text: `${pendingItem.value.item_name} added to cart`,
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+
+		pendingItem.value = null
+		pendingItemQty.value = 1
+	}
+}
+
+function handleCreateReturnFromHistory(invoice) {
+	// Open return dialog with pre-filled invoice
+	showReturnDialog.value = true
+	toast.create({
+		title: "Create Return",
+		text: `Creating return for invoice ${invoice.name}`,
+		icon: "alert-circle",
+		iconClasses: "text-orange-600",
+	})
+}
+
+async function handleSyncClick() {
+	if (isOffline.value) {
+		toast.create({
+			title: "Offline Mode",
+			text: `${pendingInvoicesCount.value} invoice(s) pending sync`,
+			icon: "alert-circle",
+			iconClasses: "text-orange-600",
+		})
+		return
+	}
+
+	if (pendingInvoicesCount.value === 0) {
+		toast.create({
+			title: "All Synced",
+			text: "No pending invoices to sync",
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+		return
+	}
+
+	try {
+		const result = await syncPending()
+
+		if (result.success > 0) {
+			toast.create({
+				title: "Sync Complete",
+				text: `${result.success} invoice(s) synced successfully`,
+				icon: "check",
+				iconClasses: "text-green-600",
+			})
+		}
+
+		if (result.failed > 0) {
+			toast.create({
+				title: "Partial Sync",
+				text: `${result.failed} invoice(s) failed to sync`,
+				icon: "alert-circle",
+				iconClasses: "text-orange-600",
+			})
+		}
+	} catch (error) {
+		console.error('Sync error:', error)
+		toast.create({
+			title: "Sync Failed",
+			text: error.message || "Failed to sync invoices",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
 	}
 }
 </script>

@@ -4,6 +4,7 @@
 
 from __future__ import unicode_literals
 import json
+import uuid
 import frappe
 from frappe import _
 from frappe.utils import flt, nowdate, nowtime, get_datetime
@@ -131,55 +132,112 @@ def submit_invoice(invoice_data):
 			invoice_data = json.loads(invoice_data)
 
 		pos_profile = invoice_data.get("pos_profile")
+		if not pos_profile:
+			frappe.throw(_("POS Profile is required"))
+
 		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
+
+		# Get customer - try multiple sources
+		customer = invoice_data.get("customer")
+
+		# If customer is a dict, extract the name
+		if isinstance(customer, dict):
+			customer = customer.get("name") or customer.get("customer_name")
+
+		# Fall back to POS Profile default customer
+		if not customer:
+			customer = pos_profile_doc.customer
+
+		# If still no customer, throw error
+		if not customer:
+			frappe.throw(_("Customer is required. Please select a customer or set a default customer in POS Profile."))
 
 		# Create Sales Invoice
 		invoice = frappe.new_doc("Sales Invoice")
 		invoice.pos_profile = pos_profile
-		invoice.customer = invoice_data.get("customer")
+		invoice.customer = customer
 		invoice.company = pos_profile_doc.company
 		invoice.selling_price_list = pos_profile_doc.selling_price_list
 		invoice.currency = pos_profile_doc.currency
 		invoice.is_pos = 1
 		invoice.is_return = invoice_data.get("is_return", 0)
+		invoice.posting_date = nowdate()
+		invoice.posting_time = nowtime()
 
 		# Set warehouse
 		invoice.set_warehouse = pos_profile_doc.warehouse
 
 		# Add items
-		for item_data in invoice_data.get("items", []):
+		items = invoice_data.get("items", [])
+		if not items:
+			frappe.throw(_("At least one item is required"))
+
+		for item_data in items:
+			item_code = item_data.get("item_code")
+			if not item_code:
+				continue
+
 			invoice.append("items", {
-				"item_code": item_data.get("item_code"),
-				"qty": item_data.get("qty", 1),
-				"rate": item_data.get("rate", 0),
+				"item_code": item_code,
+				"qty": flt(item_data.get("qty") or item_data.get("quantity", 1)),
+				"rate": flt(item_data.get("rate", 0)),
 				"warehouse": item_data.get("warehouse") or pos_profile_doc.warehouse,
 				"batch_no": item_data.get("batch_no"),
 				"serial_no": item_data.get("serial_no"),
-				"uom": item_data.get("uom"),
-				"conversion_factor": item_data.get("conversion_factor", 1),
+				"uom": item_data.get("uom") or item_data.get("stock_uom"),
+				"conversion_factor": flt(item_data.get("conversion_factor", 1)),
 			})
+
+		# Calculate totals
+		invoice.run_method("calculate_taxes_and_totals")
 
 		# Add payments
-		for payment in invoice_data.get("payments", []):
-			invoice.append("payments", {
-				"mode_of_payment": payment.get("mode_of_payment"),
-				"amount": payment.get("amount", 0),
-			})
+		payments = invoice_data.get("payments", [])
+		if payments:
+			for payment in payments:
+				mode_of_payment = payment.get("mode_of_payment")
+				amount = flt(payment.get("amount", 0))
 
-		# Set paid amount
-		invoice.paid_amount = sum(p.get("amount", 0) for p in invoice_data.get("payments", []))
+				if mode_of_payment and amount > 0:
+					# Get payment account from POS Payment Method
+					payment_method = frappe.db.get_value(
+						"POS Payment Method",
+						{"parent": pos_profile, "mode_of_payment": mode_of_payment},
+						["default_account", "allow_in_returns"],
+						as_dict=1
+					)
 
-		# Save and submit
-		invoice.insert()
-		invoice.submit()
+					if payment_method:
+						invoice.append("payments", {
+							"mode_of_payment": mode_of_payment,
+							"amount": amount,
+							"account": payment_method.get("default_account"),
+						})
+
+		# Set paid amount and change
+		total_paid = sum(flt(p.get("amount", 0)) for p in invoice_data.get("payments", []))
+		invoice.paid_amount = total_paid
+		invoice.change_amount = max(total_paid - invoice.grand_total, 0)
+
+		# Save invoice
+		invoice.insert(ignore_permissions=True)
+
+		# Submit if fully paid
+		if invoice.paid_amount >= invoice.grand_total:
+			invoice.submit()
+
+		frappe.db.commit()
 
 		return {
 			"name": invoice.name,
-			"status": "Submitted",
+			"status": "Submitted" if invoice.docstatus == 1 else "Draft",
 			"grand_total": invoice.grand_total,
-			"outstanding_amount": invoice.outstanding_amount
+			"outstanding_amount": invoice.outstanding_amount,
+			"paid_amount": invoice.paid_amount,
+			"change_amount": invoice.change_amount
 		}
 	except Exception as e:
+		frappe.db.rollback()
 		frappe.log_error(frappe.get_traceback(), "Submit Invoice Error")
 		frappe.throw(_("Error submitting invoice: {0}").format(str(e)))
 
@@ -195,7 +253,7 @@ def get_customers(pos_profile, search_term=None, start=0, limit=20):
 
 		# Get the customer group from POS Profile if exists
 		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
-		if pos_profile_doc.customer_group:
+		if hasattr(pos_profile_doc, 'customer_group') and pos_profile_doc.customer_group:
 			filters["customer_group"] = pos_profile_doc.customer_group
 
 		customers = frappe.get_list(

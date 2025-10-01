@@ -186,14 +186,19 @@
 					<span>Net Total</span>
 					<span class="font-medium text-gray-900">E or {{ formatCurrency(subtotal) }}</span>
 				</div>
-				<div v-if="discountAmount > 0" class="flex items-center justify-between text-[10px] mb-1">
-					<span class="text-green-600 flex items-center">
-						<svg class="w-3 h-3 inline mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+				<div class="flex items-center justify-between text-[10px] mb-1">
+					<button
+						@click="$emit('apply-coupon')"
+						class="text-blue-600 hover:text-blue-700 flex items-center font-medium"
+					>
+						<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
 						</svg>
-						Additional 15% discount applied
+						{{ discountAmount > 0 ? 'Change Coupon' : 'Apply Coupon' }}
+					</button>
+					<span v-if="discountAmount > 0" class="font-medium text-green-600">
+						E or -{{ formatCurrency(discountAmount) }}
 					</span>
-					<span class="font-medium text-green-600">E or -{{ formatCurrency(discountAmount) }}</span>
 				</div>
 				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
 					<button class="text-blue-600 hover:text-blue-700 flex items-center">
@@ -232,7 +237,7 @@
 				</button>
 				<button
 					v-if="items.length > 0"
-					@click="$emit('clear-cart')"
+					@click="$emit('save-draft')"
 					class="w-full py-1.5 px-3 rounded-lg font-medium text-xs text-orange-600 bg-orange-50 hover:bg-orange-100 transition-all"
 				>
 					Hold
@@ -276,6 +281,8 @@ const emit = defineEmits([
 	"select-customer",
 	"proceed-to-payment",
 	"clear-cart",
+	"save-draft",
+	"apply-coupon",
 ])
 
 const totalQuantity = computed(() => {
