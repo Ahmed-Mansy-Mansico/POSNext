@@ -126,7 +126,12 @@
               <Button variant="solid" theme="blue" @click="resumeShift">
                 Resume Shift
               </Button>
-              <Button variant="subtle" theme="gray" @click="closeAndOpenNew">
+              <Button
+                variant="subtle"
+                theme="gray"
+                @click="closeAndOpenNew"
+                :disabled="closingExistingShift"
+              >
                 Close & Open New
               </Button>
             </div>
@@ -168,6 +173,13 @@
       </div>
     </template>
   </Dialog>
+
+  <ShiftClosingDialog
+    v-if="existingShift"
+    v-model="showClosingDialog"
+    :opening-shift="existingShift?.pos_opening_shift?.name"
+    @shift-closed="handleExistingShiftClosed"
+  />
 </template>
 
 <script setup>
@@ -175,6 +187,7 @@ import { ref, computed, watch } from "vue"
 import { Dialog, Input, Button } from "frappe-ui"
 import { useShift } from "../composables/useShift"
 import { createResource } from "frappe-ui"
+import ShiftClosingDialog from "./ShiftClosingDialog.vue"
 
 const props = defineProps({
   modelValue: Boolean,
@@ -193,6 +206,9 @@ const step = ref(1)
 const selectedProfile = ref(null)
 const openingBalances = ref({})
 const existingShift = ref(null)
+const showClosingDialog = ref(false)
+const closingExistingShift = ref(false)
+const restartProfileName = ref(null)
 
 // Get POS Profiles
 const profilesResource = createResource({
@@ -225,6 +241,13 @@ watch(open, (isOpen) => {
   } else {
     resetDialog()
   }
+})
+
+watch(showClosingDialog, (isOpen) => {
+	closingExistingShift.value = isOpen
+	if (!isOpen && existingShift.value) {
+		restartProfileName.value = null
+	}
 })
 
 async function initDialog() {
@@ -286,10 +309,12 @@ function resumeShift() {
 }
 
 function closeAndOpenNew() {
-  // TODO: Implement close shift and open new
-  // For now, just reset to step 1
-  existingShift.value = null
-  step.value = 1
+  if (!existingShift.value?.pos_opening_shift?.name) {
+    return
+  }
+
+  restartProfileName.value = existingShift.value.pos_profile?.name || null
+  showClosingDialog.value = true
 }
 
 function closeDialog() {
@@ -299,5 +324,32 @@ function closeDialog() {
 function formatDateTime(datetime) {
   if (!datetime) return ""
   return new Date(datetime).toLocaleString()
+}
+
+async function handleExistingShiftClosed() {
+	showClosingDialog.value = false
+	const profileToRestore = restartProfileName.value
+	restartProfileName.value = null
+	existingShift.value = null
+	step.value = 1
+	openingBalances.value = {}
+
+	await checkOpeningShift.fetch()
+
+	if (!profilesResource.data || profilesResource.data.length === 0) {
+		await profilesResource.fetch()
+	}
+
+	if (profileToRestore) {
+		const matchedProfile = profilesResource.data?.find(
+			(profile) => profile.name === profileToRestore
+		)
+
+		if (matchedProfile) {
+			selectedProfile.value = matchedProfile
+			await dialogDataResource.fetch()
+			step.value = 2
+		}
+	}
 }
 </script>

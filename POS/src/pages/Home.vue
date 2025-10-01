@@ -83,7 +83,7 @@
                     <Button
                       variant="solid"
                       theme="red"
-                      @click="showCloseShiftDialog = true"
+                      @click="openCloseShiftDialog"
                       class="flex-1"
                     >
                       Close Shift
@@ -227,6 +227,7 @@
       v-model="showCloseShiftDialog"
       :opening-shift="currentShift?.name"
       @shift-closed="handleShiftClosed"
+      @update:modelValue="handleCloseShiftDialogToggle"
     />
   </div>
 </template>
@@ -256,6 +257,8 @@ const ping = createResource({
 const showLogoutDialog = ref(false)
 const showOpenShiftDialog = ref(false)
 const showCloseShiftDialog = ref(false)
+const logoutAfterClose = ref(false)
+const closingShiftInProgress = ref(false)
 
 onMounted(() => {
 	// Check for open shift on component mount
@@ -278,11 +281,13 @@ function confirmLogout() {
 }
 
 function handleLogout() {
+	logoutAfterClose.value = false
 	session.logout.submit()
 }
 
 function logoutWithCloseShift() {
-	// Open close shift dialog
+	// Open close shift dialog and remember to logout after closing
+	logoutAfterClose.value = true
 	showLogoutDialog.value = false
 	showCloseShiftDialog.value = true
 }
@@ -294,15 +299,30 @@ function handleShiftOpened() {
 }
 
 function handleShiftClosed() {
+	closingShiftInProgress.value = true
 	showCloseShiftDialog.value = false
 	// Refresh shift status
 	checkOpeningShift.fetch()
-	// If user wanted to logout after closing shift, logout now
-	// For now, just show success message
+	if (logoutAfterClose.value) {
+		session.logout.submit()
+		logoutAfterClose.value = false
+	}
+	closingShiftInProgress.value = false
 }
 
 function formatDateTime(datetime) {
 	if (!datetime) return ""
 	return new Date(datetime).toLocaleString()
+}
+
+function openCloseShiftDialog() {
+	logoutAfterClose.value = false
+	showCloseShiftDialog.value = true
+}
+
+function handleCloseShiftDialogToggle(value) {
+	if (!value && !closingShiftInProgress.value) {
+		logoutAfterClose.value = false
+	}
 }
 </script>
