@@ -5,6 +5,21 @@ const STORE_NAME = 'invoices'
 
 let db = null
 
+function sanitizeDraftData(data) {
+	if (data === null || data === undefined) {
+		return data
+	}
+
+	try {
+		// Vue reactive refs/proxies can't be stored directly in IndexedDB.
+		// Serializing through JSON removes reactivity while keeping data shallow.
+		return JSON.parse(JSON.stringify(data))
+	} catch (error) {
+		console.warn('Failed to sanitize draft data for IndexedDB storage', error)
+		throw error
+	}
+}
+
 // Initialize IndexedDB
 async function initDB() {
 	if (db) return db
@@ -40,10 +55,11 @@ async function initDB() {
 // Save draft invoice
 export async function saveDraft(invoiceData) {
 	const database = await initDB()
+	const sanitizedInvoiceData = sanitizeDraftData(invoiceData) || {}
 
 	const draft = {
 		draft_id: `DRAFT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-		...invoiceData,
+		...sanitizedInvoiceData,
 		created_at: new Date().toISOString(),
 		updated_at: new Date().toISOString(),
 	}
@@ -70,9 +86,10 @@ export async function updateDraft(draftId, invoiceData) {
 				return reject(new Error('Draft not found'))
 			}
 
+			const sanitizedInvoiceData = sanitizeDraftData(invoiceData) || {}
 			const updatedDraft = {
 				...existingDraft,
-				...invoiceData,
+				...sanitizedInvoiceData,
 				updated_at: new Date().toISOString(),
 			}
 
