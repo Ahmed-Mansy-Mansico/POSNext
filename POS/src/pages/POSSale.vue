@@ -419,12 +419,12 @@ const {
 	totalDiscount,
 	grandTotal,
 	posProfile,
+	payments,
 	addItem,
 	removeItem,
 	updateItemQuantity,
 	submitInvoice,
 	clearCart,
-	submitInvoiceResource,
 } = useInvoice()
 
 const itemsSelectorRef = ref(null)
@@ -474,7 +474,6 @@ onMounted(async () => {
 					const needsRefresh = !stats.lastSync || (Date.now() - stats.lastSync) > (24 * 60 * 60 * 1000)
 
 					if (!cacheReady || needsRefresh) {
-						console.log('Pre-loading data for offline use...')
 						toast.create({
 							title: "Syncing Data",
 							text: "Loading items and customers for offline use...",
@@ -629,30 +628,31 @@ async function handlePaymentCompleted(paymentData) {
 			return
 		}
 
-		// Set payments directly
-		const invoiceData = {
-			pos_profile: posProfile.value,
-			customer: customerValue || currentProfile.value?.customer,
-			items: invoiceItems.value,
-			payments: paymentData.payments,
+		payments.value = []
+		if (paymentData.payments && Array.isArray(paymentData.payments)) {
+			paymentData.payments.forEach(p => {
+				payments.value.push({
+					mode_of_payment: p.mode_of_payment,
+					amount: p.amount,
+					type: p.type
+				})
+			})
 		}
 
-		// Check if offline
 		if (isOffline.value) {
-			// Save to offline queue
-			await saveInvoiceOffline(invoiceData)
+			await saveInvoiceOffline({
+				pos_profile: posProfile.value,
+				customer: customerValue || currentProfile.value?.customer,
+				items: invoiceItems.value,
+				payments: payments.value,
+			})
 
 			lastInvoiceName.value = `OFFLINE-${Date.now()}`
 			lastInvoiceTotal.value = grandTotal.value
-
-			// Close payment dialog
 			showPaymentDialog.value = false
 
-			// Clear the cart
 			clearCart()
 			customer.value = null
-
-			// Show success dialog
 			showSuccessDialog.value = true
 
 			toast.create({
@@ -662,28 +662,19 @@ async function handlePaymentCompleted(paymentData) {
 				iconClasses: "text-orange-600",
 			})
 		} else {
-			// Submit online
-			const result = await submitInvoiceResource.submit({
-				invoice_data: invoiceData,
-			})
+			const result = await submitInvoice()
 
 			if (result) {
 				lastInvoiceName.value = result.name || result.message?.name || "Unknown"
-				lastInvoiceTotal.value = grandTotal.value
-
-				// Close payment dialog
+				lastInvoiceTotal.value = result.grand_total || result.total || 0
 				showPaymentDialog.value = false
-
-				// Clear the cart
 				clearCart()
 				customer.value = null
 
-				// Refresh items to get updated stock
 				if (itemsSelectorRef.value) {
 					itemsSelectorRef.value.loadItems()
 				}
 
-				// Show success dialog
 				showSuccessDialog.value = true
 
 				toast.create({

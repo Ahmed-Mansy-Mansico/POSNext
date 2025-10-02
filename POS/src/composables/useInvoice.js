@@ -11,10 +11,32 @@ export function useInvoice() {
 	const couponCode = ref(null)
 
 	// Resources
+	const updateInvoiceResource = createResource({
+		url: "pos_next.api.invoices.update_invoice",
+		makeParams(params) {
+			return { data: JSON.stringify(params.data) }
+		},
+		auto: false,
+	})
+
 	const submitInvoiceResource = createResource({
 		url: "pos_next.api.invoices.submit_invoice",
-		makeParams({ invoice_data }) {
-			return { invoice_data: JSON.stringify(invoice_data) }
+		makeParams(params) {
+			return {
+				invoice: JSON.stringify(params.invoice),
+				data: JSON.stringify(params.data || {}),
+			}
+		},
+		auto: false,
+	})
+
+	const validateCartItemsResource = createResource({
+		url: "pos_next.api.invoices.validate_cart_items",
+		makeParams({ items, pos_profile }) {
+			return {
+				items: JSON.stringify(items),
+				pos_profile: pos_profile,
+			}
 		},
 		auto: false,
 	})
@@ -172,21 +194,130 @@ export function useInvoice() {
 		}
 	}
 
-	async function submitInvoice() {
+	async function validateStock() {
+		/**
+		 * Validate stock availability before submission
+		 * Returns array of errors if stock is insufficient
+		 */
+		const items = invoiceItems.value.map((item) => ({
+			item_code: item.item_code,
+			qty: item.quantity,
+			warehouse: item.warehouse,
+			conversion_factor: item.conversion_factor || 1,
+			stock_qty: item.quantity * (item.conversion_factor || 1),
+			is_stock_item: item.is_stock_item !== false, // default to true
+		}))
+
+		try {
+			const result = await validateCartItemsResource.submit({
+				items: items,
+				pos_profile: posProfile.value,
+			})
+			return result || []
+		} catch (error) {
+			console.error("Stock validation error:", error)
+			return []
+		}
+	}
+
+	async function saveDraft() {
+		/**
+		 * Save invoice as draft (Step 1 - POSAwesome style)
+		 * This creates the invoice with docstatus=0
+		 */
 		const invoiceData = {
+			doctype: "Sales Invoice",
 			pos_profile: posProfile.value,
 			customer: customer.value?.name || customer.value,
-			items: invoiceItems.value,
-			payments: payments.value,
-			additional_discount_percentage: 0,
+			items: invoiceItems.value.map((item) => ({
+				item_code: item.item_code,
+				item_name: item.item_name,
+				qty: item.quantity,
+				rate: item.rate,
+				uom: item.uom,
+				warehouse: item.warehouse,
+				batch_no: item.batch_no,
+				serial_no: item.serial_no,
+				conversion_factor: item.conversion_factor || 1,
+				discount_percentage: item.discount_percentage || 0,
+				discount_amount: item.discount_amount || 0,
+			})),
+			payments: payments.value.map((p) => ({
+				mode_of_payment: p.mode_of_payment,
+				amount: p.amount,
+				type: p.type,
+			})),
 			discount_amount: additionalDiscount.value || 0,
 			coupon_code: couponCode.value,
+			is_pos: 1,
+			update_stock: 1,
+		}
+
+		const result = await updateInvoiceResource.submit({ data: invoiceData })
+		return result?.data || result
+	}
+
+	async function submitInvoice() {
+		/**
+		 * Two-step submission process (POSAwesome style):
+		 * 1. Create/update draft invoice
+		 * 2. Validate stock and submit
+		 */
+		try {
+			// Step 1: Create invoice draft
+			const invoiceData = {
+			doctype: "Sales Invoice",
+			pos_profile: posProfile.value,
+			customer: customer.value?.name || customer.value,
+			items: invoiceItems.value.map((item) => ({
+				item_code: item.item_code,
+				item_name: item.item_name,
+				qty: item.quantity,
+				rate: item.rate,
+				uom: item.uom,
+				warehouse: item.warehouse,
+				batch_no: item.batch_no,
+				serial_no: item.serial_no,
+				conversion_factor: item.conversion_factor || 1,
+				discount_percentage: item.discount_percentage || 0,
+				discount_amount: item.discount_amount || 0,
+			})),
+			payments: payments.value.map((p) => ({
+				mode_of_payment: p.mode_of_payment,
+				amount: p.amount,
+				type: p.type,
+			})),
+			discount_amount: additionalDiscount.value || 0,
+			coupon_code: couponCode.value,
+			is_pos: 1,
+			update_stock: 1, // Critical: Ensures stock is updated
+		}
+
+		const draftInvoice = await updateInvoiceResource.submit({ data: invoiceData })
+
+		let invoiceDoc = draftInvoice
+		if (draftInvoice && typeof draftInvoice === 'object' && 'data' in draftInvoice) {
+			invoiceDoc = draftInvoice.data
+		}
+
+		if (!invoiceDoc || !invoiceDoc.name) {
+			throw new Error("Failed to create draft invoice - no invoice name returned")
+		}
+
+		const submitData = {
 			change_amount: remainingAmount.value < 0 ? Math.abs(remainingAmount.value) : 0,
 		}
 
-		const result = await submitInvoiceResource.submit({ invoice_data: invoiceData })
+		const result = await submitInvoiceResource.submit({
+			invoice: invoiceDoc,
+			data: submitData,
+		})
+
 		resetInvoice()
 		return result
+	} catch (error) {
+		throw new Error(`Failed to submit invoice: ${error.message}`)
+		}
 	}
 
 	function resetInvoice() {
@@ -231,12 +362,16 @@ export function useInvoice() {
 		addPayment,
 		removePayment,
 		updatePayment,
+		validateStock,
+		saveDraft,
 		submitInvoice,
 		resetInvoice,
 		clearCart,
 
 		// Resources
+		updateInvoiceResource,
 		submitInvoiceResource,
+		validateCartItemsResource,
 		applyOffersResource,
 		getItemDetailsResource,
 	}
