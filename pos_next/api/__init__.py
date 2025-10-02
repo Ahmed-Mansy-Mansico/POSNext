@@ -9,6 +9,7 @@ from . import items
 from . import shifts
 from . import pos_profile
 from . import customers
+from . import offers
 
 @frappe.whitelist(allow_guest=True)
 def ping():

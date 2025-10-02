@@ -24,6 +24,39 @@
 					</div>
 				</div>
 
+				<!-- My Gift Cards -->
+				<div v-if="giftCards.length > 0">
+					<label class="block text-sm font-medium text-gray-700 mb-2">
+						My Gift Cards
+					</label>
+					<div class="space-y-2 max-h-40 overflow-y-auto">
+						<div
+							v-for="card in giftCards"
+							:key="card.coupon_code"
+							@click="applyGiftCard(card)"
+							class="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-3 cursor-pointer hover:shadow-md transition-all"
+						>
+							<div class="flex items-center justify-between">
+								<div class="flex-1">
+									<div class="flex items-center space-x-2">
+										<svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+											<path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+											<path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
+										</svg>
+										<h4 class="text-sm font-semibold text-gray-900">
+											{{ card.coupon_code }}
+										</h4>
+									</div>
+									<p class="text-xs text-gray-600 mt-1">{{ card.coupon_name }}</p>
+								</div>
+								<svg class="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+									<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+								</svg>
+							</div>
+						</div>
+					</div>
+				</div>
+
 				<!-- Available Offers -->
 				<div v-if="availableOffers.length > 0">
 					<label class="block text-sm font-medium text-gray-700 mb-2">
@@ -39,17 +72,20 @@
 							<div class="flex items-start justify-between">
 								<div class="flex-1">
 									<h4 class="text-sm font-semibold text-gray-900">
-										{{ offer.offer_name || offer.name }}
+										{{ offer.title || offer.name }}
 									</h4>
 									<p class="text-xs text-gray-600 mt-1">
-										{{ offer.description || 'No description available' }}
+										{{ offer.description || 'Special offer' }}
 									</p>
 									<div class="flex items-center space-x-3 mt-2">
-										<span class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">
+										<span v-if="offer.discount_percentage" class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">
 											{{ offer.discount_percentage }}% OFF
 										</span>
-										<span v-if="offer.minimum_amount" class="text-xs text-gray-500">
-											Min: {{ formatCurrency(offer.minimum_amount) }}
+										<span v-if="offer.discount_amount" class="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">
+											{{ formatCurrency(offer.discount_amount) }} OFF
+										</span>
+										<span v-if="offer.min_amt" class="text-xs text-gray-500">
+											Min: {{ formatCurrency(offer.min_amt) }}
 										</span>
 									</div>
 								</div>
@@ -102,12 +138,20 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { Dialog, Button, Input } from 'frappe-ui'
+import { Dialog, Button, Input, createResource, toast } from 'frappe-ui'
+import { formatCurrency as formatCurrencyUtil } from '@/utils/currency'
 
 const props = defineProps({
 	modelValue: Boolean,
 	cartTotal: Number,
 	items: Array,
+	posProfile: String,
+	customer: String,
+	company: String,
+	currency: {
+		type: String,
+		default: 'USD'
+	}
 })
 
 const emit = defineEmits(['update:modelValue', 'discount-applied', 'discount-removed'])
@@ -115,8 +159,56 @@ const emit = defineEmits(['update:modelValue', 'discount-applied', 'discount-rem
 const show = ref(props.modelValue)
 const couponCode = ref('')
 const availableOffers = ref([])
+const giftCards = ref([])
 const appliedDiscount = ref(null)
 const applying = ref(false)
+
+// Resource to load gift cards
+const giftCardsResource = createResource({
+	url: 'pos_next.api.offers.get_active_coupons',
+	makeParams() {
+		return {
+			customer: props.customer,
+			company: props.company
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		giftCards.value = data?.message || data || []
+	}
+})
+
+// Resource to load offers
+const offersResource = createResource({
+	url: 'pos_next.api.offers.get_offers',
+	makeParams() {
+		return {
+			pos_profile: props.posProfile
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		const offers = data?.message || data || []
+		// Filter auto offers that are not coupon-based
+		availableOffers.value = offers.filter(offer =>
+			offer.auto && !offer.coupon_based &&
+			checkOfferEligibility(offer)
+		)
+	}
+})
+
+// Resource to validate coupon
+const couponResource = createResource({
+	url: 'pos_next.api.offers.validate_coupon',
+	makeParams() {
+		return {
+			coupon_code: couponCode.value,
+			customer: props.customer,
+			company: props.company
+		}
+	},
+	auto: false
+})
 
 watch(() => props.modelValue, (val) => {
 	show.value = val
@@ -129,105 +221,148 @@ watch(show, (val) => {
 	emit('update:modelValue', val)
 })
 
+function checkOfferEligibility(offer) {
+	// Check minimum amount
+	if (offer.min_amt && props.cartTotal < offer.min_amt) {
+		return false
+	}
+	// Check maximum amount
+	if (offer.max_amt && props.cartTotal > offer.max_amt) {
+		return false
+	}
+	return true
+}
+
 async function loadAvailableOffers() {
-	// In a real implementation, this would fetch from backend
-	// For now, we'll use mock data
-	availableOffers.value = [
-		{
-			name: 'WELCOME10',
-			offer_name: 'Welcome Offer',
-			description: 'Get 10% off on your first purchase',
-			discount_percentage: 10,
-			minimum_amount: 100,
-		},
-		{
-			name: 'SAVE15',
-			offer_name: 'Save More',
-			description: 'Get 15% off on orders above 500',
-			discount_percentage: 15,
-			minimum_amount: 500,
-		},
-		{
-			name: 'MEGA20',
-			offer_name: 'Mega Sale',
-			description: 'Get 20% off on orders above 1000',
-			discount_percentage: 20,
-			minimum_amount: 1000,
-		},
-	]
+	if (!props.posProfile) return
+	try {
+		await offersResource.reload()
+		// Also load gift cards if customer is selected
+		if (props.customer && props.company) {
+			await giftCardsResource.reload()
+		}
+	} catch (error) {
+		console.error('Error loading offers:', error)
+	}
+}
+
+function applyGiftCard(card) {
+	couponCode.value = card.coupon_code
+	applyCoupon()
 }
 
 async function applyCoupon() {
-	if (!couponCode.value) return
+	if (!couponCode.value.trim()) return
 
 	applying.value = true
 	try {
-		// Find matching offer
-		const offer = availableOffers.value.find(
-			o => o.name.toLowerCase() === couponCode.value.toLowerCase()
-		)
+		await couponResource.reload()
+		const result = couponResource.data?.message || couponResource.data
 
-		if (!offer) {
-			window.frappe.msgprint({
+		if (!result || !result.valid) {
+			toast.create({
 				title: 'Invalid Coupon',
-				message: 'The coupon code you entered is not valid',
-				indicator: 'red'
+				text: result?.message || 'The coupon code you entered is not valid',
+				icon: 'x',
+				iconClasses: 'text-red-600'
 			})
 			return
 		}
+
+		const offer = result.offer
 
 		// Check minimum amount
-		if (offer.minimum_amount && props.cartTotal < offer.minimum_amount) {
-			window.frappe.msgprint({
+		if (offer.min_amt && props.cartTotal < offer.min_amt) {
+			toast.create({
 				title: 'Minimum Amount Required',
-				message: `This offer requires a minimum purchase of ${formatCurrency(offer.minimum_amount)}`,
-				indicator: 'orange'
+				text: `This offer requires a minimum purchase of ${formatCurrency(offer.min_amt)}`,
+				icon: 'alert-circle',
+				iconClasses: 'text-orange-600'
 			})
 			return
 		}
 
-		// Calculate discount
-		const discountAmount = (props.cartTotal * offer.discount_percentage) / 100
+		// Calculate discount based on discount type
+		let discountAmount = 0
+		if (offer.discount_percentage) {
+			discountAmount = (props.cartTotal * offer.discount_percentage) / 100
+		} else if (offer.discount_amount) {
+			discountAmount = offer.discount_amount
+		}
 
 		appliedDiscount.value = {
-			name: offer.offer_name || offer.name,
-			code: offer.name,
-			percentage: offer.discount_percentage,
+			name: offer.title || offer.name,
+			code: couponCode.value.toUpperCase(),
+			percentage: offer.discount_percentage || 0,
 			amount: discountAmount,
+			type: offer.discount_type,
+			coupon: result.coupon,
+			offer: offer
 		}
 
 		emit('discount-applied', appliedDiscount.value)
 
-		window.frappe.msgprint({
+		toast.create({
 			title: 'Success',
-			message: `Coupon ${offer.name} applied successfully!`,
-			indicator: 'green'
+			text: `Coupon ${couponCode.value.toUpperCase()} applied successfully!`,
+			icon: 'check',
+			iconClasses: 'text-green-600'
 		})
 
 		couponCode.value = ''
 	} catch (error) {
 		console.error('Error applying coupon:', error)
+		toast.create({
+			title: 'Error',
+			text: 'Failed to apply coupon. Please try again.',
+			icon: 'x',
+			iconClasses: 'text-red-600'
+		})
 	} finally {
 		applying.value = false
 	}
 }
 
 function selectOffer(offer) {
-	couponCode.value = offer.name
-	applyCoupon()
+	// For auto offers, apply directly
+	let discountAmount = 0
+	if (offer.discount_percentage) {
+		discountAmount = (props.cartTotal * offer.discount_percentage) / 100
+	} else if (offer.discount_amount) {
+		discountAmount = offer.discount_amount
+	}
+
+	appliedDiscount.value = {
+		name: offer.title || offer.name,
+		code: offer.name,
+		percentage: offer.discount_percentage || 0,
+		amount: discountAmount,
+		type: offer.discount_type,
+		offer: offer
+	}
+
+	emit('discount-applied', appliedDiscount.value)
+
+	toast.create({
+		title: 'Offer Applied',
+		text: `${offer.title} applied successfully!`,
+		icon: 'check',
+		iconClasses: 'text-green-600'
+	})
 }
 
 function removeDiscount() {
 	appliedDiscount.value = null
 	emit('discount-removed')
-	window.frappe.msgprint({
+	toast.create({
 		title: 'Removed',
-		message: 'Discount has been removed',
-		indicator: 'blue'
+		text: 'Discount has been removed',
+		icon: 'info',
+		iconClasses: 'text-blue-600'
 	})
 }
 
 function formatCurrency(amount) {
-	return parseFloat(amount || 0).toFixed(2)
+	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
 }
 </script>

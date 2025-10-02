@@ -234,6 +234,47 @@
 			</div>
 		</div>
 
+		<!-- Coupons & Offers Buttons -->
+		<div v-if="items.length > 0" class="px-2.5 pt-2.5 pb-1 bg-gray-50">
+			<div class="flex gap-2">
+				<!-- Coupons Button -->
+				<button
+					@click="$emit('show-coupons')"
+					class="relative flex-1 flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-purple-300 hover:border-purple-500 hover:bg-purple-50 transition-all group"
+				>
+					<div class="flex items-center space-x-2">
+						<div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+							<svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
+							</svg>
+						</div>
+						<span class="text-xs font-semibold text-gray-900">Coupons</span>
+					</div>
+					<span v-if="availableGiftCards.length > 0" class="bg-purple-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+						{{ availableGiftCards.length }}
+					</span>
+				</button>
+
+				<!-- Offers Button -->
+				<button
+					@click="$emit('show-offers')"
+					class="relative flex-1 flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-green-300 hover:border-green-500 hover:bg-green-50 transition-all group"
+				>
+					<div class="flex items-center space-x-2">
+						<div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors">
+							<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+							</svg>
+						</div>
+						<span class="text-xs font-semibold text-gray-900">Offers</span>
+					</div>
+					<span v-if="availableOffers.length > 0" class="bg-green-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+						{{ availableOffers.length }}
+					</span>
+				</button>
+			</div>
+		</div>
+
 		<!-- Totals Summary -->
 		<div class="p-2.5 bg-white border-t border-gray-200">
 			<!-- Summary Details -->
@@ -246,19 +287,9 @@
 					<span>Net Total</span>
 					<span class="font-medium text-gray-900">{{ formatCurrency(subtotal) }}</span>
 				</div>
-				<div class="flex items-center justify-between text-[10px] mb-1">
-					<button
-						@click="$emit('apply-coupon')"
-						class="text-blue-600 hover:text-blue-700 flex items-center font-medium"
-					>
-						<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
-						</svg>
-						{{ discountAmount > 0 ? 'Change Coupon' : 'Apply Coupon' }}
-					</button>
-					<span v-if="discountAmount > 0" class="font-medium text-green-600">
-						-{{ formatCurrency(discountAmount) }}
-					</span>
+				<div v-if="discountAmount > 0" class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
+					<span>Discount</span>
+					<span class="font-semibold text-green-600">-{{ formatCurrency(discountAmount) }}</span>
 				</div>
 				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
 					<button class="text-blue-600 hover:text-blue-700 flex items-center">
@@ -351,14 +382,19 @@ const emit = defineEmits([
 	"clear-cart",
 	"save-draft",
 	"apply-coupon",
+	"show-coupons",
+	"show-offers",
 ])
 
 const customerSearch = ref("")
 const allCustomers = ref([])
 const customersLoaded = ref(false)
 const selectedIndex = ref(-1)
+const availableOffers = ref([])
+const availableGiftCards = ref([])
 
 // Load customers into memory on mount for instant filtering
+// Load customers resource
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const customersResource = createResource({
 	url: "pos_next.api.customers.get_customers",
@@ -383,6 +419,78 @@ const customersResource = createResource({
 		console.error("Error loading customers:", error)
 	}
 })
+
+// Load offers resource
+const offersResource = createResource({
+	url: "pos_next.api.offers.get_offers",
+	makeParams() {
+		return {
+			pos_profile: props.posProfile
+		}
+	},
+	auto: true,
+	onSuccess(data) {
+		const offers = data?.message || data || []
+		console.log('✓ Loaded offers:', offers.length, offers)
+
+		// Filter only auto-apply offers that are eligible
+		const eligible = offers.filter(offer =>
+			offer.auto && !offer.coupon_based &&
+			checkOfferEligibility(offer)
+		)
+
+		console.log('✓ Eligible offers:', eligible.length, eligible)
+		availableOffers.value = eligible.slice(0, 3) // Show top 3
+	},
+	onError(error) {
+		console.error('Error loading offers:', error)
+	}
+})
+
+// Load gift cards resource
+const giftCardsResource = createResource({
+	url: "pos_next.api.offers.get_active_coupons",
+	makeParams() {
+		return {
+			customer: props.customer?.name || props.customer,
+			company: props.posProfile // Will get company from profile
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		availableGiftCards.value = data?.message || data || []
+	}
+})
+
+// Watch for customer changes to load their gift cards
+watch(() => props.customer, (newCustomer) => {
+	if (newCustomer && props.posProfile) {
+		giftCardsResource.reload()
+	} else {
+		availableGiftCards.value = []
+	}
+})
+
+// Watch for cart changes to update eligible offers
+watch(() => props.grandTotal, () => {
+	if (offersResource.data) {
+		const offers = offersResource.data?.message || offersResource.data || []
+		availableOffers.value = offers.filter(offer =>
+			offer.auto && !offer.coupon_based &&
+			checkOfferEligibility(offer)
+		).slice(0, 3)
+	}
+})
+
+function checkOfferEligibility(offer) {
+	if (offer.min_amt && props.grandTotal < offer.min_amt) {
+		return false
+	}
+	if (offer.max_amt && props.grandTotal > offer.max_amt) {
+		return false
+	}
+	return true
+}
 
 // Direct computed results - zero latency filtering!
 const customerResults = computed(() => {
