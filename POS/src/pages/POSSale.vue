@@ -216,9 +216,17 @@
 		</div>
 
 		<!-- Main Content: Two Column Layout -->
-		<div v-if="hasOpenShift" class="flex-1 flex overflow-hidden">
-			<!-- Left: Items Selector (2/3 width) -->
-			<div class="w-2/3 border-r border-gray-200 flex flex-col bg-white">
+		<div
+			v-if="hasOpenShift"
+			ref="containerRef"
+			class="flex-1 flex overflow-hidden relative"
+		>
+			<!-- Left: Items Selector -->
+			<div
+				:style="{ width: leftPanelWidth + 'px' }"
+				class="flex flex-col bg-white overflow-hidden flex-shrink-0"
+				style="will-change: width; contain: layout;"
+			>
 				<ItemsSelector
 					ref="itemsSelectorRef"
 					:pos-profile="currentProfile?.name"
@@ -228,8 +236,37 @@
 				/>
 			</div>
 
-			<!-- Right: Invoice Cart (1/3 width) -->
-			<div class="w-1/3 flex flex-col bg-gray-50">
+			<!-- Draggable Divider -->
+			<div
+				ref="dividerRef"
+				role="separator"
+				aria-orientation="vertical"
+				@pointerdown="startResize"
+				@pointermove="handleResize"
+				@pointerup="stopResize"
+				@pointercancel="stopResize"
+				class="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize relative flex-shrink-0 z-10"
+				:class="{ 'bg-blue-500': isResizing }"
+				style="transition: background-color 0.1s ease;"
+			>
+				<!-- Expanded hit area for easier grabbing -->
+				<div
+					class="absolute inset-y-0 -left-2 -right-2"
+					style="cursor: col-resize;"
+				></div>
+				<!-- Visual handle -->
+				<div
+					class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-12 bg-gray-400 rounded-full"
+					:class="{ 'bg-blue-600': isResizing, 'bg-blue-500': !isResizing }"
+					style="transition: background-color 0.1s ease; opacity: 0.8;"
+				></div>
+			</div>
+
+			<!-- Right: Invoice Cart -->
+			<div
+				class="flex-1 flex flex-col bg-gray-50 overflow-hidden"
+				style="min-width: 300px; contain: layout;"
+			>
 				<InvoiceCart
 					:items="invoiceItems"
 					:customer="customer"
@@ -435,7 +472,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from "vue"
+import { ref, onMounted, onUnmounted, computed, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useInvoice } from "@/composables/useInvoice"
 import { useShift } from "@/composables/useShift"
@@ -457,6 +494,9 @@ import { printInvoiceByName } from "@/utils/printInvoice"
 import { saveDraft, getDraftsCount, deleteDraft } from "@/utils/draftManager"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { cacheItemsFromServer, cacheCustomersFromServer } from "@/utils/offline"
+
+const LEFT_PANEL_MIN = 320
+const RIGHT_PANEL_MIN = 360
 
 const router = useRouter()
 const { currentProfile, currentShift, hasOpenShift, checkOpeningShift } = useShift()
@@ -511,6 +551,10 @@ const isLoading = ref(true)
 const currentTime = ref("")
 const shiftDuration = ref("")
 const draftsCount = ref(0)
+const containerRef = ref(null)
+const dividerRef = ref(null)
+const leftPanelWidth = ref(800) // Start with 800px width
+const isResizing = ref(false)
 
 // Update shift duration every second
 function updateShiftDuration() {
@@ -531,6 +575,7 @@ function updateShiftDuration() {
 }
 
 onMounted(async () => {
+	window.addEventListener('resize', updateLayoutBounds)
 	try {
 		// Update time and shift duration every second
 		setInterval(() => {
@@ -618,6 +663,8 @@ onMounted(async () => {
 		// Add click outside listener
 		document.addEventListener('click', handleClickOutside)
 
+		requestAnimationFrame(updateLayoutBounds)
+
 		// Update drafts count
 		await updateDraftsCount()
 	} catch (error) {
@@ -627,8 +674,16 @@ onMounted(async () => {
 	}
 })
 
+watch(hasOpenShift, value => {
+	if (value && typeof window !== 'undefined') {
+		requestAnimationFrame(updateLayoutBounds)
+	}
+})
+
 onUnmounted(() => {
 	document.removeEventListener('click', handleClickOutside)
+	window.removeEventListener('resize', updateLayoutBounds)
+	stopResize()
 })
 
 function handleShiftOpened() {
@@ -1082,5 +1137,99 @@ async function handleSyncClick() {
 			iconClasses: "text-red-600",
 		})
 	}
+}
+
+// Resizable layout helpers
+let resizeState = null
+let bodyStyleSnapshot = null
+
+function clampLeftPanelWidth(width, containerWidth) {
+	const safeContainerWidth = Number.isFinite(containerWidth) && containerWidth > 0
+		? containerWidth
+		: LEFT_PANEL_MIN + RIGHT_PANEL_MIN
+	const maxWidth = Math.max(LEFT_PANEL_MIN, safeContainerWidth - RIGHT_PANEL_MIN)
+	const clampedWidth = Math.min(Math.max(width, LEFT_PANEL_MIN), maxWidth)
+	return Number.isFinite(clampedWidth) ? clampedWidth : LEFT_PANEL_MIN
+}
+
+function updateLayoutBounds() {
+	if (!containerRef.value) return
+	const containerWidth = containerRef.value.offsetWidth
+	leftPanelWidth.value = clampLeftPanelWidth(leftPanelWidth.value, containerWidth)
+}
+
+function startResize(event) {
+	if (!containerRef.value || !dividerRef.value) return
+	if (event.isPrimary === false) return
+	if (event.button !== undefined && event.button !== 0 && event.pointerType !== 'touch') return
+
+	updateLayoutBounds()
+
+	resizeState = {
+		pointerId: event.pointerId,
+		startX: event.clientX,
+		startWidth: leftPanelWidth.value,
+		containerWidth: containerRef.value?.offsetWidth ?? LEFT_PANEL_MIN + RIGHT_PANEL_MIN
+	}
+
+	isResizing.value = true
+	bodyStyleSnapshot = {
+		cursor: document.body.style.cursor,
+		userSelect: document.body.style.userSelect
+	}
+
+	dividerRef.value.setPointerCapture?.(event.pointerId)
+	document.body.style.cursor = 'col-resize'
+	document.body.style.userSelect = 'none'
+	event.preventDefault()
+}
+
+function handleResize(event) {
+	if (!isResizing.value || !resizeState || (event.pointerId ?? resizeState.pointerId) !== resizeState.pointerId) {
+		return
+	}
+
+	event.preventDefault()
+
+	const containerWidth = containerRef.value?.offsetWidth ?? resizeState.containerWidth
+	resizeState.containerWidth = containerWidth
+
+	const deltaX = event.clientX - resizeState.startX
+	const rawWidth = resizeState.startWidth + deltaX
+
+	leftPanelWidth.value = clampLeftPanelWidth(rawWidth, containerWidth)
+}
+
+function stopResize(event) {
+	if (!isResizing.value || !resizeState) {
+		return
+	}
+
+	if (event?.pointerId !== undefined && event.pointerId !== resizeState.pointerId) {
+		return
+	}
+
+	if (event?.preventDefault) {
+		event.preventDefault()
+	}
+
+	if (dividerRef.value?.hasPointerCapture?.(resizeState.pointerId)) {
+		dividerRef.value.releasePointerCapture(resizeState.pointerId)
+	}
+
+	isResizing.value = false
+	resizeState = null
+	restoreBodyStyles()
+	updateLayoutBounds()
+}
+
+function restoreBodyStyles() {
+	if (!bodyStyleSnapshot) {
+		return
+	}
+
+	document.body.style.cursor = bodyStyleSnapshot.cursor || ''
+	document.body.style.userSelect = bodyStyleSnapshot.userSelect || ''
+	bodyStyleSnapshot = null
 }
 </script>
