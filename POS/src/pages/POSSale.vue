@@ -202,6 +202,7 @@
 					ref="itemsSelectorRef"
 					:pos-profile="currentProfile?.name"
 					:cart-items="invoiceItems"
+					:currency="currentProfile?.currency || 'USD'"
 					@item-selected="handleItemSelected"
 				/>
 			</div>
@@ -216,6 +217,7 @@
 					:discount-amount="totalDiscount"
 					:grand-total="grandTotal"
 					:pos-profile="currentProfile?.name"
+					:currency="currentProfile?.currency || 'USD'"
 					@update-quantity="updateItemQuantity"
 					@remove-item="removeItem"
 					@select-customer="handleCustomerSelected"
@@ -270,6 +272,7 @@
 			v-model="showPaymentDialog"
 			:grand-total="grandTotal"
 			:pos-profile="currentProfile?.name"
+			:currency="currentProfile?.currency || 'USD'"
 			@payment-completed="handlePaymentCompleted"
 		/>
 

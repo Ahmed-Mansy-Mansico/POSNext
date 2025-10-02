@@ -159,6 +159,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue"
 import { Dialog, Input, Button, createResource } from "frappe-ui"
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -167,6 +168,10 @@ const props = defineProps({
 		default: 0,
 	},
 	posProfile: String,
+	currency: {
+		type: String,
+		default: 'USD'
+	}
 })
 
 const emit = defineEmits(["update:modelValue", "payment-completed"])
@@ -288,6 +293,6 @@ function completePayment() {
 }
 
 function formatCurrency(amount) {
-	return parseFloat(amount || 0).toFixed(2)
+	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
 }
 </script>

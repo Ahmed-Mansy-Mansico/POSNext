@@ -174,7 +174,7 @@
 										{{ item.item_name }}
 									</h4>
 									<p class="text-[10px] text-gray-500">
-										E or {{ formatCurrency(item.rate) }} / {{ item.stock_uom || 'Nos' }}
+										{{ formatCurrency(item.rate) }} / {{ item.stock_uom || 'Nos' }}
 									</p>
 								</div>
 								<button
@@ -215,7 +215,7 @@
 						</div>
 						<div class="text-right">
 							<p class="text-xs font-bold text-gray-900">
-								E or {{ formatCurrency(item.amount || item.rate * item.quantity) }}
+								{{ formatCurrency(item.amount || item.rate * item.quantity) }}
 							</p>
 						</div>
 					</div>
@@ -244,7 +244,7 @@
 				</div>
 				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
 					<span>Net Total</span>
-					<span class="font-medium text-gray-900">E or {{ formatCurrency(subtotal) }}</span>
+					<span class="font-medium text-gray-900">{{ formatCurrency(subtotal) }}</span>
 				</div>
 				<div class="flex items-center justify-between text-[10px] mb-1">
 					<button
@@ -257,7 +257,7 @@
 						{{ discountAmount > 0 ? 'Change Coupon' : 'Apply Coupon' }}
 					</button>
 					<span v-if="discountAmount > 0" class="font-medium text-green-600">
-						E or -{{ formatCurrency(discountAmount) }}
+						-{{ formatCurrency(discountAmount) }}
 					</span>
 				</div>
 				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
@@ -267,7 +267,7 @@
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
 						</svg>
 					</button>
-					<span class="font-medium text-gray-900">E or {{ formatCurrency(taxAmount) }}</span>
+					<span class="font-medium text-gray-900">{{ formatCurrency(taxAmount) }}</span>
 				</div>
 			</div>
 
@@ -276,7 +276,7 @@
 				<div class="flex items-center justify-between">
 					<span class="text-sm font-bold text-gray-900">Grand Total</span>
 					<span class="text-lg font-bold text-blue-600">
-						E or {{ formatCurrency(grandTotal) }}
+						{{ formatCurrency(grandTotal) }}
 					</span>
 				</div>
 			</div>
@@ -311,6 +311,7 @@
 import { ref, computed, watch } from "vue"
 import { Input, createResource } from "frappe-ui"
 import { offlineWorker } from "@/utils/offline/workerClient"
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 
 const props = defineProps({
 	items: {
@@ -335,6 +336,10 @@ const props = defineProps({
 		default: 0,
 	},
 	posProfile: String,
+	currency: {
+		type: String,
+		default: 'USD'
+	}
 })
 
 const emit = defineEmits([
@@ -349,12 +354,12 @@ const emit = defineEmits([
 ])
 
 const customerSearch = ref("")
-const customerResults = ref([])
 const allCustomers = ref([])
 const customersLoaded = ref(false)
 const selectedIndex = ref(-1)
 
 // Load customers into memory on mount for instant filtering
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const customersResource = createResource({
 	url: "pos_next.api.customers.get_customers",
 	makeParams() {
@@ -379,15 +384,15 @@ const customersResource = createResource({
 	}
 })
 
-// Instant client-side filtering with computed property - no delay!
-const filteredCustomers = computed(() => {
+// Direct computed results - zero latency filtering!
+const customerResults = computed(() => {
 	const searchValue = customerSearch.value.trim().toLowerCase()
 
 	if (searchValue.length < 2) {
 		return []
 	}
 
-	// Filter in memory - instant results, zero latency
+	// Instant in-memory filter
 	return allCustomers.value.filter(cust => {
 		const name = (cust.customer_name || '').toLowerCase()
 		const mobile = (cust.mobile_no || '').toLowerCase()
@@ -396,14 +401,13 @@ const filteredCustomers = computed(() => {
 		return name.includes(searchValue) ||
 		       mobile.includes(searchValue) ||
 		       id.includes(searchValue)
-	}).slice(0, 20)  // Limit to 20 for optimal rendering
+	}).slice(0, 20)
 })
 
-// Sync results for template
-watch(filteredCustomers, (newResults) => {
-	customerResults.value = newResults
-	selectedIndex.value = -1  // Reset selection when results change
-}, { immediate: true })
+// Reset selection when results change
+watch(customerResults, () => {
+	selectedIndex.value = -1
+})
 
 const totalQuantity = computed(() => {
 	return props.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
@@ -458,7 +462,7 @@ function getInitials(name) {
 }
 
 function formatCurrency(amount) {
-	return parseFloat(amount || 0).toFixed(2)
+	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
 }
 
 function incrementQuantity(item) {

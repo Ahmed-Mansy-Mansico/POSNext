@@ -241,12 +241,17 @@
 import { ref, onMounted, toRef } from "vue"
 import { Input, toast } from "frappe-ui"
 import { useItems } from "@/composables/useItems"
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 
 const props = defineProps({
 	posProfile: String,
 	cartItems: {
 		type: Array,
 		default: () => []
+	},
+	currency: {
+		type: String,
+		default: 'USD'
 	}
 })
 
@@ -305,7 +310,7 @@ function handleBarcodeScan() {
 }
 
 function formatCurrency(amount) {
-	return parseFloat(amount || 0).toFixed(2)
+	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
 }
 
 // Expose methods for parent component
