@@ -1,4 +1,5 @@
 <template>
+	<!-- Main Dialog -->
 	<Dialog
 		v-model="show"
 		:options="{ title: 'Draft Invoices', size: 'lg' }"
@@ -85,7 +86,7 @@
 					v-if="drafts.length > 0"
 					variant="subtle"
 					theme="red"
-					@click="handleClearAll"
+					@click="showClearAllDialog = true"
 				>
 					Clear All
 				</Button>
@@ -95,21 +96,77 @@
 			</div>
 		</template>
 	</Dialog>
+
+	<!-- Delete Single Draft Confirmation -->
+	<Dialog
+		v-model="showDeleteDialog"
+		:options="{ title: 'Delete Draft?', size: 'xs' }"
+	>
+		<template #body-content>
+			<div class="py-3">
+				<p class="text-sm text-gray-600">
+					Permanently delete this draft invoice?
+				</p>
+			</div>
+		</template>
+		<template #actions>
+			<div class="flex space-x-2 w-full">
+				<Button class="flex-1" variant="subtle" @click="showDeleteDialog = false">
+					Cancel
+				</Button>
+				<Button class="flex-1" variant="solid" theme="red" @click="confirmDeleteDraft">
+					Delete
+				</Button>
+			</div>
+		</template>
+	</Dialog>
+
+	<!-- Clear All Drafts Confirmation -->
+	<Dialog
+		v-model="showClearAllDialog"
+		:options="{ title: 'Clear All Drafts?', size: 'xs' }"
+	>
+		<template #body-content>
+			<div class="py-3">
+				<p class="text-sm text-gray-600">
+					Permanently delete all {{ drafts.length }} draft invoices?
+				</p>
+			</div>
+		</template>
+		<template #actions>
+			<div class="flex space-x-2 w-full">
+				<Button class="flex-1" variant="subtle" @click="showClearAllDialog = false">
+					Cancel
+				</Button>
+				<Button class="flex-1" variant="solid" theme="red" @click="confirmClearAll">
+					Clear All
+				</Button>
+			</div>
+		</template>
+	</Dialog>
 </template>
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { Dialog, Button } from 'frappe-ui'
+import { Dialog, Button, toast } from 'frappe-ui'
 import { getAllDrafts, deleteDraft, clearAllDrafts } from '@/utils/draftManager'
+import { formatCurrency as formatCurrencyUtil } from '@/utils/currency'
 
 const props = defineProps({
-	modelValue: Boolean
+	modelValue: Boolean,
+	currency: {
+		type: String,
+		default: 'USD'
+	}
 })
 
-const emit = defineEmits(['update:modelValue', 'load-draft'])
+const emit = defineEmits(['update:modelValue', 'load-draft', 'drafts-updated'])
 
 const show = ref(props.modelValue)
 const drafts = ref([])
+const showDeleteDialog = ref(false)
+const showClearAllDialog = ref(false)
+const draftToDelete = ref(null)
 
 watch(() => props.modelValue, (val) => {
 	show.value = val
@@ -131,28 +188,70 @@ async function loadDrafts() {
 		drafts.value = await getAllDrafts()
 	} catch (error) {
 		console.error('Error loading drafts:', error)
+		toast.create({
+			title: 'Error',
+			text: 'Failed to load draft invoices',
+			icon: 'x',
+			iconClasses: 'text-red-600'
+		})
 	}
 }
 
-async function handleDeleteDraft(draftId) {
-	if (confirm('Are you sure you want to delete this draft?')) {
-		try {
-			await deleteDraft(draftId)
-			await loadDrafts()
-		} catch (error) {
-			console.error('Error deleting draft:', error)
-		}
+function handleDeleteDraft(draftId) {
+	draftToDelete.value = draftId
+	showDeleteDialog.value = true
+}
+
+async function confirmDeleteDraft() {
+	try {
+		await deleteDraft(draftToDelete.value)
+		await loadDrafts()
+		showDeleteDialog.value = false
+		draftToDelete.value = null
+
+		// Notify parent to update count
+		emit('drafts-updated')
+
+		toast.create({
+			title: 'Deleted',
+			text: 'Draft invoice deleted',
+			icon: 'check',
+			iconClasses: 'text-green-600'
+		})
+	} catch (error) {
+		console.error('Error deleting draft:', error)
+		toast.create({
+			title: 'Error',
+			text: 'Failed to delete draft',
+			icon: 'x',
+			iconClasses: 'text-red-600'
+		})
 	}
 }
 
-async function handleClearAll() {
-	if (confirm('Are you sure you want to delete all drafts?')) {
-		try {
-			await clearAllDrafts()
-			await loadDrafts()
-		} catch (error) {
-			console.error('Error clearing drafts:', error)
-		}
+async function confirmClearAll() {
+	try {
+		await clearAllDrafts()
+		await loadDrafts()
+		showClearAllDialog.value = false
+
+		// Notify parent to update count
+		emit('drafts-updated')
+
+		toast.create({
+			title: 'Cleared',
+			text: 'All draft invoices deleted',
+			icon: 'check',
+			iconClasses: 'text-green-600'
+		})
+	} catch (error) {
+		console.error('Error clearing drafts:', error)
+		toast.create({
+			title: 'Error',
+			text: 'Failed to clear drafts',
+			icon: 'x',
+			iconClasses: 'text-red-600'
+		})
 	}
 }
 
@@ -167,7 +266,7 @@ function formatDateTime(dateStr) {
 }
 
 function formatCurrency(amount) {
-	return parseFloat(amount || 0).toFixed(2)
+	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
 }
 
 function calculateTotal(items) {

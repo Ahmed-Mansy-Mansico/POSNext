@@ -320,7 +320,9 @@
 		<!-- Draft Invoices Dialog -->
 		<DraftInvoicesDialog
 			v-model="showDraftDialog"
+			:currency="currentProfile?.currency || 'USD'"
 			@load-draft="handleLoadDraft"
+			@drafts-updated="updateDraftsCount"
 		/>
 
 		<!-- Return Invoice Dialog -->
@@ -452,7 +454,7 @@ import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
 import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
 import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
 import { printInvoiceByName } from "@/utils/printInvoice"
-import { saveDraft, getDraftsCount } from "@/utils/draftManager"
+import { saveDraft, getDraftsCount, deleteDraft } from "@/utils/draftManager"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { cacheItemsFromServer, cacheCustomersFromServer } from "@/utils/offline"
 
@@ -921,6 +923,12 @@ async function handleLoadDraft(draft) {
 
 		// Load customer
 		customer.value = draft.customer
+
+		// Delete the draft after loading (to prevent duplicates)
+		await deleteDraft(draft.draft_id)
+
+		// Update drafts count
+		await updateDraftsCount()
 
 		// Close dialog
 		showDraftDialog.value = false
