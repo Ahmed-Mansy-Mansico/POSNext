@@ -32,6 +32,28 @@
 								<p v-if="currentProfile" class="text-xs text-gray-500">{{ currentProfile.name }}</p>
 							</div>
 						</div>
+
+						<!-- Time and Shift Duration -->
+						<div class="flex items-center space-x-4 ml-6">
+							<!-- Current Time -->
+							<div class="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-100">
+								<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+								</svg>
+								<span class="text-sm font-semibold text-gray-900">{{ currentTime }}</span>
+							</div>
+
+							<!-- Shift Duration -->
+							<div v-if="hasOpenShift && currentShift" class="flex items-center space-x-2 px-3 py-1.5 bg-green-50 rounded-lg border border-green-100">
+								<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+								</svg>
+								<div class="text-xs">
+									<span class="text-gray-600">Shift Open:</span>
+									<span class="font-semibold text-gray-900 ml-1">{{ shiftDuration }}</span>
+								</div>
+							</div>
+						</div>
 					</div>
 
 					<!-- Right Side: Controls -->
@@ -183,7 +205,6 @@
 						<div class="flex items-center space-x-3 px-2">
 							<div class="text-right">
 								<p class="text-sm font-semibold text-gray-900">{{ getCurrentUser() }}</p>
-								<p class="text-xs text-gray-500">{{ currentTime }}</p>
 							</div>
 							<div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
 								<span class="text-sm font-bold text-white">{{ getUserInitials() }}</span>
@@ -342,6 +363,30 @@
 			@customer-created="handleCustomerCreated"
 		/>
 
+		<!-- Clear Cart Confirmation Dialog -->
+		<Dialog
+			v-model="showClearCartDialog"
+			:options="{ title: 'Clear Cart?', size: 'xs' }"
+		>
+			<template #body-content>
+				<div class="py-3">
+					<p class="text-sm text-gray-600">
+						Remove all {{ invoiceItems.length }} items from cart?
+					</p>
+				</div>
+			</template>
+			<template #actions>
+				<div class="flex space-x-2 w-full">
+					<Button class="flex-1" variant="subtle" @click="showClearCartDialog = false">
+						Cancel
+					</Button>
+					<Button class="flex-1" variant="solid" theme="red" @click="confirmClearCart">
+						Clear All
+					</Button>
+				</div>
+			</template>
+		</Dialog>
+
 		<!-- Success Dialog -->
 		<Dialog
 			v-model="showSuccessDialog"
@@ -454,6 +499,7 @@ const showCouponDialog = ref(false)
 const showBatchSerialDialog = ref(false)
 const showHistoryDialog = ref(false)
 const showCreateCustomerDialog = ref(false)
+const showClearCartDialog = ref(false)
 const initialCustomerName = ref("")
 const pendingItem = ref(null)
 const pendingItemQty = ref(1)
@@ -461,15 +507,40 @@ const lastInvoiceName = ref("")
 const lastInvoiceTotal = ref(0)
 const isLoading = ref(true)
 const currentTime = ref("")
+const shiftDuration = ref("")
 const draftsCount = ref(0)
+
+// Update shift duration every second
+function updateShiftDuration() {
+	if (!hasOpenShift.value || !currentShift.value?.period_start_date) {
+		shiftDuration.value = ""
+		return
+	}
+
+	const startTime = new Date(currentShift.value.period_start_date)
+	const now = new Date()
+	const diff = now - startTime
+
+	const hours = Math.floor(diff / (1000 * 60 * 60))
+	const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+	const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+	shiftDuration.value = `${hours}h ${minutes}m ${seconds}s`
+}
 
 onMounted(async () => {
 	try {
-		// Update time every second
+		// Update time and shift duration every second
 		setInterval(() => {
 			const now = new Date()
 			currentTime.value = now.toLocaleTimeString('en-US', { hour12: false })
+			updateShiftDuration()
 		}, 1000)
+
+		// Initial update
+		const now = new Date()
+		currentTime.value = now.toLocaleTimeString('en-US', { hour12: false })
+		updateShiftDuration()
 
 		// Check for existing open shift
 		await checkOpeningShift.fetch()
@@ -564,6 +635,8 @@ function handleShiftOpened() {
 	if (currentProfile.value) {
 		posProfile.value = currentProfile.value.name
 	}
+	// Update shift duration immediately
+	updateShiftDuration()
 	toast.create({
 		title: "Shift Opened",
 		text: "You can now start making sales",
@@ -729,17 +802,19 @@ async function handlePaymentCompleted(paymentData) {
 
 function handleClearCart() {
 	if (invoiceItems.value.length === 0) return
+	showClearCartDialog.value = true
+}
 
-	if (confirm("Are you sure you want to clear the cart?")) {
-		clearCart()
-		customer.value = null
-		toast.create({
-			title: "Cart Cleared",
-			text: "All items removed from cart",
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
-	}
+function confirmClearCart() {
+	clearCart()
+	customer.value = null
+	showClearCartDialog.value = false
+	toast.create({
+		title: "Cart Cleared",
+		text: "All items removed from cart",
+		icon: "check",
+		iconClasses: "text-green-600",
+	})
 }
 
 function handleCloseShift() {
