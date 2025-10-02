@@ -50,7 +50,7 @@ export function useInvoice() {
 	})
 
 	const getItemDetailsResource = createResource({
-		url: "pos_next.api.invoices.get_item_details",
+		url: "pos_next.api.items.get_item_details",
 		auto: false,
 	})
 

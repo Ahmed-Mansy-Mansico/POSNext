@@ -95,17 +95,21 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { Dialog, Input, Button, toast, createResource } from 'frappe-ui'
 
 const props = defineProps({
 	modelValue: Boolean,
 	posProfile: String,
+	initialName: String,
 })
 
 const emit = defineEmits(['update:modelValue', 'customer-created'])
 
-const show = ref(props.modelValue)
+const show = computed({
+	get: () => props.modelValue,
+	set: (val) => emit('update:modelValue', val)
+})
 const creating = ref(false)
 const customerGroups = ref(['Commercial', 'Individual', 'Non Profit', 'Government'])
 const territories = ref(['All Territories'])
@@ -116,6 +120,22 @@ const customerData = ref({
 	email_id: '',
 	customer_group: 'Individual',
 	territory: 'All Territories',
+})
+
+// Watch for dialog open and populate initial name
+watch(() => props.modelValue, (newVal) => {
+	if (newVal && props.initialName) {
+		customerData.value.customer_name = props.initialName
+	} else if (!newVal) {
+		// Reset form when dialog closes
+		customerData.value = {
+			customer_name: '',
+			mobile_no: '',
+			email_id: '',
+			customer_group: 'Individual',
+			territory: 'All Territories',
+		}
+	}
 })
 
 // Create customer resource

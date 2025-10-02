@@ -48,3 +48,30 @@ def get_pos_profile_data(pos_profile):
 		"pos_profile": profile_doc,
 		"company": company_doc
 	}
+
+
+@frappe.whitelist()
+def get_payment_methods(pos_profile):
+	"""Get available payment methods from POS Profile"""
+	try:
+		payment_methods = frappe.get_list(
+			"POS Payment Method",
+			filters={"parent": pos_profile},
+			fields=["mode_of_payment", "default", "allow_in_returns"],
+			order_by="idx",
+			ignore_permissions=True
+		)
+
+		# Get payment type for each method
+		for method in payment_methods:
+			payment_type = frappe.db.get_value(
+				"Mode of Payment",
+				method["mode_of_payment"],
+				"type"
+			)
+			method["type"] = payment_type or "Cash"
+
+		return payment_methods
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Payment Methods Error")
+		frappe.throw(_("Error fetching payment methods: {0}").format(str(e)))

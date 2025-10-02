@@ -215,9 +215,11 @@
 					:tax-amount="totalTax"
 					:discount-amount="totalDiscount"
 					:grand-total="grandTotal"
+					:pos-profile="currentProfile?.name"
 					@update-quantity="updateItemQuantity"
 					@remove-item="removeItem"
-					@select-customer="showCustomerDialog = true"
+					@select-customer="handleCustomerSelected"
+					@create-customer="handleCreateCustomer"
 					@proceed-to-payment="handleProceedToPayment"
 					@clear-cart="handleClearCart"
 					@save-draft="handleSaveDraft"
@@ -329,6 +331,14 @@
 			@create-return="handleCreateReturnFromHistory"
 		/>
 
+		<!-- Create Customer Dialog -->
+		<CreateCustomerDialog
+			v-model="showCreateCustomerDialog"
+			:pos-profile="currentProfile?.name"
+			:initial-name="initialCustomerName"
+			@customer-created="handleCustomerCreated"
+		/>
+
 		<!-- Success Dialog -->
 		<Dialog
 			v-model="showSuccessDialog"
@@ -392,6 +402,7 @@ import ReturnInvoiceDialog from "@/components/sale/ReturnInvoiceDialog.vue"
 import CouponDialog from "@/components/sale/CouponDialog.vue"
 import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
 import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
+import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
 import { printInvoiceByName } from "@/utils/printInvoice"
 import { saveDraft, getDraftsCount } from "@/utils/draftManager"
 import { offlineWorker } from "@/utils/offline/workerClient"
@@ -439,6 +450,8 @@ const showReturnDialog = ref(false)
 const showCouponDialog = ref(false)
 const showBatchSerialDialog = ref(false)
 const showHistoryDialog = ref(false)
+const showCreateCustomerDialog = ref(false)
+const initialCustomerName = ref("")
 const pendingItem = ref(null)
 const pendingItemQty = ref(1)
 const lastInvoiceName = ref("")
@@ -588,14 +601,24 @@ function handleItemSelected(item) {
 }
 
 function handleCustomerSelected(selectedCustomer) {
-	customer.value = selectedCustomer
-	showCustomerDialog.value = false
-	toast.create({
-		title: "Customer Selected",
-		text: `${selectedCustomer.customer_name} selected`,
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	if (selectedCustomer) {
+		customer.value = selectedCustomer
+		showCustomerDialog.value = false
+		toast.create({
+			title: "Customer Selected",
+			text: `${selectedCustomer.customer_name} selected`,
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} else {
+		// Clear customer
+		customer.value = null
+	}
+}
+
+function handleCreateCustomer(searchValue) {
+	initialCustomerName.value = searchValue || ""
+	showCreateCustomerDialog.value = true
 }
 
 function handleProceedToPayment() {
@@ -909,6 +932,17 @@ function handleCreateReturnFromHistory(invoice) {
 		text: `Creating return for invoice ${invoice.name}`,
 		icon: "alert-circle",
 		iconClasses: "text-orange-600",
+	})
+}
+
+function handleCustomerCreated(newCustomer) {
+	customer.value = newCustomer
+	showCreateCustomerDialog.value = false
+	toast.create({
+		title: "Customer Created",
+		text: `${newCustomer.customer_name} created and selected`,
+		icon: "check",
+		iconClasses: "text-green-600",
 	})
 }
 

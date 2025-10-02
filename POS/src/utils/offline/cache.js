@@ -132,7 +132,7 @@ export const cacheItemsFromServer = async (posProfile) => {
 	try {
 		console.log('Fetching items from server...')
 
-		const response = await call('pos_next.api.invoices.get_items', {
+		const response = await call('pos_next.api.items.get_items', {
 			pos_profile: posProfile,
 			start: 0,
 			limit: 9999 // Get all items
@@ -167,7 +167,7 @@ export const cacheCustomersFromServer = async (posProfile) => {
 	try {
 		console.log('Fetching customers from server...')
 
-		const response = await call('pos_next.api.invoices.get_customers', {
+		const response = await call('pos_next.api.customers.get_customers', {
 			pos_profile: posProfile,
 			start: 0,
 			limit: 9999 // Get all customers

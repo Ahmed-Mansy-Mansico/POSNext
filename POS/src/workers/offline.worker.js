@@ -185,11 +185,19 @@ async function searchCachedCustomers(searchTerm = '', limit = 20) {
 			return await db.customers.limit(limit).toArray()
 		}
 
-		const results = await db.customers
-			.where('name').startsWithIgnoreCase(term)
-			.or('customer_name').startsWithIgnoreCase(term)
-			.limit(limit)
-			.toArray()
+		// Get all customers and filter in memory for 'includes' behavior
+		// This is fast because IndexedDB is already in-memory for small datasets
+		const allCustomers = await db.customers.toArray()
+
+		const results = allCustomers.filter(cust => {
+			const name = (cust.customer_name || '').toLowerCase()
+			const mobile = (cust.mobile_no || '').toLowerCase()
+			const id = (cust.name || '').toLowerCase()
+
+			return name.includes(term) ||
+			       mobile.includes(term) ||
+			       id.includes(term)
+		}).slice(0, limit)
 
 		return results
 	} catch (error) {

@@ -182,7 +182,7 @@ const paymentAmount = ref("")
 const paymentEntries = ref([])
 
 const paymentMethodsResource = createResource({
-	url: "pos_next.api.invoices.get_payment_methods",
+	url: "pos_next.api.pos_profile.get_payment_methods",
 	params: {
 		pos_profile: props.posProfile,
 	},

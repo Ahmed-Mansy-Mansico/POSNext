@@ -272,3 +272,137 @@ def get_batch_serial_details(item_code, warehouse):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get Batch/Serial Details Error")
 		frappe.throw(_("Error fetching batch/serial details: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20):
+	"""Get items for POS with stock, price, and tax details"""
+	try:
+		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
+
+		filters = {"disabled": 0, "has_variants": 0}
+
+		# Add item group filter if provided
+		if item_group:
+			filters["item_group"] = item_group
+
+		# Build search conditions
+		or_filters = []
+		if search_term:
+			or_filters = [
+				["item_code", "like", f"%{search_term}%"],
+				["item_name", "like", f"%{search_term}%"],
+				["description", "like", f"%{search_term}%"]
+			]
+
+		# Get items
+		items = frappe.get_list(
+			"Item",
+			filters=filters,
+			or_filters=or_filters if or_filters else None,
+			fields=[
+				"name as item_code",
+				"item_name",
+				"description",
+				"stock_uom",
+				"image",
+				"is_stock_item",
+				"has_batch_no",
+				"has_serial_no"
+			],
+			start=start,
+			page_length=limit,
+			order_by="item_name asc"
+		)
+
+		# Enrich items with price and stock data
+		for item in items:
+			# Get price
+			price = frappe.db.get_value(
+				"Item Price",
+				{
+					"item_code": item["item_code"],
+					"price_list": pos_profile_doc.selling_price_list
+				},
+				"price_list_rate"
+			)
+			item["rate"] = price or 0
+
+			# Get stock if warehouse specified
+			if pos_profile_doc.warehouse and item.get("is_stock_item"):
+				stock = frappe.db.get_value(
+					"Bin",
+					{
+						"item_code": item["item_code"],
+						"warehouse": pos_profile_doc.warehouse
+					},
+					"actual_qty"
+				)
+				item["actual_qty"] = stock or 0
+			else:
+				item["actual_qty"] = 0
+
+		return items
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Items Error")
+		frappe.throw(_("Error fetching items: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_item_details(item_code, pos_profile, customer=None, qty=1):
+	"""Get detailed item info including price, tax, stock"""
+	try:
+		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
+		item_doc = frappe.get_cached_doc("Item", item_code)
+
+		# Prepare item dict
+		item = {
+			"item_code": item_code,
+			"has_batch_no": item_doc.has_batch_no,
+			"has_serial_no": item_doc.has_serial_no,
+			"is_stock_item": item_doc.is_stock_item,
+			"pos_profile": pos_profile,
+			"qty": qty
+		}
+
+		return get_item_detail(
+			item=json.dumps(item),
+			warehouse=pos_profile_doc.warehouse,
+			price_list=pos_profile_doc.selling_price_list,
+			company=pos_profile_doc.company
+		)
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Item Details Error")
+		frappe.throw(_("Error fetching item details: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_item_groups(pos_profile):
+	"""Get item groups for filtering"""
+	try:
+		# Get item groups from POS Profile's item groups table
+		item_groups = frappe.db.sql(
+			"""
+			SELECT DISTINCT ig.item_group
+			FROM `tabPOS Item Group` ig
+			WHERE ig.parent = %s
+			ORDER BY ig.item_group
+			""",
+			pos_profile,
+			as_dict=1
+		)
+
+		# If no item groups defined in POS Profile, get all item groups
+		if not item_groups:
+			item_groups = frappe.get_list(
+				"Item Group",
+				filters={"is_group": 0},
+				fields=["name as item_group"],
+				order_by="name",
+				limit_page_length=50
+			)
+
+		return item_groups
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Item Groups Error")
+		frappe.throw(_("Error fetching item groups: {0}").format(str(e)))

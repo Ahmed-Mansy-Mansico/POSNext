@@ -33,15 +33,16 @@
 			</div>
 		</div>
 
-		<!-- Search Bar with View Controls -->
+		<!-- Search Bar with Barcode Scanner and View Controls -->
 		<div class="px-3 py-2 bg-white border-b border-gray-200">
 			<div class="flex items-center space-x-2">
 				<div class="flex-1 relative">
 					<Input
 						v-model="searchTerm"
 						type="text"
-						placeholder="Search by item code, serial number or barcode"
+						placeholder="Search by item code, name or scan barcode"
 						class="w-full text-sm"
+						@keyup.enter="handleBarcodeSearch"
 					>
 						<template #prefix>
 							<svg
@@ -57,6 +58,17 @@
 									d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
 								/>
 							</svg>
+						</template>
+						<template #suffix>
+							<button
+								@click="handleBarcodeScan"
+								class="p-1 hover:bg-gray-100 rounded transition-colors"
+								title="Scan Barcode"
+							>
+								<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+								</svg>
+							</button>
 						</template>
 					</Input>
 				</div>
@@ -227,7 +239,7 @@
 
 <script setup>
 import { ref, onMounted, toRef } from "vue"
-import { Input } from "frappe-ui"
+import { Input, toast } from "frappe-ui"
 import { useItems } from "@/composables/useItems"
 
 const props = defineProps({
@@ -259,6 +271,37 @@ onMounted(() => {
 
 function handleItemClick(item) {
 	emit("item-selected", item)
+}
+
+function handleBarcodeSearch() {
+	if (!searchTerm.value.trim()) return
+
+	// If only one item matches, auto-select it
+	if (filteredItems.value.length === 1) {
+		emit("item-selected", filteredItems.value[0])
+		searchTerm.value = ""
+		toast.create({
+			title: "Item Added",
+			text: `${filteredItems.value[0].item_name} added to cart`,
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	}
+}
+
+function handleBarcodeScan() {
+	// Focus on search input for barcode scanner
+	const input = document.querySelector('input[type="text"]')
+	if (input) {
+		input.focus()
+	}
+
+	toast.create({
+		title: "Scan Barcode",
+		text: "Ready to scan barcode or enter manually",
+		icon: "alert-circle",
+		iconClasses: "text-blue-600",
+	})
 }
 
 function formatCurrency(amount) {

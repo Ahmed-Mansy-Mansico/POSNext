@@ -140,7 +140,7 @@ const showCreateDialog = ref(false)
 const loading = ref(false)
 
 const customersResource = createResource({
-	url: "pos_next.api.invoices.get_customers",
+	url: "pos_next.api.customers.get_customers",
 	makeParams() {
 		return {
 			pos_profile: props.posProfile,
