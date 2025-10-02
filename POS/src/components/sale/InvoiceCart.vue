@@ -41,21 +41,27 @@
 					</button>
 				</div>
 				<div v-else>
-					<Input
-						v-model="customerSearch"
+					<!-- Search Icon Prefix -->
+					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+						<svg v-if="customersLoaded" class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+						</svg>
+						<div v-else class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-500"></div>
+					</div>
+
+					<!-- Native Input for Instant Search -->
+					<input
+						id="cart-customer-search"
+						name="cart-customer-search"
+						:value="customerSearch"
+						@input="handleSearchInput"
 						type="text"
 						placeholder="Search customer by name or mobile"
-						class="w-full text-xs"
+						class="w-full pl-10 text-xs border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						:disabled="!customersLoaded"
 						@keydown="handleKeydown"
-					>
-						<template #prefix>
-							<svg v-if="customersLoaded" class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-							</svg>
-							<div v-else class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-500"></div>
-						</template>
-					</Input>
+						aria-label="Search customer in cart"
+					/>
 
 					<!-- Customer Dropdown -->
 					<div
@@ -85,8 +91,8 @@
 
 						<!-- No Results + Create New Option -->
 						<div v-else-if="customerSearch.trim().length >= 2">
-							<div class="px-3 py-2 text-center text-xs text-gray-500 border-b border-gray-100">
-								No customers found
+							<div class="px-3 py-2 text-center text-xs font-medium text-gray-700 border-b border-gray-100">
+								No results for "{{ customerSearch }}"
 							</div>
 						</div>
 
@@ -340,7 +346,7 @@
 
 <script setup>
 import { ref, computed, watch } from "vue"
-import { Input, createResource } from "frappe-ui"
+import { createResource } from "frappe-ui"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 
@@ -520,6 +526,11 @@ watch(customerResults, () => {
 const totalQuantity = computed(() => {
 	return props.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
 })
+
+// Handle search input with instant reactivity
+function handleSearchInput(event) {
+	customerSearch.value = event.target.value
+}
 
 // Keyboard navigation
 function handleKeydown(event) {

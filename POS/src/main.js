@@ -1,4 +1,5 @@
 import { createApp } from "vue"
+import { createPinia } from "pinia"
 
 import App from "./App.vue"
 import router from "./router"
@@ -112,11 +113,13 @@ async function initializeApp() {
 
 	// Now set up the app with CSRF token ready
 	const app = createApp(App)
+	const pinia = createPinia()
 
 	// Wrap frappeRequest with CSRF auto-refresh
 	const csrfAwareFrappeRequest = createCSRFAwareRequest(frappeRequest)
 	setConfig("resourceFetcher", csrfAwareFrappeRequest)
 
+	app.use(pinia)
 	app.use(router)
 	app.use(resourcesPlugin)
 	app.use(pageMetaPlugin)

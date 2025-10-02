@@ -4,7 +4,7 @@
 		<div class="px-3 pt-3 pb-2 bg-white border-b border-gray-200">
 			<div class="flex items-center space-x-2 overflow-x-auto pb-1">
 				<button
-					@click="selectedItemGroup = null"
+					@click="itemStore.setSelectedItemGroup(null)"
 					:class="[
 						'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
 						!selectedItemGroup
@@ -20,7 +20,7 @@
 				<button
 					v-for="group in itemGroups"
 					:key="group.item_group"
-					@click="selectedItemGroup = group.item_group"
+					@click="itemStore.setSelectedItemGroup(group.item_group)"
 					:class="[
 						'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
 						selectedItemGroup === group.item_group
@@ -37,40 +37,46 @@
 		<div class="px-3 py-2 bg-white border-b border-gray-200">
 			<div class="flex items-center space-x-2">
 				<div class="flex-1 relative">
-					<Input
-						v-model="searchTerm"
+					<!-- Search Icon -->
+					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+						<svg
+							class="h-4 w-4 text-gray-400"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+							/>
+						</svg>
+					</div>
+					<!-- Search Input -->
+					<input
+						id="item-search"
+						name="item-search"
+						:value="searchTerm"
+						@input="handleSearchInput"
 						type="text"
 						placeholder="Search by item code, name or scan barcode"
-						class="w-full text-sm"
+						class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						@keyup.enter="handleBarcodeSearch"
-					>
-						<template #prefix>
-							<svg
-								class="h-4 w-4 text-gray-400"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-								/>
+						aria-label="Search items"
+					/>
+					<!-- Barcode Scan Icon -->
+					<div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+						<button
+							@click="handleBarcodeScan"
+							class="p-1 hover:bg-gray-100 rounded transition-colors"
+							title="Scan Barcode"
+						>
+							<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
 							</svg>
-						</template>
-						<template #suffix>
-							<button
-								@click="handleBarcodeScan"
-								class="p-1 hover:bg-gray-100 rounded transition-colors"
-								title="Scan Barcode"
-							>
-								<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
-								</svg>
-							</button>
-						</template>
-					</Input>
+						</button>
+					</div>
 				</div>
 				<div class="flex items-center space-x-0.5 bg-gray-100 rounded-md p-0.5">
 					<button
@@ -102,7 +108,7 @@
 		</div>
 
 		<!-- Loading State -->
-		<div v-if="itemsResource.loading" class="flex-1 flex items-center justify-center p-3">
+		<div v-if="loading" class="flex-1 flex items-center justify-center p-3">
 			<div class="text-center py-8">
 				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
 				<p class="mt-3 text-xs text-gray-500">Loading items...</p>
@@ -128,7 +134,10 @@
 						d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
 					/>
 				</svg>
-				<p class="mt-2 text-xs text-gray-500">No items found</p>
+				<p v-if="searchTerm || selectedItemGroup" class="mt-2 text-xs font-medium text-gray-700">
+					No results for <span v-if="searchTerm">"{{ searchTerm }}"</span><span v-if="searchTerm && selectedItemGroup"> in </span><span v-if="selectedItemGroup">{{ selectedItemGroup }}</span>
+				</p>
+				<p v-else class="mt-2 text-xs text-gray-500">No items available</p>
 			</div>
 		</div>
 
@@ -238,10 +247,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, toRef } from "vue"
-import { Input, toast } from "frappe-ui"
-import { useItems } from "@/composables/useItems"
+import { ref, onMounted, watch } from "vue"
+import { toast } from "frappe-ui"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { useItemSearchStore } from "@/stores/itemSearch"
+import { storeToRefs } from "pinia"
 
 const props = defineProps({
 	posProfile: String,
@@ -257,22 +267,37 @@ const props = defineProps({
 
 const emit = defineEmits(["item-selected"])
 
+// Use Pinia store
+const itemStore = useItemSearchStore()
+const { filteredItems, searchTerm, selectedItemGroup, itemGroups, loading } = storeToRefs(itemStore)
+
+// Local state
 const viewMode = ref('grid')
 
-const {
-	filteredItems,
-	searchTerm,
-	selectedItemGroup,
-	itemGroups,
-	itemsResource,
-	loadItems,
-	loadItemGroups,
-} = useItems(props.posProfile, toRef(props, 'cartItems'))
+// Watch for cart items and pos profile changes
+watch(() => props.cartItems, (newCartItems) => {
+	itemStore.setCartItems(newCartItems)
+}, { immediate: true, deep: true })
+
+watch(() => props.posProfile, (newProfile) => {
+	if (newProfile) {
+		itemStore.setPosProfile(newProfile)
+	}
+}, { immediate: true })
 
 onMounted(() => {
-	loadItems()
-	loadItemGroups()
+	if (props.posProfile) {
+		itemStore.loadAllItems(props.posProfile)
+		itemStore.loadItemGroups()
+	}
 })
+
+// Handle search input with instant reactivity
+function handleSearchInput(event) {
+	const value = event.target.value
+	console.log('🔍 Item search:', value) // Debug log
+	itemStore.setSearchTerm(value)
+}
 
 function handleItemClick(item) {
 	emit("item-selected", item)
@@ -284,7 +309,7 @@ function handleBarcodeSearch() {
 	// If only one item matches, auto-select it
 	if (filteredItems.value.length === 1) {
 		emit("item-selected", filteredItems.value[0])
-		searchTerm.value = ""
+		itemStore.clearSearch()
 		toast.create({
 			title: "Item Added",
 			text: `${filteredItems.value[0].item_name} added to cart`,
@@ -315,8 +340,8 @@ function formatCurrency(amount) {
 
 // Expose methods for parent component
 defineExpose({
-	loadItems,
-	loadItemGroups,
+	loadItems: () => itemStore.loadAllItems(props.posProfile),
+	loadItemGroups: () => itemStore.loadItemGroups(),
 })
 
 function handleImageError(event) {

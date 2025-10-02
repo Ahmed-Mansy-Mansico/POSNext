@@ -6,46 +6,65 @@
 		<template #body-content>
 			<div class="space-y-4">
 				<!-- Search Input -->
-				<div>
-					<Input
-						v-model="searchTerm"
+				<div class="relative">
+					<!-- Search Icon -->
+					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+						<svg
+							class="h-5 w-5 text-gray-400"
+							fill="none"
+							stroke="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+							/>
+						</svg>
+					</div>
+					<!-- Search Input -->
+					<input
+						id="customer-search"
+						name="customer-search"
+						:value="searchTerm"
+						@input="handleSearchInput"
 						type="text"
 						placeholder="Search customers by name, mobile, or email..."
-						class="w-full"
+						class="w-full border border-gray-300 rounded-md px-3 py-2 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						@keydown="handleKeydown"
 						autofocus
-					>
-						<template #prefix>
-							<svg
-								class="h-5 w-5 text-gray-400"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-								/>
+						aria-label="Search customers"
+					/>
+					<!-- Clear Button -->
+					<div v-if="searchTerm" class="absolute inset-y-0 right-0 pr-3 flex items-center">
+						<button @click="customerStore.clearSearch()" class="text-gray-400 hover:text-gray-600">
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
 							</svg>
-						</template>
-						<template #suffix v-if="searchTerm">
-							<button @click="searchTerm = ''" class="text-gray-400 hover:text-gray-600">
-								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-								</svg>
-							</button>
-						</template>
-					</Input>
+						</button>
+					</div>
 					<p v-if="!loading && allCustomers.length > 0" class="text-xs text-gray-500 mt-1">
-						{{ customers.length }} of {{ allCustomers.length }} customers
-						<span v-if="customers.length > 0" class="text-gray-400">• Use ↑↓ to navigate, Enter to select</span>
+						<span v-if="showingRecent" class="text-blue-600 font-medium">⭐ Recent & Frequent</span>
+						<span v-else>{{ customers.length }} of {{ allCustomers.length }} customers</span>
+						<span v-if="customers.length > 0" class="text-gray-400 ml-1">• Use ↑↓ to navigate, Enter to select</span>
 					</p>
 				</div>
 
-				<!-- Customers List -->
-				<div class="max-h-96 overflow-y-auto">
+				<!-- Smart Recommendations -->
+				<div v-if="recommendations.length > 0" class="flex flex-wrap gap-2 -mt-2">
+					<div
+						v-for="rec in recommendations"
+						:key="rec.type"
+						class="inline-flex items-center space-x-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs"
+					>
+						<span>{{ rec.icon }}</span>
+						<span>{{ rec.text }}</span>
+					</div>
+				</div>
+
+				<!-- Customers List - Optimized rendering -->
+				<div class="max-h-96 overflow-y-auto" style="will-change: scroll-position;">
 					<div v-if="loading" class="text-center py-8">
 						<div
 							class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"
@@ -93,16 +112,18 @@
 								d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
 							/>
 						</svg>
-						<p class="mt-2 text-sm text-gray-500">No customers found for "{{ searchTerm }}"</p>
-						<p class="text-xs text-gray-400 mt-1">
+						<p class="mt-2 text-sm font-medium text-gray-700">No results for "{{ searchTerm }}"</p>
+						<p class="text-xs text-gray-500 mt-1">
 							Try a different search term or create a new customer
 						</p>
 					</div>
 
+					<!-- Optimized list rendering with v-memo for performance -->
 					<div v-else class="space-y-2">
 						<button
 							v-for="(customer, index) in customers"
 							:key="customer.name"
+							v-memo="[customer.name, index === selectedIndex]"
 							@click="selectCustomer(customer)"
 							:class="[
 								'w-full text-left p-3 rounded-lg border transition-all duration-75',
@@ -161,11 +182,10 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from "vue"
-import { Dialog, Input, Button } from "frappe-ui"
+import { Dialog, Button } from "frappe-ui"
 import CreateCustomerDialog from "./CreateCustomerDialog.vue"
-import { isOffline } from "@/utils/offline"
-import { offlineWorker } from "@/utils/offline/workerClient"
-import { call } from "@/utils/apiWrapper"
+import { useCustomerSearchStore } from "@/stores/customerSearch"
+import { storeToRefs } from "pinia"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -174,100 +194,40 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue", "customer-selected"])
 
+// Use Pinia store
+const customerStore = useCustomerSearchStore()
+const { filteredCustomers, loading, selectedIndex, searchTerm, allCustomers, recommendations } = storeToRefs(customerStore)
+
+// Local state
+const showCreateDialog = ref(false)
+
 const show = computed({
 	get: () => props.modelValue,
 	set: (val) => emit("update:modelValue", val),
 })
 
-const searchTerm = ref("")
-const allCustomers = ref([])
-const showCreateDialog = ref(false)
-const loading = ref(false)
-const selectedIndex = ref(-1)
+// Alias for template compatibility
+const customers = computed(() => filteredCustomers.value)
 
-// Real-time filtered customers - instant results!
-const customers = computed(() => {
-	const startTime = performance.now()
-	const term = searchTerm.value.trim().toLowerCase()
-
-	if (!term) {
-		const result = allCustomers.value.slice(0, 50)
-		const elapsed = performance.now() - startTime
-		console.log(`⚡ Computed ${result.length} customers in ${elapsed.toFixed(2)}ms`)
-		return result
-	}
-
-	// Instant in-memory filtering
-	const filtered = allCustomers.value.filter(cust => {
-		const name = (cust.customer_name || '').toLowerCase()
-		const mobile = (cust.mobile_no || '').toLowerCase()
-		const email = (cust.email_id || '').toLowerCase()
-		const id = (cust.name || '').toLowerCase()
-
-		return name.includes(term) ||
-		       mobile.includes(term) ||
-		       email.includes(term) ||
-		       id.includes(term)
-	}).slice(0, 50)
-
-	const elapsed = performance.now() - startTime
-	console.log(`⚡ Filtered ${filtered.length} customers in ${elapsed.toFixed(2)}ms (search: "${term}")`)
-	return filtered
-})
-
-// Load all customers into memory once
-async function loadAllCustomers() {
-	if (!props.posProfile) {
-		return
-	}
-
-	loading.value = true
-	try {
-		// Try to get from worker cache first
-		const cachedCustomers = await offlineWorker.searchCachedCustomers("", 9999)
-
-		if (cachedCustomers && cachedCustomers.length > 0) {
-			allCustomers.value = cachedCustomers
-			console.log(`✓ Loaded ${cachedCustomers.length} customers for instant search`)
-		} else if (!isOffline()) {
-			// Fetch from server if cache is empty
-			const response = await call("pos_next.api.customers.get_customers", {
-				pos_profile: props.posProfile,
-				search_term: "",
-				start: 0,
-				limit: 9999,
-			})
-			const list = response?.message || response || []
-			allCustomers.value = list
-
-			// Cache for future use
-			if (list.length) {
-				await offlineWorker.cacheCustomers(list)
-			}
-			console.log(`✓ Loaded ${list.length} customers for instant search`)
-		}
-	} catch (error) {
-		console.error("Error loading customers:", error)
-		allCustomers.value = []
-	} finally {
-		loading.value = false
-	}
-}
-
-// Reset selection when results change
-watch(customers, () => {
-	selectedIndex.value = -1
-})
+// Show recent customers label
+const showingRecent = computed(() => !searchTerm.value && customers.value.length > 0)
 
 // Load customers when dialog opens
 watch(show, (newVal) => {
 	if (newVal) {
-		searchTerm.value = ""
+		customerStore.clearSearch()
 		if (allCustomers.value.length === 0) {
-			loadAllCustomers()
+			customerStore.loadAllCustomers(props.posProfile)
 		}
 	}
 })
+
+// Handle search input with instant reactivity
+function handleSearchInput(event) {
+	const value = event.target.value
+	console.log('🔍 Search input:', value) // Debug log
+	customerStore.setSearchTerm(value)
+}
 
 // Keyboard navigation
 function handleKeydown(event) {
@@ -275,10 +235,10 @@ function handleKeydown(event) {
 
 	if (event.key === 'ArrowDown') {
 		event.preventDefault()
-		selectedIndex.value = Math.min(selectedIndex.value + 1, customers.value.length - 1)
+		customerStore.setSelectedIndex(Math.min(selectedIndex.value + 1, customers.value.length - 1))
 	} else if (event.key === 'ArrowUp') {
 		event.preventDefault()
-		selectedIndex.value = Math.max(selectedIndex.value - 1, -1)
+		customerStore.setSelectedIndex(Math.max(selectedIndex.value - 1, -1))
 	} else if (event.key === 'Enter') {
 		event.preventDefault()
 		if (selectedIndex.value >= 0 && selectedIndex.value < customers.value.length) {
@@ -293,11 +253,15 @@ function handleKeydown(event) {
 
 onMounted(() => {
 	if (props.posProfile) {
-		loadAllCustomers()
+		customerStore.loadAllCustomers(props.posProfile)
+		customerStore.loadCustomerHistory()
 	}
 })
 
 function selectCustomer(customer) {
+	// Track selection for recommendations
+	customerStore.trackCustomerSelection(customer.name)
+
 	emit("customer-selected", customer)
 	show.value = false
 }
@@ -308,20 +272,11 @@ function createNewCustomer() {
 
 async function handleCustomerCreated(customer) {
 	if (props.posProfile) {
-		try {
-			// Add to local array
-			const existingWithoutNew = allCustomers.value.filter(
-				(cust) => cust.name !== customer.name
-			)
-			allCustomers.value = [customer, ...existingWithoutNew]
-
-			// Cache in worker
-			await offlineWorker.cacheCustomers([customer])
-			console.log("✓ New customer cached for instant search")
-		} catch (error) {
-			console.error("Error caching newly created customer:", error)
-		}
+		await customerStore.addCustomerToCache(customer)
 	}
+
+	// Track new customer selection
+	customerStore.trackCustomerSelection(customer.name)
 
 	emit("customer-selected", customer)
 	show.value = false
