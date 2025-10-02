@@ -56,16 +56,18 @@ bench build --app pos_next
 bench restart
 ```
 
-### Step 3: Setup
+### Step 3: Access POS
+
+Visit `https://<your-domain>/pos` (or `http://<server-ip>/pos`) replacing the host with your DNS/IP.
+
+### Step 4: Setup
 
 1. **Create POS Profile**: `Retail > POS Profile > New`
    - Set Company, Warehouse, Price List, Currency, Payment Methods
 
-2. **Open POS**: Navigate to `/app/pos-sale`
+2. **(Optional) Create Offers**: `POSAwesome > POS Offer`
 
-3. **(Optional) Create Offers**: `POSAwesome > POS Offer`
-
-4. **(Optional) Create Coupons**: `POSAwesome > POS Coupon`
+3. **(Optional) Create Coupons**: `POSAwesome > POS Coupon`
 
 ## 📖 Quick Start
 
