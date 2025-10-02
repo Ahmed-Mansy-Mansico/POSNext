@@ -178,7 +178,7 @@
 								</button>
 								<hr class="my-2 border-gray-100">
 								<button
-									@click="handleCloseShift; showActionsMenu = false"
+									@click="handleCloseShift(); showActionsMenu = false"
 									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 flex items-center space-x-3 transition-colors"
 								>
 									<svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
