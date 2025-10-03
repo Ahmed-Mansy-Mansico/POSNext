@@ -46,7 +46,12 @@ def get_pos_profile_data(pos_profile):
 
 	return {
 		"pos_profile": profile_doc,
-		"company": company_doc
+		"company": company_doc,
+		"print_settings": {
+			"auto_print": profile_doc.get("print_receipt_on_order_complete", 0),
+			"print_format": profile_doc.get("print_format"),
+			"letter_head": profile_doc.get("letter_head"),
+		}
 	}
 
 

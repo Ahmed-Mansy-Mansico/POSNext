@@ -841,14 +841,35 @@ async function handlePaymentCompleted(paymentData) {
 					itemsSelectorRef.value.loadItems()
 				}
 
-				showSuccessDialog.value = true
-
-				toast.create({
-					title: "Success",
-					text: `Invoice ${lastInvoiceName.value} created successfully`,
-					icon: "check",
-					iconClasses: "text-green-600",
-				})
+				// Check if auto-print is enabled
+				const autoPrint = currentProfile.value?.print_receipt_on_order_complete
+				if (autoPrint) {
+					try {
+						await printInvoiceByName(lastInvoiceName.value)
+						toast.create({
+							title: "Success",
+							text: `Invoice ${lastInvoiceName.value} created and sent to printer`,
+							icon: "check",
+							iconClasses: "text-green-600",
+						})
+					} catch (error) {
+						console.error("Auto-print error:", error)
+						toast.create({
+							title: "Invoice Created",
+							text: `Invoice ${lastInvoiceName.value} created but print failed`,
+							icon: "alert-circle",
+							iconClasses: "text-orange-600",
+						})
+					}
+				} else {
+					showSuccessDialog.value = true
+					toast.create({
+						title: "Success",
+						text: `Invoice ${lastInvoiceName.value} created successfully`,
+						icon: "check",
+						iconClasses: "text-green-600",
+					})
+				}
 			}
 		}
 	} catch (error) {

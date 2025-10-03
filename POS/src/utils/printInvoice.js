@@ -1,3 +1,5 @@
+import { call } from "@/utils/apiWrapper"
+
 // Print utility for POS invoices
 export function printInvoice(invoiceData) {
 	const printWindow = window.open('', '_blank', 'width=800,height=600')
@@ -249,16 +251,13 @@ function formatCurrency(amount) {
 
 export async function printInvoiceByName(invoiceName) {
 	try {
-		const response = await window.frappe.call({
-			method: 'frappe.client.get',
-			args: {
-				doctype: 'Sales Invoice',
-				name: invoiceName
-			}
+		const response = await call('frappe.client.get', {
+			doctype: 'Sales Invoice',
+			name: invoiceName
 		})
 
-		if (response.message) {
-			printInvoice(response.message)
+		if (response) {
+			printInvoice(response)
 		}
 	} catch (error) {
 		console.error('Error fetching invoice for print:', error)
