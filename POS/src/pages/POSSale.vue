@@ -245,9 +245,12 @@
 				@pointermove="handleResize"
 				@pointerup="stopResize"
 				@pointercancel="stopResize"
-				class="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize relative flex-shrink-0 z-10"
-				:class="{ 'bg-blue-500': isResizing }"
-				style="transition: background-color 0.1s ease;"
+				class="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize relative flex-shrink-0 transition-all duration-100"
+				:class="{
+					'bg-blue-500': isResizing,
+					'pointer-events-none opacity-0': isAnyDialogOpen,
+					'z-[1]': !isAnyDialogOpen
+				}"
 			>
 				<!-- Expanded hit area for easier grabbing -->
 				<div
@@ -477,6 +480,7 @@ import { useRouter } from "vue-router"
 import { useInvoice } from "@/composables/useInvoice"
 import { useShift } from "@/composables/useShift"
 import { useOffline } from "@/composables/useOffline"
+import { useDialog, useDialogState } from "@/composables/useDialogState"
 import { Button, Dialog, toast } from "frappe-ui"
 import ItemsSelector from "@/components/sale/ItemsSelector.vue"
 import InvoiceCart from "@/components/sale/InvoiceCart.vue"
@@ -528,20 +532,23 @@ const {
 	clearCart,
 } = useInvoice()
 
+// Use dialog composable for automatic global tracking
+const { isOpen: showPaymentDialog } = useDialog('payment')
+const { isOpen: showCustomerDialog } = useDialog('customer')
+const { isOpen: showSuccessDialog } = useDialog('success')
+const { isOpen: showOpenShiftDialog } = useDialog('openShift')
+const { isOpen: showCloseShiftDialog } = useDialog('closeShift')
+const { isOpen: showDraftDialog } = useDialog('draft')
+const { isOpen: showReturnDialog } = useDialog('return')
+const { isOpen: showCouponDialog } = useDialog('coupon')
+const { isOpen: showBatchSerialDialog } = useDialog('batchSerial')
+const { isOpen: showHistoryDialog } = useDialog('history')
+const { isOpen: showCreateCustomerDialog } = useDialog('createCustomer')
+const { isOpen: showClearCartDialog } = useDialog('clearCart')
+
+// Other refs
 const itemsSelectorRef = ref(null)
-const showPaymentDialog = ref(false)
-const showCustomerDialog = ref(false)
-const showSuccessDialog = ref(false)
-const showOpenShiftDialog = ref(false)
-const showCloseShiftDialog = ref(false)
 const showActionsMenu = ref(false)
-const showDraftDialog = ref(false)
-const showReturnDialog = ref(false)
-const showCouponDialog = ref(false)
-const showBatchSerialDialog = ref(false)
-const showHistoryDialog = ref(false)
-const showCreateCustomerDialog = ref(false)
-const showClearCartDialog = ref(false)
 const initialCustomerName = ref("")
 const pendingItem = ref(null)
 const pendingItemQty = ref(1)
@@ -555,6 +562,9 @@ const containerRef = ref(null)
 const dividerRef = ref(null)
 const leftPanelWidth = ref(800) // Start with 800px width
 const isResizing = ref(false)
+
+// Get global dialog state for divider behavior
+const { isAnyDialogOpen } = useDialogState()
 
 // Update shift duration every second
 function updateShiftDuration() {
