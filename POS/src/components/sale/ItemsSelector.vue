@@ -57,22 +57,33 @@
 					<input
 						id="item-search"
 						name="item-search"
+						ref="searchInputRef"
 						:value="searchTerm"
 						@input="handleSearchInput"
+						@keydown="handleKeyDown"
 						type="text"
-						placeholder="Search by item code, name or scan barcode"
-						class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-						@keyup.enter="handleBarcodeSearch"
+						:placeholder="scannerEnabled ? 'Scanner Ready - Scan barcode now' : 'Search by item code, name or scan barcode'"
+						:class="[
+							'w-full text-sm border rounded-md px-3 py-2 pl-10 pr-10 focus:outline-none transition-all',
+							scannerEnabled
+								? 'border-green-400 bg-green-50 focus:ring-2 focus:ring-green-500 focus:border-transparent'
+								: 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+						]"
 						aria-label="Search items"
 					/>
 					<!-- Barcode Scan Icon -->
 					<div class="absolute inset-y-0 right-0 pr-3 flex items-center">
 						<button
-							@click="handleBarcodeScan"
-							class="p-1 hover:bg-gray-100 rounded transition-colors"
-							title="Scan Barcode"
+							@click="toggleBarcodeScanner"
+							:class="[
+								'p-1 rounded transition-all',
+								scannerEnabled
+									? 'bg-green-100 hover:bg-green-200 text-green-700'
+									: 'hover:bg-gray-100 text-gray-600'
+							]"
+							:title="scannerEnabled ? 'Barcode Scanner: ON (Click to disable)' : 'Barcode Scanner: OFF (Click to enable)'"
 						>
-							<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
 							</svg>
 						</button>
@@ -273,6 +284,10 @@ const { filteredItems, searchTerm, selectedItemGroup, itemGroups, loading } = st
 
 // Local state
 const viewMode = ref('grid')
+const lastKeyTime = ref(0)
+const barcodeBuffer = ref('')
+const searchInputRef = ref(null)
+const scannerEnabled = ref(false)
 
 // Watch for cart items and pos profile changes
 watch(() => props.cartItems, (newCartItems) => {
@@ -292,10 +307,34 @@ onMounted(() => {
 	}
 })
 
+// Handle keydown for barcode scanner detection
+function handleKeyDown(event) {
+	const currentTime = Date.now()
+	const timeDiff = currentTime - lastKeyTime.value
+
+	// If Enter is pressed, always trigger search
+	if (event.key === 'Enter') {
+		event.preventDefault()
+		handleBarcodeSearch()
+		barcodeBuffer.value = ''
+		return
+	}
+
+	// Barcode scanners typically input very fast (< 50ms between characters)
+	// If time between keystrokes is very short, it's likely a barcode scanner
+	if (timeDiff < 50 && event.key.length === 1) {
+		barcodeBuffer.value += event.key
+	} else {
+		// Manual typing - reset buffer
+		barcodeBuffer.value = event.key.length === 1 ? event.key : ''
+	}
+
+	lastKeyTime.value = currentTime
+}
+
 // Handle search input with instant reactivity
 function handleSearchInput(event) {
 	const value = event.target.value
-	console.log('🔍 Item search:', value) // Debug log
 	itemStore.setSearchTerm(value)
 }
 
@@ -303,10 +342,37 @@ function handleItemClick(item) {
 	emit("item-selected", item)
 }
 
-function handleBarcodeSearch() {
-	if (!searchTerm.value.trim()) return
+async function handleBarcodeSearch() {
+	const barcode = searchTerm.value.trim()
 
-	// If only one item matches, auto-select it
+	if (!barcode) {
+		return
+	}
+
+	// If scanner is enabled, always try to add to cart automatically
+	const shouldAutoAdd = scannerEnabled.value
+
+	try {
+		// First try exact barcode lookup via API
+		const item = await itemStore.searchByBarcode(barcode)
+
+		if (item) {
+			// Item found by barcode - add to cart immediately
+			emit("item-selected", item)
+			itemStore.clearSearch()
+			toast.create({
+				title: "Item Added",
+				text: `${item.item_name} added to cart`,
+				icon: "check",
+				iconClasses: "text-green-600",
+			})
+			return
+		}
+	} catch (error) {
+		console.error('Barcode API error:', error)
+	}
+
+	// Fallback: If only one item matches in filtered results, auto-select it
 	if (filteredItems.value.length === 1) {
 		emit("item-selected", filteredItems.value[0])
 		itemStore.clearSearch()
@@ -316,22 +382,62 @@ function handleBarcodeSearch() {
 			icon: "check",
 			iconClasses: "text-green-600",
 		})
+	} else if (filteredItems.value.length === 0) {
+		toast.create({
+			title: "Item Not Found",
+			text: `No item found with barcode: ${barcode}`,
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+
+		// If scanner mode is enabled, clear search immediately for next scan
+		if (shouldAutoAdd) {
+			itemStore.clearSearch()
+		}
+	} else {
+		if (shouldAutoAdd) {
+			// In scanner mode, don't show manual selection - just notify
+			toast.create({
+				title: "Multiple Items Found",
+				text: `${filteredItems.value.length} items match barcode. Please refine search.`,
+				icon: "alert-circle",
+				iconClasses: "text-orange-600",
+			})
+		} else {
+			toast.create({
+				title: "Multiple Items Found",
+				text: `${filteredItems.value.length} items match. Please select one.`,
+				icon: "alert-circle",
+				iconClasses: "text-blue-600",
+			})
+		}
 	}
 }
 
-function handleBarcodeScan() {
-	// Focus on search input for barcode scanner
-	const input = document.querySelector('input[type="text"]')
-	if (input) {
-		input.focus()
-	}
+function toggleBarcodeScanner() {
+	scannerEnabled.value = !scannerEnabled.value
 
-	toast.create({
-		title: "Scan Barcode",
-		text: "Ready to scan barcode or enter manually",
-		icon: "alert-circle",
-		iconClasses: "text-blue-600",
-	})
+	// Focus on search input when enabling scanner
+	if (scannerEnabled.value) {
+		const input = searchInputRef.value || document.getElementById('item-search')
+		if (input) {
+			input.focus()
+		}
+
+		toast.create({
+			title: "Barcode Scanner Enabled",
+			text: "Scan barcode to automatically add items to cart",
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} else {
+		toast.create({
+			title: "Barcode Scanner Disabled",
+			text: "Scanner mode turned off",
+			icon: "alert-circle",
+			iconClasses: "text-gray-600",
+		})
+	}
 }
 
 function formatCurrency(amount) {

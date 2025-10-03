@@ -43,8 +43,6 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 
 	// Getters
 	const filteredItems = computed(() => {
-		const startTime = performance.now()
-
 		if (!allItems.value || allItems.value.length === 0) return []
 
 		let filtered = allItems.value
@@ -94,9 +92,6 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			return item
 		})
 
-		const elapsed = performance.now() - startTime
-		console.log(`⚡ Filtered ${result.length} items in ${elapsed.toFixed(2)}ms (search: "${searchTerm.value}")`)
-
 		return result
 	})
 
@@ -121,9 +116,6 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			const list = response?.message || response || []
 			allItems.value = list
 
-			console.log(`✓ Loaded ${list.length} items from server`)
-			console.log(`📦 Sample item with item_group:`, list[0])
-
 			// Cache for future use
 			if (list.length) {
 				await offlineWorker.cacheItems(list)
@@ -138,7 +130,6 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			try {
 				const cached = await offlineWorker.searchCachedItems('', 9999)
 				allItems.value = cached || []
-				console.log(`⚠️ Loaded ${allItems.value.length} items from cache (server failed)`)
 			} catch (cacheError) {
 				console.error('Cache also failed:', cacheError)
 				allItems.value = []
@@ -156,14 +147,23 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 
 	async function searchByBarcode(barcode) {
 		try {
+			if (!posProfile.value) {
+				console.error('No POS Profile set in store')
+				throw new Error('POS Profile not set')
+			}
+
+			console.log('Calling searchByBarcode API with posProfile:', posProfile.value)
+
 			const result = await searchByBarcodeResource.submit({
-				barcode,
+				barcode: barcode,
 				pos_profile: posProfile.value,
 			})
-			return result?.message || result
+
+			const item = result?.message || result
+			return item
 		} catch (error) {
-			console.error('Error searching by barcode:', error)
-			return null
+			console.error('Store searchByBarcode error:', error)
+			throw error
 		}
 	}
 
@@ -195,7 +195,6 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 		selectedItemGroup.value = group
 		// Clear result cache when item group changes to force re-filtering
 		resultCache.value.clear()
-		console.log('📂 Item group changed to:', group || 'All Items')
 	}
 
 	function setCartItems(items) {
