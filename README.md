@@ -18,29 +18,10 @@ A modern, high-performance Point of Sale system for ERPNext with offline capabil
 
 1. **Frappe Framework** (version 15+)
 2. **ERPNext** (version 15+)
-3. **POSAwesome** - **REQUIRED** (provides POS Offer & Coupon doctypes)
 
 ## 🚀 Installation
 
-### Step 1: Install POSAwesome (Required First)
-
-⚠️ **IMPORTANT**: POSAwesome must be installed before POS Next for coupon/offer functionality.
-
-```bash
-cd ~/frappe-bench
-
-# Get POSAwesome
-bench get-app https://github.com/defendicon/POS-Awesome-V15
-
-# Install requirements
-bench setup requirements
-
-# Install on site
-bench --site [your-site-name] install-app posawesome
-bench --site [your-site-name] migrate
-```
-
-### Step 2: Install POS Next
+### Step 1: Install POS Next
 
 ```bash
 cd ~/frappe-bench
@@ -56,18 +37,18 @@ bench build --app pos_next
 bench restart
 ```
 
-### Step 3: Access POS
+### Step 2: Access POS
 
 Visit `https://<your-domain>/pos` (or `http://<server-ip>/pos`) replacing the host with your DNS/IP.
 
-### Step 4: Setup
+### Step 3: Setup
 
 1. **Create POS Profile**: `Retail > POS Profile > New`
    - Set Company, Warehouse, Price List, Currency, Payment Methods
 
-2. **(Optional) Create Offers**: `POSAwesome > POS Offer`
+2. **(Optional) Create Offers**: `POS Next > POS Offer`
 
-3. **(Optional) Create Coupons**: `POSAwesome > POS Coupon`
+3. **(Optional) Create Coupons**: `POS Next > POS Coupon`
 
 ## 📖 Quick Start
 
@@ -112,13 +93,6 @@ Visit `https://<your-domain>/pos` (or `http://<server-ip>/pos`) replacing the ho
 Displays proper symbols for: EGP (E£), SAR (ر.س), AED (د.إ), USD ($), EUR (€), GBP (£), and more.
 
 ## 🔧 Troubleshooting
-
-### "Coupon system not installed"
-**Solution**: Install POSAwesome (see Step 1 above), then:
-```bash
-bench --site [site] migrate
-bench restart
-```
 
 ### Items Not Loading
 - Verify items exist in selected warehouse
@@ -219,7 +193,6 @@ AGPL-3.0 - See [LICENSE](LICENSE) file
 
 - [Frappe Framework](https://frappeframework.com/) - Full-stack framework
 - [ERPNext](https://erpnext.com/) - Open source ERP
-- [POSAwesome](https://github.com/defendicon/POS-Awesome-V15) - POS Offer/Coupon functionality
 - [Vue.js 3](https://vuejs.org/) - Frontend framework
 - [Tailwind CSS](https://tailwindcss.com/) - Styling
 
