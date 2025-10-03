@@ -15,7 +15,7 @@ export const pingServer = async () => {
 		const controller = new AbortController()
 		const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
 
-		const response = await fetch('/api/method/ping', {
+		const response = await fetch('/api/method/pos_next.api.ping', {
 			method: 'GET',
 			signal: controller.signal,
 		})
