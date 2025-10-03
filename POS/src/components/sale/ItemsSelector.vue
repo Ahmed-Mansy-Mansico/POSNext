@@ -91,7 +91,7 @@
 				</div>
 				<div class="flex items-center space-x-0.5 bg-gray-100 rounded-md p-0.5">
 					<button
-						@click="viewMode = 'grid'"
+						@click="setViewMode('grid')"
 						:class="[
 							'p-1.5 rounded transition-all',
 							viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
@@ -103,7 +103,7 @@
 						</svg>
 					</button>
 					<button
-						@click="viewMode = 'list'"
+						@click="setViewMode('list')"
 						:class="[
 							'p-1.5 rounded transition-all',
 							viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
@@ -153,58 +153,111 @@
 		</div>
 
 		<!-- Grid View -->
-		<div v-else-if="viewMode === 'grid'" class="flex-1 overflow-y-auto p-3">
-			<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
-				<div
-					v-for="item in filteredItems"
-					:key="item.item_code"
-					@click="handleItemClick(item)"
-					class="relative bg-white border border-gray-200 rounded-lg p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
-				>
-					<!-- Item Image with Stock Badge -->
-					<div class="relative aspect-square bg-gray-100 rounded-md mb-2 flex items-center justify-center overflow-hidden">
-						<!-- Stock Badge -->
-						<div
-							:class="[
-								'absolute top-1 right-1 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full',
-								(item.actual_qty || item.stock_qty || 0) > 0 ? 'bg-green-500' : 'bg-red-500'
-							]"
-						>
-							{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
+		<div v-else-if="viewMode === 'grid'" class="flex-1 flex flex-col overflow-hidden">
+			<div class="flex-1 overflow-y-auto p-3">
+				<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+					<div
+						v-for="item in paginatedItems"
+						:key="item.item_code"
+						@click="handleItemClick(item)"
+						class="relative bg-white border border-gray-200 rounded-lg p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+					>
+						<!-- Item Image with Stock Badge -->
+						<div class="relative aspect-square bg-gray-100 rounded-md mb-2 flex items-center justify-center overflow-hidden">
+							<!-- Stock Badge -->
+							<div
+								:class="[
+									'absolute top-1 right-1 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+									(item.actual_qty || item.stock_qty || 0) > 0 ? 'bg-green-500' : 'bg-red-500'
+								]"
+							>
+								{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
+							</div>
+
+							<img
+								v-if="item.image"
+								:src="item.image"
+								:alt="item.item_name"
+								loading="lazy"
+								class="w-full h-full object-cover"
+								@error="handleImageError"
+							/>
+							<svg
+								v-else
+								class="h-10 w-10 text-gray-300"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+								/>
+							</svg>
 						</div>
 
-						<img
-							v-if="item.image"
-							:src="item.image"
-							:alt="item.item_name"
-							class="w-full h-full object-cover"
-							@error="handleImageError"
-						/>
-						<svg
-							v-else
-							class="h-10 w-10 text-gray-300"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-							/>
-						</svg>
+						<!-- Item Details -->
+						<div>
+							<h3 class="text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
+								{{ item.item_name }}
+							</h3>
+							<p class="text-[10px] text-gray-500">
+								{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
+								<span class="text-gray-400">/ {{ item.stock_uom || 'Nos' }}</span>
+							</p>
+						</div>
 					</div>
+				</div>
+			</div>
 
-					<!-- Item Details -->
-					<div>
-						<h3 class="text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
-							{{ item.item_name }}
-						</h3>
-						<p class="text-[10px] text-gray-500">
-							{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
-							<span class="text-gray-400">/ {{ item.stock_uom || 'Nos' }}</span>
-						</p>
+			<!-- Pagination Controls for Grid View -->
+			<div v-if="totalPages > 1" class="px-3 py-2 bg-white border-t border-gray-200">
+				<div class="flex items-center justify-between">
+					<div class="text-xs text-gray-600">
+						Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredItems.length) }} of {{ filteredItems.length }} items
+					</div>
+					<div class="flex items-center space-x-1">
+						<button
+							@click="previousPage"
+							:disabled="currentPage === 1"
+							:class="[
+								'px-2 py-1 text-xs rounded border transition-all',
+								currentPage === 1
+									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+							]"
+						>
+							Previous
+						</button>
+						<div class="flex items-center space-x-1">
+							<button
+								v-for="page in getPaginationRange()"
+								:key="page"
+								@click="goToPage(page)"
+								:class="[
+									'px-2.5 py-1 text-xs rounded border transition-all',
+									currentPage === page
+										? 'bg-blue-600 text-white border-blue-600'
+										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+								]"
+							>
+								{{ page }}
+							</button>
+						</div>
+						<button
+							@click="nextPage"
+							:disabled="currentPage === totalPages"
+							:class="[
+								'px-2 py-1 text-xs rounded border transition-all',
+								currentPage === totalPages
+									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+							]"
+						>
+							Next
+						</button>
 					</div>
 				</div>
 			</div>
@@ -226,14 +279,14 @@
 					</thead>
 					<tbody class="bg-white divide-y divide-gray-200">
 						<tr
-							v-for="item in filteredItems"
+							v-for="item in paginatedItems"
 							:key="item.item_code"
 							@click="handleItemClick(item)"
 							class="cursor-pointer hover:bg-blue-50 transition-colors"
 						>
 							<td class="px-3 py-2 whitespace-nowrap">
 								<div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
-									<img v-if="item.image" :src="item.image" :alt="item.item_name" class="w-full h-full object-cover" @error="handleImageError" />
+									<img v-if="item.image" :src="item.image" :alt="item.item_name" loading="lazy" class="w-full h-full object-cover" @error="handleImageError" />
 									<svg v-else class="h-5 w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
 									</svg>
@@ -251,14 +304,64 @@
 						</tr>
 					</tbody>
 				</table>
-				<div v-if="filteredItems.length === 0" class="text-center py-8 text-gray-500">No items found</div>
+				<div v-if="paginatedItems.length === 0" class="text-center py-8 text-gray-500">No items found</div>
+			</div>
+
+			<!-- Pagination Controls for List View -->
+			<div v-if="totalPages > 1" class="px-3 py-2 bg-white border-t border-gray-200">
+				<div class="flex items-center justify-between">
+					<div class="text-xs text-gray-600">
+						Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredItems.length) }} of {{ filteredItems.length }} items
+					</div>
+					<div class="flex items-center space-x-1">
+						<button
+							@click="previousPage"
+							:disabled="currentPage === 1"
+							:class="[
+								'px-2 py-1 text-xs rounded border transition-all',
+								currentPage === 1
+									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+							]"
+						>
+							Previous
+						</button>
+						<div class="flex items-center space-x-1">
+							<button
+								v-for="page in getPaginationRange()"
+								:key="page"
+								@click="goToPage(page)"
+								:class="[
+									'px-2.5 py-1 text-xs rounded border transition-all',
+									currentPage === page
+										? 'bg-blue-600 text-white border-blue-600'
+										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+								]"
+							>
+								{{ page }}
+							</button>
+						</div>
+						<button
+							@click="nextPage"
+							:disabled="currentPage === totalPages"
+							:class="[
+								'px-2 py-1 text-xs rounded border transition-all',
+								currentPage === totalPages
+									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+							]"
+						>
+							Next
+						</button>
+					</div>
+				</div>
 			</div>
 		</div>
 	</div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
 import { toast } from "frappe-ui"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { useItemSearchStore } from "@/stores/itemSearch"
@@ -288,6 +391,26 @@ const lastKeyTime = ref(0)
 const barcodeBuffer = ref('')
 const searchInputRef = ref(null)
 const scannerEnabled = ref(false)
+const itemThreshold = ref(50) // Threshold for auto-switching to list view
+const userManuallySetView = ref(false) // Track if user manually changed view mode
+
+// Pagination state
+const currentPage = ref(1)
+const itemsPerPage = ref(20)
+
+// Computed paginated items
+const paginatedItems = computed(() => {
+	if (!filteredItems.value) return []
+
+	const start = (currentPage.value - 1) * itemsPerPage.value
+	const end = start + itemsPerPage.value
+	return filteredItems.value.slice(start, end)
+})
+
+const totalPages = computed(() => {
+	if (!filteredItems.value) return 0
+	return Math.ceil(filteredItems.value.length / itemsPerPage.value)
+})
 
 // Watch for cart items and pos profile changes
 watch(() => props.cartItems, (newCartItems) => {
@@ -299,6 +422,29 @@ watch(() => props.posProfile, (newProfile) => {
 		itemStore.setPosProfile(newProfile)
 	}
 }, { immediate: true })
+
+// Reset to page 1 when filtered items change
+watch(filteredItems, (newItems) => {
+	if (!newItems) return
+
+	const itemCount = newItems.length
+
+	// Reset pagination when items change
+	currentPage.value = 1
+
+	// Only auto-switch if user hasn't manually set a preference
+	// and we're in grid view with many items
+	if (!userManuallySetView.value && viewMode.value === 'grid' && itemCount > itemThreshold.value) {
+		viewMode.value = 'list'
+
+		toast.create({
+			title: "Switched to List View",
+			text: `Displaying ${itemCount} items - automatically switched to list view for better performance`,
+			icon: "list",
+			iconClasses: "text-blue-600",
+		})
+	}
+}, { immediate: false })
 
 onMounted(() => {
 	if (props.posProfile) {
@@ -452,5 +598,61 @@ defineExpose({
 
 function handleImageError(event) {
 	event.target.style.display = "none"
+}
+
+// View mode functions
+function setViewMode(mode) {
+	viewMode.value = mode
+	userManuallySetView.value = true
+}
+
+// Pagination functions
+function goToPage(page) {
+	if (page >= 1 && page <= totalPages.value) {
+		currentPage.value = page
+	}
+}
+
+function nextPage() {
+	if (currentPage.value < totalPages.value) {
+		currentPage.value++
+	}
+}
+
+function previousPage() {
+	if (currentPage.value > 1) {
+		currentPage.value--
+	}
+}
+
+function getPaginationRange() {
+	const range = []
+	const total = totalPages.value
+	const current = currentPage.value
+	const delta = 2 // Number of pages to show on each side of current page
+
+	if (total <= 7) {
+		// Show all pages if total is small
+		for (let i = 1; i <= total; i++) {
+			range.push(i)
+		}
+	} else {
+		// Show smart range with ellipsis
+		if (current <= 3) {
+			for (let i = 1; i <= 5; i++) {
+				range.push(i)
+			}
+		} else if (current >= total - 2) {
+			for (let i = total - 4; i <= total; i++) {
+				range.push(i)
+			}
+		} else {
+			for (let i = current - delta; i <= current + delta; i++) {
+				range.push(i)
+			}
+		}
+	}
+
+	return range
 }
 </script>
