@@ -51,7 +51,16 @@
 									<h4 class="text-sm font-semibold text-gray-900">
 										{{ invoice.name }}
 									</h4>
+									<!-- Show Return badge (red) if it's a return invoice -->
 									<span
+										v-if="invoice.is_return"
+										class="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-800"
+									>
+										Return
+									</span>
+									<!-- Otherwise show regular status badge -->
+									<span
+										v-else
 										:class="[
 											'text-xs px-2 py-0.5 rounded-full font-medium',
 											invoice.docstatus === 1
@@ -62,9 +71,6 @@
 										]"
 									>
 										{{ invoice.status }}
-									</span>
-									<span v-if="invoice.is_return" class="text-xs px-2 py-0.5 rounded-full font-medium bg-orange-100 text-orange-800">
-										Return
 									</span>
 								</div>
 								<div class="flex items-center space-x-4 text-xs text-gray-600">

@@ -356,10 +356,11 @@ def update_invoice(data):
 		if invoice_doc.is_return:
 			for payment in invoice_doc.payments:
 				payment.amount = -abs(payment.amount)
-				payment.base_amount = -abs(payment.base_amount)
+				if payment.base_amount:
+					payment.base_amount = -abs(payment.base_amount)
 
 			invoice_doc.paid_amount = flt(sum(p.amount for p in invoice_doc.payments))
-			invoice_doc.base_paid_amount = flt(sum(p.base_amount for p in invoice_doc.payments))
+			invoice_doc.base_paid_amount = flt(sum(p.base_amount or 0 for p in invoice_doc.payments))
 
 		# Save as draft
 		invoice_doc.flags.ignore_permissions = True
@@ -511,6 +512,119 @@ def delete_invoice(invoice):
 # ==========================================
 # Return Invoice Management
 # ==========================================
+
+@frappe.whitelist()
+def get_returnable_invoices(limit=50):
+	"""Get list of invoices that have items available for return."""
+	# Get submitted non-return POS invoices
+	invoices = frappe.get_all(
+		"Sales Invoice",
+		filters={
+			"docstatus": 1,
+			"is_return": 0,
+			"is_pos": 1
+		},
+		fields=["name", "customer", "customer_name", "posting_date", "grand_total", "status"],
+		order_by="posting_date desc, creation desc",
+		limit_page_length=cint(limit)
+	)
+
+	returnable_invoices = []
+
+	for invoice in invoices:
+		# Check if this invoice has any items left to return
+		# Get all return invoices against this invoice
+		return_invoices = frappe.get_all(
+			"Sales Invoice",
+			filters={
+				"return_against": invoice.name,
+				"docstatus": 1,
+				"is_return": 1
+			},
+			fields=["name"]
+		)
+
+		# If no returns yet, it's returnable
+		if not return_invoices:
+			returnable_invoices.append(invoice)
+			continue
+
+		# Check if there are any items with remaining qty
+		invoice_doc = frappe.get_doc("Sales Invoice", invoice.name)
+
+		# Calculate returned quantities
+		returned_qty = {}
+		for ret_inv in return_invoices:
+			ret_doc = frappe.get_doc("Sales Invoice", ret_inv.name)
+			for item in ret_doc.items:
+				key = item.sales_invoice_item or item.item_code
+				if key:
+					returned_qty[key] = returned_qty.get(key, 0) + abs(item.qty)
+
+		# Check if any items have remaining quantity
+		has_returnable_items = False
+		for item in invoice_doc.items:
+			already_returned = returned_qty.get(item.name, 0)
+			remaining_qty = item.qty - already_returned
+			if remaining_qty > 0:
+				has_returnable_items = True
+				break
+
+		if has_returnable_items:
+			returnable_invoices.append(invoice)
+
+	return returnable_invoices
+
+
+@frappe.whitelist()
+def get_invoice_for_return(invoice_name):
+	"""Get invoice with return tracking - calculates remaining qty for each item."""
+	if not frappe.db.exists("Sales Invoice", invoice_name):
+		frappe.throw(_("Invoice {0} does not exist").format(invoice_name))
+
+	# Get the original invoice
+	invoice = frappe.get_doc("Sales Invoice", invoice_name)
+
+	# Get all return invoices against this invoice
+	return_invoices = frappe.get_all(
+		"Sales Invoice",
+		filters={
+			"return_against": invoice_name,
+			"docstatus": 1,
+			"is_return": 1
+		},
+		fields=["name"]
+	)
+
+	# Calculate returned quantities per item
+	returned_qty = {}
+	for ret_inv in return_invoices:
+		ret_doc = frappe.get_doc("Sales Invoice", ret_inv.name)
+		for item in ret_doc.items:
+			# Match by sales_invoice_item reference or item_code
+			key = item.sales_invoice_item or item.item_code
+			if key:
+				returned_qty[key] = returned_qty.get(key, 0) + abs(item.qty)
+
+	# Calculate remaining quantities
+	invoice_dict = invoice.as_dict()
+	updated_items = []
+
+	for item in invoice_dict.get("items", []):
+		# Check how much has been returned using the item's name (row ID)
+		already_returned = returned_qty.get(item.name, 0)
+		remaining_qty = item.qty - already_returned
+
+		if remaining_qty > 0:
+			item_copy = item.copy()
+			item_copy["original_qty"] = item.qty
+			item_copy["qty"] = remaining_qty
+			item_copy["already_returned"] = already_returned
+			updated_items.append(item_copy)
+
+	invoice_dict["items"] = updated_items
+	return invoice_dict
+
 
 @frappe.whitelist()
 def search_invoices_for_return(
