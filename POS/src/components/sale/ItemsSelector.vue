@@ -57,22 +57,33 @@
 					<input
 						id="item-search"
 						name="item-search"
+						ref="searchInputRef"
 						:value="searchTerm"
 						@input="handleSearchInput"
+						@keydown="handleKeyDown"
 						type="text"
-						placeholder="Search by item code, name or scan barcode"
-						class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-						@keyup.enter="handleBarcodeSearch"
+						:placeholder="scannerEnabled ? 'Scanner Ready - Scan barcode now' : 'Search by item code, name or scan barcode'"
+						:class="[
+							'w-full text-sm border rounded-md px-3 py-2 pl-10 pr-10 focus:outline-none transition-all',
+							scannerEnabled
+								? 'border-green-400 bg-green-50 focus:ring-2 focus:ring-green-500 focus:border-transparent'
+								: 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+						]"
 						aria-label="Search items"
 					/>
 					<!-- Barcode Scan Icon -->
 					<div class="absolute inset-y-0 right-0 pr-3 flex items-center">
 						<button
-							@click="handleBarcodeScan"
-							class="p-1 hover:bg-gray-100 rounded transition-colors"
-							title="Scan Barcode"
+							@click="toggleBarcodeScanner"
+							:class="[
+								'p-1 rounded transition-all',
+								scannerEnabled
+									? 'bg-green-100 hover:bg-green-200 text-green-700'
+									: 'hover:bg-gray-100 text-gray-600'
+							]"
+							:title="scannerEnabled ? 'Barcode Scanner: ON (Click to disable)' : 'Barcode Scanner: OFF (Click to enable)'"
 						>
-							<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
 							</svg>
 						</button>
@@ -80,7 +91,7 @@
 				</div>
 				<div class="flex items-center space-x-0.5 bg-gray-100 rounded-md p-0.5">
 					<button
-						@click="viewMode = 'grid'"
+						@click="setViewMode('grid')"
 						:class="[
 							'p-1.5 rounded transition-all',
 							viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
@@ -92,7 +103,7 @@
 						</svg>
 					</button>
 					<button
-						@click="viewMode = 'list'"
+						@click="setViewMode('list')"
 						:class="[
 							'p-1.5 rounded transition-all',
 							viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
@@ -142,58 +153,111 @@
 		</div>
 
 		<!-- Grid View -->
-		<div v-else-if="viewMode === 'grid'" class="flex-1 overflow-y-auto p-3">
-			<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
-				<div
-					v-for="item in filteredItems"
-					:key="item.item_code"
-					@click="handleItemClick(item)"
-					class="relative bg-white border border-gray-200 rounded-lg p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
-				>
-					<!-- Item Image with Stock Badge -->
-					<div class="relative aspect-square bg-gray-100 rounded-md mb-2 flex items-center justify-center overflow-hidden">
-						<!-- Stock Badge -->
-						<div
-							:class="[
-								'absolute top-1 right-1 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full',
-								(item.actual_qty || item.stock_qty || 0) > 0 ? 'bg-green-500' : 'bg-red-500'
-							]"
-						>
-							{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
+		<div v-else-if="viewMode === 'grid'" class="flex-1 flex flex-col overflow-hidden">
+			<div class="flex-1 overflow-y-auto p-3">
+				<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+					<div
+						v-for="item in paginatedItems"
+						:key="item.item_code"
+						@click="handleItemClick(item)"
+						class="relative bg-white border border-gray-200 rounded-lg p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+					>
+						<!-- Item Image with Stock Badge -->
+						<div class="relative aspect-square bg-gray-100 rounded-md mb-2 flex items-center justify-center overflow-hidden">
+							<!-- Stock Badge -->
+							<div
+								:class="[
+									'absolute top-1 right-1 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+									(item.actual_qty || item.stock_qty || 0) > 0 ? 'bg-green-500' : 'bg-red-500'
+								]"
+							>
+								{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
+							</div>
+
+							<img
+								v-if="item.image"
+								:src="item.image"
+								:alt="item.item_name"
+								loading="lazy"
+								class="w-full h-full object-cover"
+								@error="handleImageError"
+							/>
+							<svg
+								v-else
+								class="h-10 w-10 text-gray-300"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+								/>
+							</svg>
 						</div>
 
-						<img
-							v-if="item.image"
-							:src="item.image"
-							:alt="item.item_name"
-							class="w-full h-full object-cover"
-							@error="handleImageError"
-						/>
-						<svg
-							v-else
-							class="h-10 w-10 text-gray-300"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-							/>
-						</svg>
+						<!-- Item Details -->
+						<div>
+							<h3 class="text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
+								{{ item.item_name }}
+							</h3>
+							<p class="text-[10px] text-gray-500">
+								{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
+								<span class="text-gray-400">/ {{ item.stock_uom || 'Nos' }}</span>
+							</p>
+						</div>
 					</div>
+				</div>
+			</div>
 
-					<!-- Item Details -->
-					<div>
-						<h3 class="text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
-							{{ item.item_name }}
-						</h3>
-						<p class="text-[10px] text-gray-500">
-							{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
-							<span class="text-gray-400">/ {{ item.stock_uom || 'Nos' }}</span>
-						</p>
+			<!-- Pagination Controls for Grid View -->
+			<div v-if="totalPages > 1" class="px-3 py-2 bg-white border-t border-gray-200">
+				<div class="flex items-center justify-between">
+					<div class="text-xs text-gray-600">
+						Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredItems.length) }} of {{ filteredItems.length }} items
+					</div>
+					<div class="flex items-center space-x-1">
+						<button
+							@click="previousPage"
+							:disabled="currentPage === 1"
+							:class="[
+								'px-2 py-1 text-xs rounded border transition-all',
+								currentPage === 1
+									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+							]"
+						>
+							Previous
+						</button>
+						<div class="flex items-center space-x-1">
+							<button
+								v-for="page in getPaginationRange()"
+								:key="page"
+								@click="goToPage(page)"
+								:class="[
+									'px-2.5 py-1 text-xs rounded border transition-all',
+									currentPage === page
+										? 'bg-blue-600 text-white border-blue-600'
+										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+								]"
+							>
+								{{ page }}
+							</button>
+						</div>
+						<button
+							@click="nextPage"
+							:disabled="currentPage === totalPages"
+							:class="[
+								'px-2 py-1 text-xs rounded border transition-all',
+								currentPage === totalPages
+									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+							]"
+						>
+							Next
+						</button>
 					</div>
 				</div>
 			</div>
@@ -215,14 +279,14 @@
 					</thead>
 					<tbody class="bg-white divide-y divide-gray-200">
 						<tr
-							v-for="item in filteredItems"
+							v-for="item in paginatedItems"
 							:key="item.item_code"
 							@click="handleItemClick(item)"
 							class="cursor-pointer hover:bg-blue-50 transition-colors"
 						>
 							<td class="px-3 py-2 whitespace-nowrap">
 								<div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
-									<img v-if="item.image" :src="item.image" :alt="item.item_name" class="w-full h-full object-cover" @error="handleImageError" />
+									<img v-if="item.image" :src="item.image" :alt="item.item_name" loading="lazy" class="w-full h-full object-cover" @error="handleImageError" />
 									<svg v-else class="h-5 w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
 									</svg>
@@ -240,14 +304,64 @@
 						</tr>
 					</tbody>
 				</table>
-				<div v-if="filteredItems.length === 0" class="text-center py-8 text-gray-500">No items found</div>
+				<div v-if="paginatedItems.length === 0" class="text-center py-8 text-gray-500">No items found</div>
+			</div>
+
+			<!-- Pagination Controls for List View -->
+			<div v-if="totalPages > 1" class="px-3 py-2 bg-white border-t border-gray-200">
+				<div class="flex items-center justify-between">
+					<div class="text-xs text-gray-600">
+						Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredItems.length) }} of {{ filteredItems.length }} items
+					</div>
+					<div class="flex items-center space-x-1">
+						<button
+							@click="previousPage"
+							:disabled="currentPage === 1"
+							:class="[
+								'px-2 py-1 text-xs rounded border transition-all',
+								currentPage === 1
+									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+							]"
+						>
+							Previous
+						</button>
+						<div class="flex items-center space-x-1">
+							<button
+								v-for="page in getPaginationRange()"
+								:key="page"
+								@click="goToPage(page)"
+								:class="[
+									'px-2.5 py-1 text-xs rounded border transition-all',
+									currentPage === page
+										? 'bg-blue-600 text-white border-blue-600'
+										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+								]"
+							>
+								{{ page }}
+							</button>
+						</div>
+						<button
+							@click="nextPage"
+							:disabled="currentPage === totalPages"
+							:class="[
+								'px-2 py-1 text-xs rounded border transition-all',
+								currentPage === totalPages
+									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+							]"
+						>
+							Next
+						</button>
+					</div>
+				</div>
 			</div>
 		</div>
 	</div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from "vue"
+import { ref, computed, onMounted, watch } from "vue"
 import { toast } from "frappe-ui"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { useItemSearchStore } from "@/stores/itemSearch"
@@ -273,6 +387,30 @@ const { filteredItems, searchTerm, selectedItemGroup, itemGroups, loading } = st
 
 // Local state
 const viewMode = ref('grid')
+const lastKeyTime = ref(0)
+const barcodeBuffer = ref('')
+const searchInputRef = ref(null)
+const scannerEnabled = ref(false)
+const itemThreshold = ref(50) // Threshold for auto-switching to list view
+const userManuallySetView = ref(false) // Track if user manually changed view mode
+
+// Pagination state
+const currentPage = ref(1)
+const itemsPerPage = ref(20)
+
+// Computed paginated items
+const paginatedItems = computed(() => {
+	if (!filteredItems.value) return []
+
+	const start = (currentPage.value - 1) * itemsPerPage.value
+	const end = start + itemsPerPage.value
+	return filteredItems.value.slice(start, end)
+})
+
+const totalPages = computed(() => {
+	if (!filteredItems.value) return 0
+	return Math.ceil(filteredItems.value.length / itemsPerPage.value)
+})
 
 // Watch for cart items and pos profile changes
 watch(() => props.cartItems, (newCartItems) => {
@@ -285,6 +423,29 @@ watch(() => props.posProfile, (newProfile) => {
 	}
 }, { immediate: true })
 
+// Reset to page 1 when filtered items change
+watch(filteredItems, (newItems) => {
+	if (!newItems) return
+
+	const itemCount = newItems.length
+
+	// Reset pagination when items change
+	currentPage.value = 1
+
+	// Only auto-switch if user hasn't manually set a preference
+	// and we're in grid view with many items
+	if (!userManuallySetView.value && viewMode.value === 'grid' && itemCount > itemThreshold.value) {
+		viewMode.value = 'list'
+
+		toast.create({
+			title: "Switched to List View",
+			text: `Displaying ${itemCount} items - automatically switched to list view for better performance`,
+			icon: "list",
+			iconClasses: "text-blue-600",
+		})
+	}
+}, { immediate: false })
+
 onMounted(() => {
 	if (props.posProfile) {
 		itemStore.loadAllItems(props.posProfile)
@@ -292,10 +453,34 @@ onMounted(() => {
 	}
 })
 
+// Handle keydown for barcode scanner detection
+function handleKeyDown(event) {
+	const currentTime = Date.now()
+	const timeDiff = currentTime - lastKeyTime.value
+
+	// If Enter is pressed, always trigger search
+	if (event.key === 'Enter') {
+		event.preventDefault()
+		handleBarcodeSearch()
+		barcodeBuffer.value = ''
+		return
+	}
+
+	// Barcode scanners typically input very fast (< 50ms between characters)
+	// If time between keystrokes is very short, it's likely a barcode scanner
+	if (timeDiff < 50 && event.key.length === 1) {
+		barcodeBuffer.value += event.key
+	} else {
+		// Manual typing - reset buffer
+		barcodeBuffer.value = event.key.length === 1 ? event.key : ''
+	}
+
+	lastKeyTime.value = currentTime
+}
+
 // Handle search input with instant reactivity
 function handleSearchInput(event) {
 	const value = event.target.value
-	console.log('🔍 Item search:', value) // Debug log
 	itemStore.setSearchTerm(value)
 }
 
@@ -303,10 +488,37 @@ function handleItemClick(item) {
 	emit("item-selected", item)
 }
 
-function handleBarcodeSearch() {
-	if (!searchTerm.value.trim()) return
+async function handleBarcodeSearch() {
+	const barcode = searchTerm.value.trim()
 
-	// If only one item matches, auto-select it
+	if (!barcode) {
+		return
+	}
+
+	// If scanner is enabled, always try to add to cart automatically
+	const shouldAutoAdd = scannerEnabled.value
+
+	try {
+		// First try exact barcode lookup via API
+		const item = await itemStore.searchByBarcode(barcode)
+
+		if (item) {
+			// Item found by barcode - add to cart immediately
+			emit("item-selected", item)
+			itemStore.clearSearch()
+			toast.create({
+				title: "Item Added",
+				text: `${item.item_name} added to cart`,
+				icon: "check",
+				iconClasses: "text-green-600",
+			})
+			return
+		}
+	} catch (error) {
+		console.error('Barcode API error:', error)
+	}
+
+	// Fallback: If only one item matches in filtered results, auto-select it
 	if (filteredItems.value.length === 1) {
 		emit("item-selected", filteredItems.value[0])
 		itemStore.clearSearch()
@@ -316,22 +528,62 @@ function handleBarcodeSearch() {
 			icon: "check",
 			iconClasses: "text-green-600",
 		})
+	} else if (filteredItems.value.length === 0) {
+		toast.create({
+			title: "Item Not Found",
+			text: `No item found with barcode: ${barcode}`,
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+
+		// If scanner mode is enabled, clear search immediately for next scan
+		if (shouldAutoAdd) {
+			itemStore.clearSearch()
+		}
+	} else {
+		if (shouldAutoAdd) {
+			// In scanner mode, don't show manual selection - just notify
+			toast.create({
+				title: "Multiple Items Found",
+				text: `${filteredItems.value.length} items match barcode. Please refine search.`,
+				icon: "alert-circle",
+				iconClasses: "text-orange-600",
+			})
+		} else {
+			toast.create({
+				title: "Multiple Items Found",
+				text: `${filteredItems.value.length} items match. Please select one.`,
+				icon: "alert-circle",
+				iconClasses: "text-blue-600",
+			})
+		}
 	}
 }
 
-function handleBarcodeScan() {
-	// Focus on search input for barcode scanner
-	const input = document.querySelector('input[type="text"]')
-	if (input) {
-		input.focus()
-	}
+function toggleBarcodeScanner() {
+	scannerEnabled.value = !scannerEnabled.value
 
-	toast.create({
-		title: "Scan Barcode",
-		text: "Ready to scan barcode or enter manually",
-		icon: "alert-circle",
-		iconClasses: "text-blue-600",
-	})
+	// Focus on search input when enabling scanner
+	if (scannerEnabled.value) {
+		const input = searchInputRef.value || document.getElementById('item-search')
+		if (input) {
+			input.focus()
+		}
+
+		toast.create({
+			title: "Barcode Scanner Enabled",
+			text: "Scan barcode to automatically add items to cart",
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} else {
+		toast.create({
+			title: "Barcode Scanner Disabled",
+			text: "Scanner mode turned off",
+			icon: "alert-circle",
+			iconClasses: "text-gray-600",
+		})
+	}
 }
 
 function formatCurrency(amount) {
@@ -346,5 +598,61 @@ defineExpose({
 
 function handleImageError(event) {
 	event.target.style.display = "none"
+}
+
+// View mode functions
+function setViewMode(mode) {
+	viewMode.value = mode
+	userManuallySetView.value = true
+}
+
+// Pagination functions
+function goToPage(page) {
+	if (page >= 1 && page <= totalPages.value) {
+		currentPage.value = page
+	}
+}
+
+function nextPage() {
+	if (currentPage.value < totalPages.value) {
+		currentPage.value++
+	}
+}
+
+function previousPage() {
+	if (currentPage.value > 1) {
+		currentPage.value--
+	}
+}
+
+function getPaginationRange() {
+	const range = []
+	const total = totalPages.value
+	const current = currentPage.value
+	const delta = 2 // Number of pages to show on each side of current page
+
+	if (total <= 7) {
+		// Show all pages if total is small
+		for (let i = 1; i <= total; i++) {
+			range.push(i)
+		}
+	} else {
+		// Show smart range with ellipsis
+		if (current <= 3) {
+			for (let i = 1; i <= 5; i++) {
+				range.push(i)
+			}
+		} else if (current >= total - 2) {
+			for (let i = total - 4; i <= total; i++) {
+				range.push(i)
+			}
+		} else {
+			for (let i = current - delta; i <= current + delta; i++) {
+				range.push(i)
+			}
+		}
+	}
+
+	return range
 }
 </script>

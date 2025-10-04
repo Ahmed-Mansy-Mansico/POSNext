@@ -57,14 +57,17 @@ export default defineConfig({
 		port: 8080,
 		proxy: {
 			'^/(app|api|assets|files)': {
-				target: 'http://localhost:8000',
+				target: 'http://127.0.0.1:8000',
 				ws: true,
 				changeOrigin: true,
 				secure: false,
 				cookieDomainRewrite: 'localhost',
 				router: function(req) {
 					const site_name = req.headers.host.split(':')[0];
-					return `http://${site_name}:8000`;
+					// Support both localhost and 127.0.0.1
+					const isLocalhost = site_name === 'localhost' || site_name === '127.0.0.1';
+					const targetHost = isLocalhost ? '127.0.0.1' : site_name;
+					return `http://${targetHost}:8000`;
 				}
 			}
 		}

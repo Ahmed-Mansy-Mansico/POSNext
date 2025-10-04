@@ -1,136 +1,173 @@
 <template>
-	<Dialog v-model="show" :options="{ title: 'Payment', size: 'lg' }">
+	<Dialog v-model="show" :options="{ title: 'Complete Payment', size: '2xl' }">
 		<template #body-content>
-			<div class="space-y-4">
-				<!-- Amount Summary -->
-				<div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-					<div class="flex justify-between items-center mb-2">
-						<span class="text-sm text-gray-600">Total Amount:</span>
-						<span class="text-2xl font-bold text-gray-900">{{
-							formatCurrency(grandTotal)
-						}}</span>
+			<div class="space-y-6">
+				<!-- Payment Summary Card -->
+				<div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+					<div class="flex justify-between items-start mb-4">
+						<div>
+							<div class="text-sm font-medium text-gray-600 mb-1">Total Amount</div>
+							<div class="text-4xl font-bold text-gray-900">
+								{{ formatCurrency(grandTotal) }}
+							</div>
+						</div>
+						<div class="text-right">
+							<div v-if="remainingAmount > 0" class="mb-2">
+								<div class="text-xs font-medium text-orange-600 mb-1">Remaining</div>
+								<div class="text-2xl font-bold text-orange-600">
+									{{ formatCurrency(remainingAmount) }}
+								</div>
+							</div>
+							<div v-if="changeAmount > 0">
+								<div class="text-xs font-medium text-green-600 mb-1">Change</div>
+								<div class="text-2xl font-bold text-green-600">
+									{{ formatCurrency(changeAmount) }}
+								</div>
+							</div>
+							<div v-if="totalPaid >= grandTotal && changeAmount === 0" class="flex items-center text-green-600">
+								<svg class="w-6 h-6 mr-1" fill="currentColor" viewBox="0 0 20 20">
+									<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+								</svg>
+								<span class="text-sm font-semibold">Paid in Full</span>
+							</div>
+						</div>
 					</div>
-					<div class="flex justify-between items-center text-sm">
-						<span class="text-gray-600">Amount Paid:</span>
-						<span
+
+					<!-- Progress Bar -->
+					<div class="w-full bg-white rounded-full h-3 overflow-hidden shadow-inner">
+						<div
 							:class="[
-								'font-semibold',
-								totalPaid >= grandTotal ? 'text-green-600' : 'text-orange-600',
+								'h-full transition-all duration-300',
+								totalPaid >= grandTotal ? 'bg-green-500' : 'bg-blue-500'
 							]"
-							>{{ formatCurrency(totalPaid) }}</span
-						>
+							:style="{ width: `${grandTotal > 0 ? Math.min((totalPaid / grandTotal) * 100, 100) : 0}%` }"
+						></div>
 					</div>
-					<div
-						v-if="remainingAmount > 0"
-						class="flex justify-between items-center text-sm mt-1"
-					>
-						<span class="text-gray-600">Remaining:</span>
-						<span class="font-semibold text-red-600">{{
-							formatCurrency(remainingAmount)
-						}}</span>
-					</div>
-					<div
-						v-if="changeAmount > 0"
-						class="flex justify-between items-center text-sm mt-1"
-					>
-						<span class="text-gray-600">Change to Return:</span>
-						<span class="font-semibold text-blue-600">{{
-							formatCurrency(changeAmount)
-						}}</span>
+					<div class="text-xs text-gray-600 mt-1">
+						{{ formatCurrency(totalPaid) }} paid of {{ formatCurrency(grandTotal) }}
 					</div>
 				</div>
 
-				<!-- Payment Methods -->
+				<!-- Payment Methods Grid -->
 				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-2">
-						Select Payment Method
-					</label>
-					<div class="grid grid-cols-2 gap-2">
+					<div class="flex items-center justify-between mb-3">
+						<h3 class="text-sm font-semibold text-gray-700">Payment Methods</h3>
+						<div v-if="remainingAmount > 0" class="text-xs text-gray-500">
+							Click to add payment
+						</div>
+					</div>
+					<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
 						<button
 							v-for="method in paymentMethods"
 							:key="method.mode_of_payment"
-							@click="selectPaymentMethod(method)"
+							@click="quickAddPayment(method)"
+							:disabled="remainingAmount === 0"
 							:class="[
-								'p-3 rounded-lg border-2 transition-all text-left',
-								selectedMethod?.mode_of_payment === method.mode_of_payment
-									? 'border-blue-500 bg-blue-50'
-									: 'border-gray-200 hover:border-gray-300',
+								'group relative p-4 rounded-xl border-2 transition-all text-left',
+								'hover:shadow-lg transform hover:-translate-y-0.5',
+								remainingAmount === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+								'border-gray-200 hover:border-blue-400 bg-white hover:bg-blue-50'
 							]"
 						>
-							<div class="font-medium text-sm">{{ method.mode_of_payment }}</div>
-							<div class="text-xs text-gray-500">{{ method.type || "Cash" }}</div>
+							<div class="flex items-start justify-between">
+								<div class="flex-1">
+									<div class="flex items-center mb-1">
+										<span class="text-2xl mr-2">{{ getPaymentIcon(method.type) }}</span>
+										<div>
+											<div class="font-semibold text-sm text-gray-900">
+												{{ method.mode_of_payment }}
+											</div>
+											<div class="text-xs text-gray-500">{{ method.type || "Cash" }}</div>
+										</div>
+									</div>
+								</div>
+								<div class="opacity-0 group-hover:opacity-100 transition-opacity">
+									<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+									</svg>
+								</div>
+							</div>
+							<div v-if="getMethodTotal(method.mode_of_payment) > 0"
+								class="mt-2 pt-2 border-t border-gray-200">
+								<div class="text-xs text-gray-500">Added</div>
+								<div class="font-bold text-blue-600">
+									{{ formatCurrency(getMethodTotal(method.mode_of_payment)) }}
+								</div>
+							</div>
 						</button>
 					</div>
 				</div>
 
-				<!-- Payment Amount Input -->
-				<div v-if="selectedMethod">
-					<label class="block text-sm font-medium text-gray-700 mb-2">
-						Enter Amount for {{ selectedMethod.mode_of_payment }}
-					</label>
-					<div class="flex space-x-2">
-						<Input
-							v-model="paymentAmount"
-							type="number"
-							step="0.01"
-							min="0"
-							placeholder="0.00"
-							class="flex-1"
-							@keyup.enter="addPaymentEntry"
-						/>
-						<Button variant="solid" theme="blue" @click="addPaymentEntry">
-							Add
-						</Button>
+				<!-- Quick Amount Buttons -->
+				<div v-if="remainingAmount > 0 && lastSelectedMethod" class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+					<div class="text-xs font-medium text-gray-600 mb-2">
+						Quick amounts for {{ lastSelectedMethod.mode_of_payment }}
 					</div>
-
-					<!-- Quick Amount Buttons -->
-					<div class="grid grid-cols-4 gap-2 mt-2">
+					<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
 						<button
 							v-for="amount in quickAmounts"
 							:key="amount"
-							@click="paymentAmount = amount"
-							class="px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"
+							@click="addCustomPayment(lastSelectedMethod, amount)"
+							class="px-4 py-3 text-sm font-semibold rounded-lg bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-all"
 						>
 							{{ formatCurrency(amount) }}
 						</button>
 					</div>
+					<div class="mt-2">
+						<div class="text-xs font-medium text-gray-600 mb-1">Custom amount</div>
+						<div class="flex space-x-2">
+							<Input
+								v-model="customAmount"
+								type="number"
+								step="0.01"
+								min="0"
+								placeholder="0.00"
+								class="flex-1"
+								@keyup.enter="addCustomPayment(lastSelectedMethod, customAmount)"
+							/>
+							<Button
+								variant="solid"
+								theme="blue"
+								@click="addCustomPayment(lastSelectedMethod, customAmount)"
+								:disabled="!customAmount || customAmount <= 0"
+							>
+								Add
+							</Button>
+						</div>
+					</div>
 				</div>
 
-				<!-- Payment Entries List -->
+				<!-- Active Payment Entries -->
 				<div v-if="paymentEntries.length > 0">
-					<label class="block text-sm font-medium text-gray-700 mb-2">
-						Payment Entries
-					</label>
-					<div class="space-y-2">
+					<h3 class="text-sm font-semibold text-gray-700 mb-3">Payment Breakdown</h3>
+					<div class="space-y-2 max-h-64 overflow-y-auto">
 						<div
 							v-for="(entry, index) in paymentEntries"
 							:key="index"
-							class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+							class="group flex items-center justify-between p-3 bg-white rounded-lg border-2 border-gray-200 hover:border-red-300 transition-all"
 						>
-							<div>
-								<div class="font-medium text-sm">{{ entry.mode_of_payment }}</div>
-								<div class="text-xs text-gray-500">{{ entry.type }}</div>
-							</div>
 							<div class="flex items-center space-x-3">
-								<span class="font-semibold text-gray-900">{{
-									formatCurrency(entry.amount)
-								}}</span>
+								<span class="text-xl">{{ getPaymentIcon(entry.type) }}</span>
+								<div>
+									<div class="font-medium text-sm text-gray-900">{{ entry.mode_of_payment }}</div>
+									<div class="text-xs text-gray-500">{{ entry.type }}</div>
+								</div>
+							</div>
+							<div class="flex items-center space-x-4">
+								<input
+									v-model.number="entry.amount"
+									type="number"
+									step="0.01"
+									min="0"
+									class="w-28 px-3 py-1 text-right font-bold text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+									@input="updatePaymentEntry(index, $event.target.value)"
+								/>
 								<button
 									@click="removePaymentEntry(index)"
-									class="text-red-500 hover:text-red-700"
+									class="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all"
 								>
-									<svg
-										class="h-5 w-5"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M6 18L18 6M6 6l12 12"
-										/>
+									<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
 									</svg>
 								</button>
 							</div>
@@ -141,23 +178,33 @@
 		</template>
 
 		<template #actions>
-			<div class="flex space-x-2">
-				<Button variant="subtle" @click="show = false">Cancel</Button>
-				<Button
-					variant="solid"
-					theme="blue"
-					@click="completePayment"
-					:disabled="!canComplete"
-				>
-					Complete Payment
+			<div class="flex justify-between items-center w-full">
+				<Button variant="subtle" @click="clearAll" v-if="paymentEntries.length > 0" theme="red">
+					Clear All
 				</Button>
+				<div class="flex space-x-2 ml-auto">
+					<Button variant="subtle" @click="show = false">Cancel</Button>
+					<Button
+						variant="solid"
+						theme="blue"
+						@click="completePayment"
+						:disabled="!canComplete"
+					>
+						<template #prefix>
+							<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+							</svg>
+						</template>
+						Complete Payment
+					</Button>
+				</div>
 			</div>
 		</template>
 	</Dialog>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from "vue"
+import { ref, computed, watch } from "vue"
 import { Dialog, Input, Button, createResource } from "frappe-ui"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 
@@ -182,8 +229,8 @@ const show = computed({
 })
 
 const paymentMethods = ref([])
-const selectedMethod = ref(null)
-const paymentAmount = ref("")
+const lastSelectedMethod = ref(null)
+const customAmount = ref("")
 const paymentEntries = ref([])
 
 const paymentMethodsResource = createResource({
@@ -194,12 +241,10 @@ const paymentMethodsResource = createResource({
 	auto: false,
 	onSuccess(data) {
 		paymentMethods.value = data?.message || data || []
-		// Select default payment method if available
-		const defaultMethod = paymentMethods.value.find((m) => m.default)
-		if (defaultMethod) {
-			selectedMethod.value = defaultMethod
-		} else if (paymentMethods.value.length > 0) {
-			selectedMethod.value = paymentMethods.value[0]
+		// Set first method as last selected for quick amounts
+		if (paymentMethods.value.length > 0) {
+			const defaultMethod = paymentMethods.value.find((m) => m.default)
+			lastSelectedMethod.value = defaultMethod || paymentMethods.value[0]
 		}
 	},
 })
@@ -224,23 +269,50 @@ const canComplete = computed(() => {
 
 const quickAmounts = computed(() => {
 	const remaining = remainingAmount.value
-	if (remaining > 0) {
-		return [
-			Math.ceil(remaining),
+	if (remaining <= 0) {
+		return [10, 20, 50, 100]
+	}
+
+	const amounts = []
+	const exactAmount = Math.ceil(remaining)
+
+	// For very small amounts (< 5), use small increments
+	if (remaining < 5) {
+		amounts.push(exactAmount, 5, 10, 20)
+	}
+	// For small amounts (5-20), use common bills/coins
+	else if (remaining < 20) {
+		amounts.push(exactAmount, 10, 20, 50)
+	}
+	// For medium amounts (20-100), use sensible denominations
+	else if (remaining < 100) {
+		amounts.push(
+			exactAmount,
+			Math.ceil(remaining / 10) * 10,
+			50,
+			100
+		)
+	}
+	// For larger amounts, use bigger increments
+	else {
+		amounts.push(
+			exactAmount,
 			Math.ceil(remaining / 10) * 10,
 			Math.ceil(remaining / 50) * 50,
-			Math.ceil(remaining / 100) * 100,
-		].filter((amt) => amt > 0)
+			Math.ceil(remaining / 100) * 100
+		)
 	}
-	return [10, 20, 50, 100]
+
+	// Remove duplicates, filter positive, sort, and limit to 4
+	return [...new Set(amounts)].filter((amt) => amt > 0).sort((a, b) => a - b).slice(0, 4)
 })
 
 watch(show, (newVal) => {
 	if (newVal) {
 		// Reset state when dialog opens
 		paymentEntries.value = []
-		paymentAmount.value = ""
-		selectedMethod.value = null
+		customAmount.value = ""
+		lastSelectedMethod.value = null
 
 		// Load payment methods
 		if (props.posProfile) {
@@ -249,36 +321,49 @@ watch(show, (newVal) => {
 	}
 })
 
-function selectPaymentMethod(method) {
-	selectedMethod.value = method
-	// Auto-fill remaining amount if nothing entered yet
-	if (!paymentAmount.value && remainingAmount.value > 0) {
-		paymentAmount.value = remainingAmount.value.toFixed(2)
-	}
-}
+// One-click payment - adds remaining amount with selected method
+function quickAddPayment(method) {
+	if (remainingAmount.value === 0) return
 
-function addPaymentEntry() {
-	if (!selectedMethod.value || !paymentAmount.value || paymentAmount.value <= 0) {
-		return
-	}
+	lastSelectedMethod.value = method
 
 	paymentEntries.value.push({
-		mode_of_payment: selectedMethod.value.mode_of_payment,
-		amount: parseFloat(paymentAmount.value),
-		type: selectedMethod.value.type || "Cash",
+		mode_of_payment: method.mode_of_payment,
+		amount: parseFloat(remainingAmount.value.toFixed(2)),
+		type: method.type || "Cash",
 	})
 
-	// Reset input
-	paymentAmount.value = ""
+	customAmount.value = ""
+}
 
-	// If payment is complete, don't select next method
-	if (totalPaid.value >= props.grandTotal) {
-		selectedMethod.value = null
-	}
+// Add custom amount for a method
+function addCustomPayment(method, amount) {
+	const amt = parseFloat(amount)
+	if (!amt || amt <= 0) return
+
+	paymentEntries.value.push({
+		mode_of_payment: method.mode_of_payment,
+		amount: amt,
+		type: method.type || "Cash",
+	})
+
+	customAmount.value = ""
 }
 
 function removePaymentEntry(index) {
 	paymentEntries.value.splice(index, 1)
+}
+
+function updatePaymentEntry(index, value) {
+	const amt = parseFloat(value)
+	if (amt && amt > 0) {
+		paymentEntries.value[index].amount = amt
+	}
+}
+
+function clearAll() {
+	paymentEntries.value = []
+	customAmount.value = ""
 }
 
 function completePayment() {
@@ -294,5 +379,29 @@ function completePayment() {
 
 function formatCurrency(amount) {
 	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
+}
+
+// Get total amount for a specific payment method
+function getMethodTotal(methodName) {
+	return paymentEntries.value
+		.filter(entry => entry.mode_of_payment === methodName)
+		.reduce((sum, entry) => sum + (entry.amount || 0), 0)
+}
+
+// Get icon based on payment type
+function getPaymentIcon(type) {
+	const iconMap = {
+		'Cash': '💵',
+		'Card': '💳',
+		'Bank': '🏦',
+		'Phone': '📱',
+		'Wallet': '👛',
+		'Credit Card': '💳',
+		'Debit Card': '💳',
+		'Mobile Money': '📱',
+		'Check': '🧾',
+		'Gift Card': '🎁',
+	}
+	return iconMap[type] || '💰'
 }
 </script>

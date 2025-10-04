@@ -2,15 +2,8 @@
 	<div class="flex flex-col h-full bg-white">
 		<!-- Header with Customer -->
 		<div class="px-3 py-2.5 border-b border-gray-200">
-			<div class="flex items-center justify-between mb-2">
+			<div class="mb-2">
 				<h2 class="text-sm font-semibold text-gray-900">Item Cart</h2>
-				<button
-					@click="$emit('clear-cart')"
-					v-if="items.length > 0"
-					class="text-xs text-red-600 hover:text-red-700 font-medium"
-				>
-					Clear
-				</button>
 			</div>
 
 			<!-- Inline Customer Search/Selection -->
@@ -114,6 +107,22 @@
 						</button>
 					</div>
 				</div>
+			</div>
+
+			<!-- Clear Cart Button -->
+			<div v-if="items.length > 0" class="mt-3 flex justify-end">
+				<button
+					@click="$emit('clear-cart')"
+					class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-red-600 transition-colors hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
+					type="button"
+					title="Clear all items from the cart"
+					aria-label="Clear all items from the cart"
+				>
+					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v2M4 7h16"/>
+					</svg>
+					<span>Clear Cart</span>
+				</button>
 			</div>
 		</div>
 

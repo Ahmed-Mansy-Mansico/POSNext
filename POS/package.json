@@ -14,6 +14,7 @@
     "copy-html-entry": "cp ../pos_next/public/pos/index.html ../pos_next/www/pos.html"
   },
   "dependencies": {
+    "@abdulrysr/saudi-riyal-new-symbol-font": "^1.0.8",
     "dexie": "^4.2.0",
     "feather-icons": "^4.29.2",
     "frappe-ui": "^0.1.192",

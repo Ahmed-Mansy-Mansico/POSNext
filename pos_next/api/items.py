@@ -8,7 +8,7 @@ import frappe
 from frappe import _, as_json
 from frappe.utils import flt, nowdate
 from erpnext.stock.doctype.batch.batch import get_batch_qty
-from erpnext.stock.get_item_details import get_item_details
+from erpnext.stock.get_item_details import get_item_details as erpnext_get_item_details
 
 
 def get_stock_availability(item_code, warehouse):
@@ -98,22 +98,29 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
 			doc.plc_conversion_rate = exchange_rate
 			doc.conversion_rate = exchange_rate
 
-	# Add company and doctype to the item args
+	# Add company to the item args
 	if company:
 		item["company"] = company
-
-	item["doctype"] = "Sales Invoice"
 
 	# Create a proper doc structure with company
 	if not doc and company:
 		doc = frappe._dict({"doctype": "Sales Invoice", "company": company})
 
 	max_discount = frappe.get_value("Item", item_code, "max_discount")
-	res = get_item_details(
-		item,
-		doc,
-		overwrite_warehouse=False,
-	)
+
+	# Prepare args dict for get_item_details - only include necessary fields
+	args = frappe._dict({
+		"doctype": "Sales Invoice",
+		"item_code": item.get("item_code"),
+		"company": item.get("company"),
+		"qty": item.get("qty", 1),
+		"selling_price_list": item.get("selling_price_list"),
+		"price_list_currency": item.get("price_list_currency"),
+		"plc_conversion_rate": item.get("plc_conversion_rate"),
+		"conversion_rate": item.get("conversion_rate"),
+	})
+
+	res = erpnext_get_item_details(args, doc)
 
 	if item.get("is_stock_item") and warehouse:
 		res["actual_qty"] = get_stock_availability(item_code, warehouse)
@@ -150,6 +157,20 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
 def search_by_barcode(barcode, pos_profile):
 	"""Search item by barcode"""
 	try:
+		# Parse pos_profile if it's a JSON string
+		if isinstance(pos_profile, str):
+			try:
+				pos_profile = json.loads(pos_profile)
+			except (json.JSONDecodeError, ValueError):
+				pass  # It's already a plain string
+
+		# Ensure pos_profile is a string (handle dict or string input)
+		if isinstance(pos_profile, dict):
+			pos_profile = pos_profile.get("name") or pos_profile.get("pos_profile")
+
+		if not pos_profile:
+			frappe.throw(_("POS Profile is required"))
+
 		# Search for item by barcode
 		item_code = frappe.db.get_value("Item Barcode", {"barcode": barcode}, "parent")
 
@@ -163,15 +184,23 @@ def search_by_barcode(barcode, pos_profile):
 		# Get POS Profile details
 		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
 
+		# Validate POS Profile has required fields
+		if not pos_profile_doc.warehouse:
+			frappe.throw(_("Warehouse not set in POS Profile {0}").format(pos_profile))
+		if not pos_profile_doc.selling_price_list:
+			frappe.throw(_("Selling Price List not set in POS Profile {0}").format(pos_profile))
+		if not pos_profile_doc.company:
+			frappe.throw(_("Company not set in POS Profile {0}").format(pos_profile))
+
 		# Get item doc
 		item_doc = frappe.get_cached_doc("Item", item_code)
 
 		# Prepare item dict for get_item_detail
 		item = {
 			"item_code": item_code,
-			"has_batch_no": item_doc.has_batch_no,
-			"has_serial_no": item_doc.has_serial_no,
-			"is_stock_item": item_doc.is_stock_item,
+			"has_batch_no": item_doc.has_batch_no or 0,
+			"has_serial_no": item_doc.has_serial_no or 0,
+			"is_stock_item": item_doc.is_stock_item or 0,
 			"pos_profile": pos_profile
 		}
 
@@ -316,7 +345,23 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			order_by="item_name asc"
 		)
 
-		# Enrich items with price and stock data
+		# Get all barcodes for these items in a single query (performance optimization)
+		item_codes = [item["item_code"] for item in items]
+		barcode_map = {}
+		if item_codes:
+			barcodes = frappe.db.sql(
+				"""
+				SELECT parent, barcode
+				FROM `tabItem Barcode`
+				WHERE parent IN %s
+				GROUP BY parent
+				""",
+				[item_codes],
+				as_dict=1
+			)
+			barcode_map = {b["parent"]: b["barcode"] for b in barcodes}
+
+		# Enrich items with price, stock, and barcode data
 		for item in items:
 			# Get price
 			price = frappe.db.get_value(
@@ -343,6 +388,9 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			else:
 				item["actual_qty"] = 0
 
+			# Add barcode from map
+			item["barcode"] = barcode_map.get(item["item_code"], "")
+
 		return items
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get Items Error")
@@ -353,6 +401,20 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 def get_item_details(item_code, pos_profile, customer=None, qty=1):
 	"""Get detailed item info including price, tax, stock"""
 	try:
+		# Parse pos_profile if it's a JSON string
+		if isinstance(pos_profile, str):
+			try:
+				pos_profile = json.loads(pos_profile)
+			except (json.JSONDecodeError, ValueError):
+				pass  # It's already a plain string
+
+		# Ensure pos_profile is a string (handle dict or string input)
+		if isinstance(pos_profile, dict):
+			pos_profile = pos_profile.get("name") or pos_profile.get("pos_profile")
+
+		if not pos_profile:
+			frappe.throw(_("POS Profile is required"))
+
 		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
 		item_doc = frappe.get_cached_doc("Item", item_code)
 

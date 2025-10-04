@@ -61,3 +61,4 @@ out/
 .vite/
 image.png
 maxresdefault.jpg
+.playwright-mcp/*
