@@ -195,6 +195,10 @@ def search_by_barcode(barcode, pos_profile):
 		# Get item doc
 		item_doc = frappe.get_cached_doc("Item", item_code)
 
+		# Check if item is allowed for sales
+		if not item_doc.is_sales_item:
+			frappe.throw(_("Item {0} is not allowed for sales").format(item_code))
+
 		# Prepare item dict for get_item_detail
 		item = {
 			"item_code": item_code,
@@ -309,7 +313,11 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 	try:
 		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
 
-		filters = {"disabled": 0, "has_variants": 0}
+		filters = {
+			"disabled": 0,
+			"has_variants": 0,
+			"is_sales_item": 1  # Only show items with "Allow Sales" enabled
+		}
 
 		# Add item group filter if provided
 		if item_group:
@@ -417,6 +425,10 @@ def get_item_details(item_code, pos_profile, customer=None, qty=1):
 
 		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
 		item_doc = frappe.get_cached_doc("Item", item_code)
+
+		# Check if item is allowed for sales
+		if not item_doc.is_sales_item:
+			frappe.throw(_("Item {0} is not allowed for sales").format(item_code))
 
 		# Prepare item dict
 		item = {
