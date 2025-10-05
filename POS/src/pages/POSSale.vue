@@ -429,6 +429,30 @@
 			</template>
 		</Dialog>
 
+		<!-- Logout Confirmation Dialog -->
+		<Dialog
+			v-model="showLogoutDialog"
+			:options="{ title: 'Logout', size: 'xs' }"
+		>
+			<template #body-content>
+				<div class="py-3">
+					<p class="text-sm text-gray-600">
+						Are you sure you want to logout?
+					</p>
+				</div>
+			</template>
+			<template #actions>
+				<div class="flex space-x-2 w-full">
+					<Button class="flex-1" variant="subtle" @click="showLogoutDialog = false">
+						Cancel
+					</Button>
+					<Button class="flex-1" variant="solid" theme="red" @click="confirmLogout">
+						Logout
+					</Button>
+				</div>
+			</template>
+		</Dialog>
+
 		<!-- Success Dialog -->
 		<Dialog
 			v-model="showSuccessDialog"
@@ -482,6 +506,7 @@ import { useShift } from "@/composables/useShift"
 import { useOffline } from "@/composables/useOffline"
 import { useDialog, useDialogState } from "@/composables/useDialogState"
 import { Button, Dialog, toast } from "frappe-ui"
+import { session } from "@/data/session"
 import ItemsSelector from "@/components/sale/ItemsSelector.vue"
 import InvoiceCart from "@/components/sale/InvoiceCart.vue"
 import PaymentDialog from "@/components/sale/PaymentDialog.vue"
@@ -546,6 +571,7 @@ const { isOpen: showBatchSerialDialog } = useDialog('batchSerial')
 const { isOpen: showHistoryDialog } = useDialog('history')
 const { isOpen: showCreateCustomerDialog } = useDialog('createCustomer')
 const { isOpen: showClearCartDialog } = useDialog('clearCart')
+const { isOpen: showLogoutDialog } = useDialog('logout')
 
 // Other refs
 const itemsSelectorRef = ref(null)
@@ -952,9 +978,12 @@ function getUserInitials() {
 
 function handleLogout() {
 	showActionsMenu.value = false
-	if (confirm("Are you sure you want to logout?")) {
-		window.location.href = "/app/logout"
-	}
+	showLogoutDialog.value = true
+}
+
+function confirmLogout() {
+	showLogoutDialog.value = false
+	session.logout.submit()
 }
 
 // Close dropdown when clicking outside
