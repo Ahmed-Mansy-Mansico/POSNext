@@ -293,6 +293,13 @@ def update_invoice(data):
 			if pos_profile_doc.currency and not invoice_doc.get("currency"):
 				invoice_doc.currency = pos_profile_doc.currency
 
+			# Copy accounting dimensions from POS Profile
+			if hasattr(pos_profile_doc, 'branch') and pos_profile_doc.branch:
+				invoice_doc.branch = pos_profile_doc.branch
+				# Also set branch on all items for GL entries
+				for item in invoice_doc.get('items', []):
+					item.branch = pos_profile_doc.branch
+
 		company = invoice_doc.get("company") or (pos_profile_doc.company if pos_profile_doc else None)
 
 		if company and invoice_doc.get("payments"):
@@ -425,6 +432,19 @@ def submit_invoice(invoice=None, data=None):
 
 		# Ensure update_stock is set
 		invoice_doc.update_stock = 1
+
+		# Copy accounting dimensions from POS Profile if not already set
+		if pos_profile and not invoice_doc.get('branch'):
+			try:
+				pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
+				if hasattr(pos_profile_doc, 'branch') and pos_profile_doc.branch:
+					invoice_doc.branch = pos_profile_doc.branch
+					# Also set branch on all items for GL entries
+					for item in invoice_doc.get('items', []):
+						if not item.get('branch'):
+							item.branch = pos_profile_doc.branch
+			except Exception:
+				pass  # Branch is optional, continue without it
 
 		# Set accounts for all payment methods before saving
 		for payment in invoice_doc.payments:

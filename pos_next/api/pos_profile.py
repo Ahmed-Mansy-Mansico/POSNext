@@ -80,3 +80,39 @@ def get_payment_methods(pos_profile):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get Payment Methods Error")
 		frappe.throw(_("Error fetching payment methods: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_taxes(pos_profile):
+	"""Get tax configuration from POS Profile"""
+	try:
+		if not pos_profile:
+			return []
+
+		# Get the POS Profile
+		profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
+		taxes_and_charges = getattr(profile_doc, 'taxes_and_charges', None)
+
+		if not taxes_and_charges:
+			return []
+
+		# Get the tax template
+		template_doc = frappe.get_cached_doc("Sales Taxes and Charges Template", taxes_and_charges)
+
+		# Extract tax rows
+		taxes = []
+		for tax_row in template_doc.taxes:
+			taxes.append({
+				"account_head": tax_row.account_head,
+				"charge_type": tax_row.charge_type,
+				"rate": tax_row.rate,
+				"description": tax_row.description,
+				"included_in_print_rate": getattr(tax_row, 'included_in_print_rate', 0),
+				"idx": tax_row.idx
+			})
+
+		return taxes
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Taxes Error")
+		# Return empty array instead of throwing - taxes are optional
+		return []

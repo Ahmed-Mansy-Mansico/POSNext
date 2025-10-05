@@ -9,6 +9,7 @@ export function useInvoice() {
 	const posProfile = ref(null)
 	const additionalDiscount = ref(0)
 	const couponCode = ref(null)
+	const taxRules = ref([]) // Tax rules from POS Profile
 
 	// Resources
 	const updateInvoiceResource = createResource({
@@ -51,6 +52,11 @@ export function useInvoice() {
 
 	const getItemDetailsResource = createResource({
 		url: "pos_next.api.items.get_item_details",
+		auto: false,
+	})
+
+	const getTaxesResource = createResource({
+		url: "pos_next.api.pos_profile.get_taxes",
 		auto: false,
 	})
 
@@ -170,10 +176,19 @@ export function useInvoice() {
 			item.discount_amount = (item.amount * item.discount_percentage) / 100
 		}
 
-		// Calculate tax (simplified - in production, use tax template logic)
+		// Calculate tax based on tax rules
 		const netAmount = item.amount - (item.discount_amount || 0)
-		// This is a simplified tax calculation - should be enhanced with proper tax template logic
-		item.tax_amount = 0 // Will be calculated by backend
+		item.tax_amount = 0
+
+		// Apply tax rules if available
+		if (taxRules.value && taxRules.value.length > 0) {
+			for (const taxRule of taxRules.value) {
+				if (taxRule.charge_type === "On Net Total" || taxRule.charge_type === "On Previous Row Total") {
+					// Simple percentage tax on net amount
+					item.tax_amount += (netAmount * (taxRule.rate || 0)) / 100
+				}
+			}
+		}
 	}
 
 	function addPayment(payment) {
@@ -335,6 +350,25 @@ export function useInvoice() {
 		couponCode.value = null
 	}
 
+	async function loadTaxRules(profileName) {
+		/**
+		 * Load tax rules from POS Profile
+		 */
+		try {
+			const result = await getTaxesResource.submit({ pos_profile: profileName })
+			taxRules.value = result?.data || result || []
+
+			// Recalculate all items with new tax rules
+			invoiceItems.value.forEach(item => recalculateItem(item))
+
+			return taxRules.value
+		} catch (error) {
+			console.error("Error loading tax rules:", error)
+			taxRules.value = []
+			return []
+		}
+	}
+
 	return {
 		// State
 		invoiceItems,
@@ -343,6 +377,7 @@ export function useInvoice() {
 		posProfile,
 		additionalDiscount,
 		couponCode,
+		taxRules,
 
 		// Computed
 		subtotal,
@@ -367,6 +402,7 @@ export function useInvoice() {
 		submitInvoice,
 		resetInvoice,
 		clearCart,
+		loadTaxRules,
 
 		// Resources
 		updateInvoiceResource,
@@ -374,5 +410,6 @@ export function useInvoice() {
 		validateCartItemsResource,
 		applyOffersResource,
 		getItemDetailsResource,
+		getTaxesResource,
 	}
 }

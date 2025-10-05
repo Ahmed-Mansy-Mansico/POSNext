@@ -530,6 +530,7 @@ const {
 	updateItemQuantity,
 	submitInvoice,
 	clearCart,
+	loadTaxRules,
 } = useInvoice()
 
 // Use dialog composable for automatic global tracking
@@ -609,6 +610,9 @@ onMounted(async () => {
 			// Set POS profile from current shift
 			if (currentProfile.value) {
 				posProfile.value = currentProfile.value.name
+
+				// Load tax rules for this POS Profile
+				await loadTaxRules(currentProfile.value.name)
 
 				// Pre-load data for offline use if online and needed
 				if (!isOffline.value) {
@@ -696,11 +700,13 @@ onUnmounted(() => {
 	stopResize()
 })
 
-function handleShiftOpened() {
+async function handleShiftOpened() {
 	showOpenShiftDialog.value = false
 	// Set POS profile after shift is opened
 	if (currentProfile.value) {
 		posProfile.value = currentProfile.value.name
+		// Load tax rules for this POS Profile
+		await loadTaxRules(currentProfile.value.name)
 	}
 	// Update shift duration immediately
 	updateShiftDuration()
