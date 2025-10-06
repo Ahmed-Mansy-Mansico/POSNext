@@ -16,6 +16,7 @@ declare module 'vue' {
     InvoiceCart: typeof import('./src/components/sale/InvoiceCart.vue')['default']
     InvoiceHistoryDialog: typeof import('./src/components/sale/InvoiceHistoryDialog.vue')['default']
     ItemsSelector: typeof import('./src/components/sale/ItemsSelector.vue')['default']
+    OffersDialog: typeof import('./src/components/sale/OffersDialog.vue')['default']
     PaymentDialog: typeof import('./src/components/sale/PaymentDialog.vue')['default']
     ReturnInvoiceDialog: typeof import('./src/components/sale/ReturnInvoiceDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

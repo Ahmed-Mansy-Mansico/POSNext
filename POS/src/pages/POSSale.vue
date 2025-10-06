@@ -279,6 +279,7 @@
 					:grand-total="grandTotal"
 					:pos-profile="currentProfile?.name"
 					:currency="currentProfile?.currency || 'USD'"
+					:applied-offer="autoAppliedOffer"
 					@update-quantity="updateItemQuantity"
 					@remove-item="removeItem"
 					@select-customer="handleCustomerSelected"
@@ -287,6 +288,8 @@
 					@clear-cart="handleClearCart"
 					@save-draft="handleSaveDraft"
 					@apply-coupon="showCouponDialog = true"
+					@show-offers="showOffersDialog = true"
+					@remove-offer="handleOfferRemoved"
 				/>
 			</div>
 		</div>
@@ -375,10 +378,27 @@
 		<!-- Coupon Dialog -->
 		<CouponDialog
 			v-model="showCouponDialog"
-			:cart-total="subtotal"
+			:subtotal="subtotal"
 			:items="invoiceItems"
+			:pos-profile="currentProfile?.name"
+			:customer="customer?.name || customer"
+			:company="currentProfile?.company"
+			:currency="currentProfile?.currency || 'USD'"
 			@discount-applied="handleDiscountApplied"
 			@discount-removed="handleDiscountRemoved"
+		/>
+
+		<!-- Offers Dialog -->
+		<OffersDialog
+			v-model="showOffersDialog"
+			:subtotal="subtotal"
+			:items="invoiceItems"
+			:pos-profile="currentProfile?.name"
+			:customer="customer?.name || customer"
+			:company="currentProfile?.company"
+			:currency="currentProfile?.currency || 'USD'"
+			@offer-applied="handleOfferApplied"
+			@offer-removed="handleOfferRemoved"
 		/>
 
 		<!-- Batch/Serial Dialog -->
@@ -516,6 +536,7 @@ import ShiftClosingDialog from "@/components/ShiftClosingDialog.vue"
 import DraftInvoicesDialog from "@/components/sale/DraftInvoicesDialog.vue"
 import ReturnInvoiceDialog from "@/components/sale/ReturnInvoiceDialog.vue"
 import CouponDialog from "@/components/sale/CouponDialog.vue"
+import OffersDialog from "@/components/sale/OffersDialog.vue"
 import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
 import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
 import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
@@ -556,6 +577,10 @@ const {
 	submitInvoice,
 	clearCart,
 	loadTaxRules,
+	calculateDiscountAmount,
+	applyDiscount,
+	removeDiscount,
+	applyOffersResource,
 } = useInvoice()
 
 // Use dialog composable for automatic global tracking
@@ -567,6 +592,7 @@ const { isOpen: showCloseShiftDialog } = useDialog('closeShift')
 const { isOpen: showDraftDialog } = useDialog('draft')
 const { isOpen: showReturnDialog } = useDialog('return')
 const { isOpen: showCouponDialog } = useDialog('coupon')
+const { isOpen: showOffersDialog } = useDialog('offers')
 const { isOpen: showBatchSerialDialog } = useDialog('batchSerial')
 const { isOpen: showHistoryDialog } = useDialog('history')
 const { isOpen: showCreateCustomerDialog } = useDialog('createCustomer')
@@ -589,6 +615,7 @@ const containerRef = ref(null)
 const dividerRef = ref(null)
 const leftPanelWidth = ref(800) // Start with 800px width
 const isResizing = ref(false)
+const autoAppliedOffer = ref(null)
 
 // Get global dialog state for divider behavior
 const { isAnyDialogOpen } = useDialogState()
@@ -720,7 +747,44 @@ watch(hasOpenShift, value => {
 	}
 })
 
+// Watch cart changes to auto-apply eligible offers with debouncing
+let autoApplyTimeout = null
+watch([invoiceItems, subtotal], async (newVal, oldVal) => {
+	// Clear any pending auto-apply
+	if (autoApplyTimeout) {
+		clearTimeout(autoApplyTimeout)
+	}
+
+	// Only auto-apply if:
+	// 1. Cart is not empty
+	// 2. POS profile is set
+	// 3. No offer is currently applied (to avoid overwriting manual selections)
+	if (invoiceItems.value.length > 0 && posProfile.value && !autoAppliedOffer.value) {
+		// Debounce for 500ms to avoid excessive API calls
+		autoApplyTimeout = setTimeout(async () => {
+			await autoApplyOffers()
+		}, 500)
+	} else if (invoiceItems.value.length === 0) {
+		// Clear auto-applied offers when cart is emptied
+		autoAppliedOffer.value = null
+	}
+}, { deep: true })
+
+// Watch for items changes and re-apply offer if one is already applied
+watch(invoiceItems, () => {
+	if (autoAppliedOffer.value && invoiceItems.value.length > 0) {
+		// Re-apply the current offer to new items
+		applyDiscount(autoAppliedOffer.value)
+	}
+}, { deep: true })
+
 onUnmounted(() => {
+	// Clean up timeout
+	if (autoApplyTimeout) {
+		clearTimeout(autoApplyTimeout)
+	}
+
+	// Clean up event listeners
 	document.removeEventListener('click', handleClickOutside)
 	window.removeEventListener('resize', updateLayoutBounds)
 	stopResize()
@@ -868,6 +932,7 @@ async function handlePaymentCompleted(paymentData) {
 				showPaymentDialog.value = false
 				clearCart()
 				customer.value = null
+				autoAppliedOffer.value = null
 
 				if (itemsSelectorRef.value) {
 					itemsSelectorRef.value.loadItems()
@@ -928,6 +993,7 @@ function handleClearCart() {
 function confirmClearCart() {
 	clearCart()
 	customer.value = null
+	autoAppliedOffer.value = null
 	showClearCartDialog.value = false
 	toast.create({
 		title: "Cart Cleared",
@@ -1089,24 +1155,125 @@ function handleReturnCreated(returnInvoice) {
 }
 
 function handleDiscountApplied(discount) {
-	// Update invoice with discount
-	// In a real implementation, this would update the invoice totals
+	// Use the composable's applyDiscount function
+	applyDiscount(discount)
+	showCouponDialog.value = false
+
 	toast.create({
-		title: "Discount Applied",
-		text: `${discount.name} (${discount.percentage}% off) applied successfully`,
+		title: "Coupon Applied",
+		text: `${discount.name} applied successfully`,
 		icon: "check",
 		iconClasses: "text-green-600",
 	})
 }
 
 function handleDiscountRemoved() {
-	// Remove discount from invoice
+	// Use the composable's removeDiscount function
+	removeDiscount()
+	autoAppliedOffer.value = null
+
 	toast.create({
 		title: "Discount Removed",
 		text: "Discount has been removed from cart",
 		icon: "check",
 		iconClasses: "text-blue-600",
 	})
+}
+
+function handleOfferApplied(offer) {
+	// Use the composable's applyDiscount function
+	applyDiscount(offer)
+	autoAppliedOffer.value = offer
+	showOffersDialog.value = false
+
+	toast.create({
+		title: "Offer Applied",
+		text: `${offer.name} applied successfully`,
+		icon: "check",
+		iconClasses: "text-green-600",
+	})
+}
+
+function handleOfferRemoved() {
+	// Use the composable's removeDiscount function
+	removeDiscount()
+	autoAppliedOffer.value = null
+
+	toast.create({
+		title: "Offer Removed",
+		text: "Offer has been removed from cart",
+		icon: "check",
+		iconClasses: "text-blue-600",
+	})
+}
+
+async function autoApplyOffers() {
+	// Automatically apply eligible offers from the backend
+	try {
+		// Clear auto-applied flag if cart is empty
+		if (invoiceItems.value.length === 0) {
+			autoAppliedOffer.value = null
+			return
+		}
+
+		const invoiceData = {
+			doctype: "Sales Invoice",
+			pos_profile: posProfile.value,
+			customer: customer.value?.name || customer.value || currentProfile.value?.customer,
+			items: invoiceItems.value.map(item => ({
+				item_code: item.item_code,
+				item_name: item.item_name,
+				qty: item.quantity,
+				rate: item.rate,
+				uom: item.uom,
+				warehouse: item.warehouse,
+				conversion_factor: item.conversion_factor || 1,
+			})),
+		}
+
+		const result = await applyOffersResource.submit({ invoice_data: invoiceData })
+
+		if (result && result.items) {
+			let hasDiscounts = false
+			const discountedItems = []
+
+			// Collect items with discounts
+			result.items.forEach(serverItem => {
+				const cartItem = invoiceItems.value.find(i => i.item_code === serverItem.item_code)
+				if (cartItem && serverItem.discount_percentage > 0) {
+					discountedItems.push({
+						item: cartItem,
+						discount_percentage: serverItem.discount_percentage,
+						discount_amount: serverItem.discount_amount || 0
+					})
+					hasDiscounts = true
+				}
+			})
+
+			// Apply all discounts at once using the composable
+			if (hasDiscounts) {
+				discountedItems.forEach(({ item, discount_percentage, discount_amount }) => {
+					item.discount_percentage = discount_percentage
+					item.discount_amount = discount_amount
+					updateItemQuantity(item.item_code, item.quantity)
+				})
+
+				autoAppliedOffer.value = { name: "Auto Offer", applied: true }
+
+				toast.create({
+					title: "Offers Applied",
+					text: "Eligible offers have been applied to your cart",
+					icon: "check",
+					iconClasses: "text-green-600",
+				})
+			} else {
+				autoAppliedOffer.value = null
+			}
+		}
+	} catch (error) {
+		// Silently fail - don't interrupt the user experience
+		console.error("Error auto-applying offers:", error)
+	}
 }
 
 function handleBatchSerialSelected(batchSerial) {

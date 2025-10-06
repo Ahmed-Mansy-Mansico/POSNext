@@ -163,35 +163,122 @@ export function useInvoice() {
 		const item = invoiceItems.value.find((i) => i.item_code === itemCode)
 		if (item) {
 			item.discount_percentage = parseFloat(discountPercentage) || 0
-			const discountAmount =
-				(item.rate * item.quantity * item.discount_percentage) / 100
-			item.discount_amount = discountAmount
+			item.discount_amount = 0 // Let recalculateItem compute it
 			recalculateItem(item)
 		}
 	}
 
-	function recalculateItem(item) {
-		// Recalculate amount
-		item.amount = item.quantity * item.rate
+	function calculateDiscountAmount(discount, baseAmount = null) {
+		/**
+		 * ⭐ SINGLE SOURCE OF TRUTH FOR ALL DISCOUNT CALCULATIONS ⭐
+		 *
+		 * This function centralizes discount calculation logic.
+		 * All components should use this for consistency.
+		 *
+		 * IMPORTANT: Discounts are ALWAYS calculated on SUBTOTAL (before tax)
+		 * This ensures tax is applied AFTER discount, which is the correct order.
+		 *
+		 * Calculation Order:
+		 * 1. Subtotal (item total)
+		 * 2. - Discount (calculated here)
+		 * 3. = Net Amount
+		 * 4. + Tax (on net amount)
+		 * 5. = Grand Total
+		 *
+		 * @param {Object} discount - { percentage, amount, offer }
+		 * @param {Number} baseAmount - Base amount to calculate on (defaults to subtotal)
+		 * @returns {Number} Calculated discount amount
+		 */
+		if (!discount) return 0
 
-		// Recalculate discount if percentage is set
-		if (item.discount_percentage > 0) {
-			item.discount_amount = (item.amount * item.discount_percentage) / 100
+		const base = baseAmount !== null ? baseAmount : subtotal.value
+
+		if (discount.percentage > 0) {
+			// Percentage discount on SUBTOTAL (before tax)
+			return (base * discount.percentage) / 100
+		} else if (discount.amount > 0) {
+			// Fixed amount discount
+			return discount.amount
 		}
 
-		// Calculate tax based on tax rules
-		const netAmount = item.amount - (item.discount_amount || 0)
-		item.tax_amount = 0
+		return 0
+	}
 
-		// Apply tax rules if available
+	function applyDiscount(discount) {
+		/**
+		 * Apply discount to all items in the cart
+		 * @param {Object} discount - { percentage, amount, name }
+		 */
+		if (!discount) return
+
+		if (discount.percentage > 0) {
+			// Apply percentage discount to all items
+			invoiceItems.value.forEach(item => {
+				item.discount_percentage = discount.percentage
+				item.discount_amount = 0
+				recalculateItem(item)
+			})
+		} else if (discount.amount > 0) {
+			// Distribute fixed discount amount proportionally across items
+			const total = subtotal.value
+			if (total > 0) {
+				invoiceItems.value.forEach(item => {
+					const itemTotal = item.rate * item.quantity
+					const itemDiscount = (itemTotal / total) * discount.amount
+					item.discount_amount = itemDiscount
+					item.discount_percentage = 0
+					recalculateItem(item)
+				})
+			}
+		}
+	}
+
+	function removeDiscount() {
+		/**
+		 * Remove all discounts from cart items
+		 */
+		invoiceItems.value.forEach(item => {
+			item.discount_percentage = 0
+			item.discount_amount = 0
+			recalculateItem(item)
+		})
+	}
+
+	function recalculateItem(item) {
+		// Step 1: Calculate base amount (rate * quantity)
+		const baseAmount = item.quantity * item.rate
+
+		// Step 2: Calculate discount amount
+		let discountAmount = 0
+		if (item.discount_percentage > 0) {
+			discountAmount = (baseAmount * item.discount_percentage) / 100
+		} else if (item.discount_amount > 0) {
+			// If discount_amount is set directly, use it
+			discountAmount = item.discount_amount
+			// Also calculate the percentage for consistency
+			item.discount_percentage = baseAmount > 0 ? (discountAmount / baseAmount) * 100 : 0
+		}
+		item.discount_amount = discountAmount
+
+		// Step 3: Calculate net amount (after discount, before tax)
+		const netAmount = baseAmount - discountAmount
+
+		// Step 4: Calculate tax on net amount
+		let taxAmount = 0
 		if (taxRules.value && taxRules.value.length > 0) {
 			for (const taxRule of taxRules.value) {
 				if (taxRule.charge_type === "On Net Total" || taxRule.charge_type === "On Previous Row Total") {
-					// Simple percentage tax on net amount
-					item.tax_amount += (netAmount * (taxRule.rate || 0)) / 100
+					taxAmount += (netAmount * (taxRule.rate || 0)) / 100
 				}
 			}
 		}
+		item.tax_amount = taxAmount
+
+		// Step 5: Calculate final item amount (net amount + tax)
+		item.amount = netAmount + taxAmount
+
+		// Force reactivity update
+		invoiceItems.value = [...invoiceItems.value]
 	}
 
 	function addPayment(payment) {
@@ -397,6 +484,9 @@ export function useInvoice() {
 		updateItemQuantity,
 		updateItemRate,
 		updateItemDiscount,
+		calculateDiscountAmount,
+		applyDiscount,
+		removeDiscount,
 		addPayment,
 		removePayment,
 		updatePayment,
