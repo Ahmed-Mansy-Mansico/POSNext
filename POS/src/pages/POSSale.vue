@@ -619,6 +619,7 @@ const leftPanelWidth = ref(800) // Start with 800px width
 const isResizing = ref(false)
 const autoAppliedOffer = ref(null)
 const appliedCoupon = ref(null)
+const pendingPaymentAfterCustomer = ref(false)
 
 // Get global dialog state for divider behavior
 const { isAnyDialogOpen } = useDialogState()
@@ -852,6 +853,12 @@ function handleCustomerSelected(selectedCustomer) {
 			icon: "check",
 			iconClasses: "text-green-600",
 		})
+
+		// If there was a pending payment, continue to payment dialog
+		if (pendingPaymentAfterCustomer.value) {
+			pendingPaymentAfterCustomer.value = false
+			showPaymentDialog.value = true
+		}
 	} else {
 		// Clear customer
 		customer.value = null
@@ -871,6 +878,21 @@ function handleProceedToPayment() {
 			icon: "alert-circle",
 			iconClasses: "text-orange-600",
 		})
+		return
+	}
+
+	// Check if customer is selected
+	const customerValue = customer.value?.name || customer.value
+	if (!customerValue && !currentProfile.value?.customer) {
+		toast.create({
+			title: "Customer Required",
+			text: "Please select a customer before proceeding",
+			icon: "alert-circle",
+			iconClasses: "text-orange-600",
+		})
+		showCustomerDialog.value = true
+		// Set flag to continue to payment after customer selection
+		pendingPaymentAfterCustomer.value = true
 		return
 	}
 
