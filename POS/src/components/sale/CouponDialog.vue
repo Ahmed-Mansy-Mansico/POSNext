@@ -161,6 +161,10 @@ const props = defineProps({
 	currency: {
 		type: String,
 		default: 'USD'
+	},
+	appliedCoupon: {
+		type: Object,
+		default: null
 	}
 })
 
@@ -207,11 +211,18 @@ watch(() => props.modelValue, (val) => {
 		loadGiftCards()
 		errorMessage.value = ''
 		couponCode.value = ''
+		// Sync with external state
+		appliedDiscount.value = props.appliedCoupon
 	}
 })
 
 watch(show, (val) => {
 	emit('update:modelValue', val)
+})
+
+// Watch for external coupon removal
+watch(() => props.appliedCoupon, (val) => {
+	appliedDiscount.value = val
 })
 
 async function loadGiftCards() {
@@ -266,6 +277,48 @@ async function applyCoupon() {
 			return
 		}
 
+		// Check maximum amount (on subtotal before tax)
+		if (offer.max_amt && props.subtotal > offer.max_amt) {
+			errorMessage.value = `This offer is only valid for purchases up to ${formatCurrency(offer.max_amt)}`
+			toast.create({
+				title: 'Maximum Amount Exceeded',
+				text: errorMessage.value,
+				icon: 'alert-circle',
+				iconClasses: 'text-orange-600'
+			})
+			return
+		}
+
+		// Check minimum quantity
+		if (offer.min_qty) {
+			const totalQty = props.items.reduce((sum, item) => sum + item.quantity, 0)
+			if (totalQty < offer.min_qty) {
+				errorMessage.value = `This offer requires at least ${offer.min_qty} items in your cart`
+				toast.create({
+					title: 'Minimum Quantity Required',
+					text: errorMessage.value,
+					icon: 'alert-circle',
+					iconClasses: 'text-orange-600'
+				})
+				return
+			}
+		}
+
+		// Check maximum quantity
+		if (offer.max_qty) {
+			const totalQty = props.items.reduce((sum, item) => sum + item.quantity, 0)
+			if (totalQty > offer.max_qty) {
+				errorMessage.value = `This offer is only valid for up to ${offer.max_qty} items`
+				toast.create({
+					title: 'Maximum Quantity Exceeded',
+					text: errorMessage.value,
+					icon: 'alert-circle',
+					iconClasses: 'text-orange-600'
+				})
+				return
+			}
+		}
+
 		// Calculate discount on subtotal (before tax)
 		let discountAmount = 0
 		if (offer.discount_percentage) {
@@ -273,6 +326,9 @@ async function applyCoupon() {
 		} else if (offer.discount_amount) {
 			discountAmount = offer.discount_amount
 		}
+
+		// Clamp discount to subtotal to prevent negative totals
+		discountAmount = Math.min(discountAmount, props.subtotal)
 
 		appliedDiscount.value = {
 			name: offer.title || offer.name,

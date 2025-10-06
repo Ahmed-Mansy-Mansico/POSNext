@@ -29,17 +29,20 @@
 					<div
 						v-for="offer in eligibleOffers"
 						:key="offer.name"
-						@click="selectOffer(offer)"
+						@click="checkOfferEligibility(offer) ? selectOffer(offer) : null"
 						:class="[
-							'relative rounded-xl p-4 cursor-pointer transition-all duration-200 border-2',
-							appliedOffer?.name === offer.name
+							'relative rounded-xl p-4 transition-all duration-200 border-2',
+							checkOfferEligibility(offer) ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
+							appliedOffer?.code === offer.name
 								? 'bg-green-50 border-green-500 shadow-md'
-								: 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:border-green-400 hover:shadow-lg'
+								: checkOfferEligibility(offer)
+									? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:border-green-400 hover:shadow-lg'
+									: 'bg-gray-50 border-gray-300'
 						]"
 					>
 						<!-- Applied Badge -->
 						<div
-							v-if="appliedOffer?.name === offer.name"
+							v-if="appliedOffer?.code === offer.name"
 							class="absolute top-2 right-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center space-x-1"
 						>
 							<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -147,16 +150,16 @@
 
 						<!-- Apply Button -->
 						<button
-							v-if="subtotal >= (offer.min_amt || 0)"
+							v-if="checkOfferEligibility(offer)"
 							@click.stop="selectOffer(offer)"
 							:class="[
 								'mt-3 w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all',
-								appliedOffer?.name === offer.name
+								appliedOffer?.code === offer.name
 									? 'bg-red-600 hover:bg-red-700 text-white'
 									: 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'
 							]"
 						>
-							{{ appliedOffer?.name === offer.name ? 'Remove Offer' : 'Apply Offer' }}
+							{{ appliedOffer?.code === offer.name ? 'Remove Offer' : 'Apply Offer' }}
 						</button>
 					</div>
 				</div>
@@ -191,6 +194,10 @@ const props = defineProps({
 	currency: {
 		type: String,
 		default: 'USD'
+	},
+	appliedOffer: {
+		type: Object,
+		default: null
 	}
 })
 
@@ -198,7 +205,7 @@ const emit = defineEmits(['update:modelValue', 'offer-applied', 'offer-removed']
 
 const show = ref(props.modelValue)
 const allOffers = ref([])
-const appliedOffer = ref(null)
+const appliedOffer = computed(() => props.appliedOffer)
 const loading = ref(false)
 
 // Resource to load offers
@@ -289,8 +296,7 @@ async function loadOffers() {
 
 function selectOffer(offer) {
 	// Toggle offer - if already applied, remove it
-	if (appliedOffer.value?.name === offer.name) {
-		appliedOffer.value = null
+	if (appliedOffer.value?.code === offer.name) {
 		emit('offer-removed')
 		toast.create({
 			title: 'Offer Removed',
@@ -325,7 +331,10 @@ function selectOffer(offer) {
 		discountAmount = discountData.amount
 	}
 
-	appliedOffer.value = {
+	// Clamp discount to subtotal to prevent negative totals
+	discountAmount = Math.min(discountAmount, props.subtotal)
+
+	const offerData = {
 		name: offer.title || offer.name,
 		code: offer.name,
 		percentage: discountData.percentage,
@@ -334,7 +343,7 @@ function selectOffer(offer) {
 		offer: offer
 	}
 
-	emit('offer-applied', appliedOffer.value)
+	emit('offer-applied', offerData)
 
 	toast.create({
 		title: 'Offer Applied!',

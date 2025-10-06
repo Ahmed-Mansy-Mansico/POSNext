@@ -384,6 +384,7 @@
 			:customer="customer?.name || customer"
 			:company="currentProfile?.company"
 			:currency="currentProfile?.currency || 'USD'"
+			:applied-coupon="appliedCoupon"
 			@discount-applied="handleDiscountApplied"
 			@discount-removed="handleDiscountRemoved"
 		/>
@@ -397,6 +398,7 @@
 			:customer="customer?.name || customer"
 			:company="currentProfile?.company"
 			:currency="currentProfile?.currency || 'USD'"
+			:applied-offer="autoAppliedOffer"
 			@offer-applied="handleOfferApplied"
 			@offer-removed="handleOfferRemoved"
 		/>
@@ -616,6 +618,7 @@ const dividerRef = ref(null)
 const leftPanelWidth = ref(800) // Start with 800px width
 const isResizing = ref(false)
 const autoAppliedOffer = ref(null)
+const appliedCoupon = ref(null)
 
 // Get global dialog state for divider behavior
 const { isAnyDialogOpen } = useDialogState()
@@ -1157,6 +1160,7 @@ function handleReturnCreated(returnInvoice) {
 function handleDiscountApplied(discount) {
 	// Use the composable's applyDiscount function
 	applyDiscount(discount)
+	appliedCoupon.value = discount
 	showCouponDialog.value = false
 
 	toast.create({
@@ -1171,6 +1175,7 @@ function handleDiscountRemoved() {
 	// Use the composable's removeDiscount function
 	removeDiscount()
 	autoAppliedOffer.value = null
+	appliedCoupon.value = null
 
 	toast.create({
 		title: "Discount Removed",
