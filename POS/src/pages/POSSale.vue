@@ -1,219 +1,79 @@
 <template>
 	<div class="h-screen flex flex-col bg-gray-50">
 		<!-- Loading State -->
-		<div
-			v-if="isLoading"
-			class="flex-1 flex items-center justify-center bg-gray-50"
-		>
-			<div class="text-center">
-				<div
-					class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"
-				></div>
-				<p class="mt-4 text-sm text-gray-500">Loading...</p>
-			</div>
-		</div>
+		<LoadingSpinner v-if="isLoading" />
 
 		<!-- Main App -->
 		<template v-else>
 			<!-- Header -->
-		<div class="bg-white border-b border-gray-200 shadow-sm">
-			<div class="px-6 py-3">
-				<div class="flex justify-between items-center">
-					<!-- Left Side: Logo/Brand -->
-					<div class="flex items-center space-x-4">
-						<div class="flex items-center space-x-3">
-							<div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
-								<svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-									<path d="M20 7h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM10 4h4v3h-4V4zm10 16H4V9h16v11z"/>
-								</svg>
-							</div>
-							<div>
-								<h1 class="text-base font-bold text-gray-900">POS Next</h1>
-								<p v-if="currentProfile" class="text-xs text-gray-500">{{ currentProfile.name }}</p>
-							</div>
-						</div>
-
-						<!-- Time and Shift Duration -->
-						<div class="flex items-center space-x-4 ml-6">
-							<!-- Current Time -->
-							<div class="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 rounded-lg border border-blue-100">
-								<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-								</svg>
-								<span class="text-sm font-semibold text-gray-900">{{ currentTime }}</span>
-							</div>
-
-							<!-- Shift Duration -->
-							<div v-if="hasOpenShift && currentShift" class="flex items-center space-x-2 px-3 py-1.5 bg-green-50 rounded-lg border border-green-100">
-								<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
-								</svg>
-								<div class="text-xs">
-									<span class="text-gray-600">Shift Open:</span>
-									<span class="font-semibold text-gray-900 ml-1">{{ shiftDuration }}</span>
-								</div>
-							</div>
-						</div>
-					</div>
-
-					<!-- Right Side: Controls -->
-					<div class="flex items-center space-x-1">
-						<!-- WiFi/Offline Status -->
-						<button
-							@click="handleSyncClick"
-							:class="[
-								'p-2 hover:bg-gray-50 rounded-lg transition-colors relative group',
-								isSyncing ? 'animate-pulse' : ''
-							]"
-							:title="isOffline ? `Offline (${pendingInvoicesCount} pending)` : 'Online - Click to sync'"
-						>
-							<svg
-								v-if="!isOffline"
-								class="w-5 h-5 text-green-600"
-								fill="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
-							</svg>
-							<svg
-								v-else
-								class="w-5 h-5 text-orange-600"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/>
-							</svg>
-							<span
-								v-if="pendingInvoicesCount > 0"
-								class="absolute -top-1 -right-1 bg-orange-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center"
-							>
-								{{ pendingInvoicesCount }}
-							</span>
-						</button>
-
-						<!-- Printer -->
-						<button class="p-2 hover:bg-gray-50 rounded-lg transition-colors group" title="Print">
-							<svg class="w-5 h-5 text-gray-600 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-							</svg>
-						</button>
-
-						<!-- Refresh -->
-						<button class="p-2 hover:bg-gray-50 rounded-lg transition-colors group" title="Refresh">
-							<svg class="w-5 h-5 text-gray-600 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-							</svg>
-						</button>
-
-						<!-- Scanner -->
-						<button class="p-2 hover:bg-gray-50 rounded-lg transition-colors group" title="Scan Barcode">
-							<svg class="w-5 h-5 text-gray-600 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
-							</svg>
-						</button>
-
-						<div class="w-px h-6 bg-gray-200 mx-2"></div>
-
-						<!-- Actions Dropdown -->
-						<div class="relative">
-							<button
-								@click="showActionsMenu = !showActionsMenu"
-								class="flex items-center space-x-2 px-3 py-2 hover:bg-gray-50 rounded-lg border border-gray-200 transition-colors"
-							>
-								<svg class="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-									<path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-								</svg>
-								<span class="text-sm font-medium text-gray-700">Actions</span>
-								<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-								</svg>
-							</button>
-
-							<!-- Dropdown Menu -->
-							<div
-								v-if="showActionsMenu"
-								@click.stop
-								class="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50"
-							>
-								<button
-									v-if="hasOpenShift"
-									@click="showOpenShiftDialog = true; showActionsMenu = false"
-									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
-								>
-									<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-									</svg>
-									<span>View Shift</span>
-								</button>
-								<button
-									@click="showDraftDialog = true; showActionsMenu = false"
-									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 flex items-center space-x-3 transition-colors relative"
-								>
-									<svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-									</svg>
-									<span>Draft Invoices</span>
-									<span v-if="draftsCount > 0" class="ml-auto text-xs bg-purple-600 text-white px-1.5 py-0.5 rounded-full">
-										{{ draftsCount }}
-									</span>
-								</button>
-								<button
-									@click="showHistoryDialog = true; showActionsMenu = false"
-									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 flex items-center space-x-3 transition-colors"
-								>
-									<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-									</svg>
-									<span>Invoice History</span>
-								</button>
-								<button
-									@click="showReturnDialog = true; showActionsMenu = false"
-									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-red-50 flex items-center space-x-3 transition-colors"
-								>
-									<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-									</svg>
-									<span>Return Invoice</span>
-								</button>
-								<hr class="my-2 border-gray-100">
-								<button
-									@click="handleCloseShift(); showActionsMenu = false"
-									class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 flex items-center space-x-3 transition-colors"
-								>
-									<svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-									</svg>
-									<span>Close Shift</span>
-								</button>
-								<hr class="my-2 border-gray-100">
-								<button
-									@click="handleLogout"
-									class="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-3 transition-colors"
-								>
-									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-									</svg>
-									<span>Logout</span>
-								</button>
-							</div>
-						</div>
-
-						<div class="w-px h-6 bg-gray-200 mx-2"></div>
-
-						<!-- User Profile -->
-						<div class="flex items-center space-x-3 px-2">
-							<div class="text-right">
-								<p class="text-sm font-semibold text-gray-900">{{ getCurrentUser() }}</p>
-							</div>
-							<div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
-								<span class="text-sm font-bold text-white">{{ getUserInitials() }}</span>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
+			<POSHeader
+				:current-time="currentTime"
+				:shift-duration="shiftDuration"
+				:has-open-shift="hasOpenShift"
+				:profile-name="currentProfile?.name"
+				:user-name="getCurrentUser()"
+				:is-offline="isOffline"
+				:is-syncing="isSyncing"
+				:pending-invoices-count="pendingInvoicesCount"
+				@sync-click="handleSyncClick"
+				@printer-click="showHistoryDialog = true"
+				@refresh-click="handleRefresh"
+				@logout="handleLogout"
+			>
+				<template #menu-items>
+					<button
+						v-if="hasOpenShift"
+						@click="showOpenShiftDialog = true"
+						class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 flex items-center space-x-3 transition-colors"
+					>
+						<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+						<span>View Shift</span>
+					</button>
+					<button
+						@click="showDraftDialog = true"
+						class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-purple-50 flex items-center space-x-3 transition-colors relative"
+					>
+						<svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+						</svg>
+						<span>Draft Invoices</span>
+						<span v-if="draftsCount > 0" class="ml-auto text-xs bg-purple-600 text-white px-1.5 py-0.5 rounded-full">
+							{{ draftsCount }}
+						</span>
+					</button>
+					<button
+						@click="showHistoryDialog = true"
+						class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-indigo-50 flex items-center space-x-3 transition-colors"
+					>
+						<svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+						</svg>
+						<span>Invoice History</span>
+					</button>
+					<button
+						@click="showReturnDialog = true"
+						class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-red-50 flex items-center space-x-3 transition-colors"
+					>
+						<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+						</svg>
+						<span>Return Invoice</span>
+					</button>
+				</template>
+				<template #additional-actions>
+					<button
+						@click="handleCloseShift()"
+						class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 flex items-center space-x-3 transition-colors"
+					>
+						<svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+						<span>Close Shift</span>
+					</button>
+				</template>
+			</POSHeader>
 
 		<!-- Main Content: Two Column Layout -->
 		<div
@@ -527,6 +387,37 @@
 				</div>
 			</template>
 		</Dialog>
+
+		<!-- Error Dialog -->
+		<Dialog
+			v-model="showErrorDialog"
+			:options="{ title: errorDialogTitle || 'Error', size: 'md' }"
+		>
+			<template #body-content>
+				<div class="py-3">
+					<p class="text-sm text-gray-700 whitespace-pre-line">
+						{{ errorDialogMessage || 'An unexpected error occurred.' }}
+					</p>
+					<div v-if="errorDetails" class="mt-3 pt-3 border-t border-gray-200">
+						<p class="text-xs text-gray-500">{{ errorDetails }}</p>
+					</div>
+				</div>
+			</template>
+			<template #actions>
+				<div class="flex justify-end space-x-2">
+					<Button variant="subtle" @click="showErrorDialog = false">
+						Close
+					</Button>
+					<Button
+						v-if="errorRetryAction"
+						variant="solid"
+						@click="handleErrorRetry"
+					>
+						Try Again
+					</Button>
+				</div>
+			</template>
+		</Dialog>
 		</template>
 	</div>
 </template>
@@ -540,6 +431,10 @@ import { useOffline } from "@/composables/useOffline"
 import { useDialog, useDialogState } from "@/composables/useDialogState"
 import { Button, Dialog, toast } from "frappe-ui"
 import { session } from "@/data/session"
+import { parseError } from "@/utils/errorHandler"
+import { checkStockAvailability, formatStockError } from "@/utils/stockValidator"
+import LoadingSpinner from "@/components/common/LoadingSpinner.vue"
+import POSHeader from "@/components/pos/POSHeader.vue"
 import ItemsSelector from "@/components/sale/ItemsSelector.vue"
 import InvoiceCart from "@/components/sale/InvoiceCart.vue"
 import PaymentDialog from "@/components/sale/PaymentDialog.vue"
@@ -615,15 +510,20 @@ const { isOpen: showCreateCustomerDialog } = useDialog('createCustomer')
 const { isOpen: showClearCartDialog } = useDialog('clearCart')
 const { isOpen: showLogoutDialog } = useDialog('logout')
 const { isOpen: showItemSelectionDialog } = useDialog('itemSelection')
+const { isOpen: showErrorDialog } = useDialog('invoiceError')
 
 // Other refs
 const itemsSelectorRef = ref(null)
-const showActionsMenu = ref(false)
 const initialCustomerName = ref("")
 const pendingItem = ref(null)
 const pendingItemQty = ref(1)
 const lastInvoiceName = ref("")
 const lastInvoiceTotal = ref(0)
+const errorDialogTitle = ref("")
+const errorDialogMessage = ref("")
+const errorDetails = ref("")
+const errorType = ref("error") // 'error', 'warning', 'validation'
+const errorRetryAction = ref(null)
 const isLoading = ref(true)
 const currentTime = ref("")
 const shiftDuration = ref("")
@@ -747,9 +647,6 @@ onMounted(async () => {
 			}
 		}
 
-		// Add click outside listener
-		document.addEventListener('click', handleClickOutside)
-
 		requestAnimationFrame(updateLayoutBounds)
 
 		// Update drafts count
@@ -805,7 +702,6 @@ onUnmounted(() => {
 	}
 
 	// Clean up event listeners
-	document.removeEventListener('click', handleClickOutside)
 	window.removeEventListener('resize', updateLayoutBounds)
 	stopResize()
 })
@@ -866,16 +762,49 @@ function handleItemSelected(item) {
 		pendingItem.value = item
 		pendingItemQty.value = 1
 		showBatchSerialDialog.value = true
-	} else {
-		// Direct add to cart
-		addItem(item)
-		toast.create({
-			title: "Item Added",
-			text: `${item.item_name} added to cart`,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		return
 	}
+
+	// Priority 4: Check stock availability before adding to cart
+	const warehouse = item.warehouse || currentProfile.value?.warehouse
+	const actualQty = item.actual_qty !== undefined ? item.actual_qty : (item.stock_qty || 0)
+
+	// Check if item has stock information and validate
+	if (warehouse && actualQty !== undefined && actualQty !== null) {
+		const stockCheck = checkStockAvailability({
+			itemCode: item.item_code,
+			qty: 1,
+			warehouse: warehouse,
+			actualQty: actualQty
+		})
+
+		if (!stockCheck.available) {
+			const errorMsg = formatStockError(
+				item.item_name,
+				1,
+				stockCheck.actualQty,
+				warehouse
+			)
+
+			// Show error dialog
+			errorDialogTitle.value = "Insufficient Stock"
+			errorDialogMessage.value = errorMsg
+			errorDetails.value = `Item: ${item.item_code} | Warehouse: ${warehouse} | Available: ${stockCheck.actualQty}`
+			errorRetryAction.value = null
+			showErrorDialog.value = true
+
+			return
+		}
+	}
+
+	// Add to cart
+	addItem(item)
+	toast.create({
+		title: "Item Added",
+		text: `${item.item_name} added to cart`,
+		icon: "check",
+		iconClasses: "text-green-600",
+	})
 }
 
 function handleCustomerSelected(selectedCustomer) {
@@ -932,6 +861,16 @@ function handleProceedToPayment() {
 	}
 
 	showPaymentDialog.value = true
+}
+
+function handleErrorRetry() {
+	showErrorDialog.value = false
+	if (errorRetryAction.value === 'payment') {
+		// Retry payment
+		setTimeout(() => {
+			showPaymentDialog.value = true
+		}, 300)
+	}
 }
 
 async function handlePaymentCompleted(paymentData) {
@@ -1031,16 +970,35 @@ async function handlePaymentCompleted(paymentData) {
 		}
 	} catch (error) {
 		console.error("Error submitting invoice:", error)
+
+		// IMPORTANT: Close payment dialog immediately to prevent UI hang
 		showPaymentDialog.value = false
 
-		const errorMessage = error.messages ? error.messages[0] : (error.message || "Failed to create invoice")
+		// Parse error using common error handler
+		const errorContext = parseError(error)
+
+		// Set error dialog state
+		errorDialogTitle.value = errorContext.title || 'Error'
+		errorDialogMessage.value = errorContext.message || 'An unexpected error occurred'
+		errorDetails.value = errorContext.technicalDetails || null
+		errorType.value = errorContext.type || 'error'
+		errorRetryAction.value = errorContext.retryable ? 'payment' : null
+
+		// Show error dialog
+		showErrorDialog.value = true
+
+		// Show toast notification
+		const toastIconClass =
+			errorContext.type === 'error' ? 'text-red-600' :
+			errorContext.type === 'warning' ? 'text-orange-600' :
+			'text-yellow-600'
 
 		toast.create({
-			title: "Error Creating Invoice",
-			text: errorMessage,
+			title: errorContext.title,
+			text: errorContext.message,
 			icon: "alert-circle",
-			iconClasses: "text-red-600",
-			timeout: 5000,
+			iconClasses: toastIconClass,
+			timeout: 6000,
 		})
 	}
 }
@@ -1216,17 +1174,7 @@ function getCurrentUser() {
 	return "User"
 }
 
-function getUserInitials() {
-	const name = getCurrentUser()
-	const parts = name.split(" ")
-	if (parts.length >= 2) {
-		return (parts[0][0] + parts[1][0]).toUpperCase()
-	}
-	return name.substring(0, 2).toUpperCase()
-}
-
 function handleLogout() {
-	showActionsMenu.value = false
 	showLogoutDialog.value = true
 }
 
@@ -1234,14 +1182,6 @@ function confirmLogout() {
 	showLogoutDialog.value = false
 	session.logout.submit()
 }
-
-// Close dropdown when clicking outside
-function handleClickOutside(event) {
-	if (showActionsMenu.value && !event.target.closest('.relative')) {
-		showActionsMenu.value = false
-	}
-}
-
 async function handleSaveDraft() {
 	if (invoiceItems.value.length === 0) {
 		toast.create({
@@ -1504,6 +1444,19 @@ function handleCustomerCreated(newCustomer) {
 		iconClasses: "text-green-600",
 	})
 }
+
+function handleRefresh() {
+	if (itemsSelectorRef.value) {
+		itemsSelectorRef.value.loadItems()
+		toast.create({
+			title: "Refreshed",
+			text: "Items list has been refreshed",
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	}
+}
+
 
 async function handleSyncClick() {
 	if (isOffline.value) {

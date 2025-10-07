@@ -8,22 +8,29 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ActionButton: typeof import('./src/components/common/ActionButton.vue')['default']
     BatchSerialDialog: typeof import('./src/components/sale/BatchSerialDialog.vue')['default']
     CouponDialog: typeof import('./src/components/sale/CouponDialog.vue')['default']
     CreateCustomerDialog: typeof import('./src/components/sale/CreateCustomerDialog.vue')['default']
     CustomerDialog: typeof import('./src/components/sale/CustomerDialog.vue')['default']
     DraftInvoicesDialog: typeof import('./src/components/sale/DraftInvoicesDialog.vue')['default']
+    ErrorDialog: typeof import('./src/components/ErrorDialog.vue')['default']
+    'ErrorDialog.example': typeof import('./src/components/ErrorDialog.example.vue')['default']
     InvoiceCart: typeof import('./src/components/sale/InvoiceCart.vue')['default']
     InvoiceHistoryDialog: typeof import('./src/components/sale/InvoiceHistoryDialog.vue')['default']
     ItemSelectionDialog: typeof import('./src/components/sale/ItemSelectionDialog.vue')['default']
     ItemsSelector: typeof import('./src/components/sale/ItemsSelector.vue')['default']
+    LoadingSpinner: typeof import('./src/components/common/LoadingSpinner.vue')['default']
     OffersDialog: typeof import('./src/components/sale/OffersDialog.vue')['default']
     PaymentDialog: typeof import('./src/components/sale/PaymentDialog.vue')['default']
+    POSHeader: typeof import('./src/components/pos/POSHeader.vue')['default']
     ReturnInvoiceDialog: typeof import('./src/components/sale/ReturnInvoiceDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ShiftClosingDialog: typeof import('./src/components/ShiftClosingDialog.vue')['default']
     ShiftOpeningDialog: typeof import('./src/components/ShiftOpeningDialog.vue')['default']
+    StatusBadge: typeof import('./src/components/common/StatusBadge.vue')['default']
     UomSelectionDialog: typeof import('./src/components/sale/UomSelectionDialog.vue')['default']
+    UserMenu: typeof import('./src/components/common/UserMenu.vue')['default']
   }
 }
