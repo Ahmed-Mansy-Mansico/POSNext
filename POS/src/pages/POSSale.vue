@@ -53,6 +53,19 @@
 						<span>Invoice History</span>
 					</button>
 					<button
+						v-if="pendingInvoicesCount > 0"
+						@click="showOfflineInvoicesDialog = true; loadPendingInvoices()"
+						class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-orange-50 flex items-center space-x-3 transition-colors relative"
+					>
+						<svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+						</svg>
+						<span>Offline Invoices</span>
+						<span class="ml-auto text-xs bg-orange-600 text-white px-1.5 py-0.5 rounded-full">
+							{{ pendingInvoicesCount }}
+						</span>
+					</button>
+					<button
 						@click="showReturnDialog = true"
 						class="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-red-50 flex items-center space-x-3 transition-colors"
 					>
@@ -198,6 +211,7 @@
 			:grand-total="grandTotal"
 			:pos-profile="currentProfile?.name"
 			:currency="currentProfile?.currency || 'USD'"
+			:is-offline="isOffline"
 			@payment-completed="handlePaymentCompleted"
 		/>
 
@@ -288,6 +302,19 @@
 			v-model="showHistoryDialog"
 			:pos-profile="currentProfile?.name"
 			@create-return="handleCreateReturnFromHistory"
+		/>
+
+		<!-- Offline Invoices Dialog -->
+		<OfflineInvoicesDialog
+			v-model="showOfflineInvoicesDialog"
+			:is-offline="isOffline"
+			:pending-invoices="pendingInvoicesList"
+			:is-syncing="isSyncing"
+			:currency="currentProfile?.currency || 'USD'"
+			@sync-all="handleSyncAll"
+			@delete-invoice="handleDeleteOfflineInvoice"
+			@edit-invoice="handleEditOfflineInvoice"
+			@refresh="loadPendingInvoices"
 		/>
 
 		<!-- Create Customer Dialog -->
@@ -404,17 +431,28 @@
 				</div>
 			</template>
 			<template #actions>
-				<div class="flex justify-end space-x-2">
-					<Button variant="subtle" @click="showErrorDialog = false">
-						Close
-					</Button>
+				<div class="flex justify-between items-center w-full">
 					<Button
-						v-if="errorRetryAction"
-						variant="solid"
-						@click="handleErrorRetry"
+						v-if="errorRetryAction === 'sync' && errorRetryActionData?.failedInvoiceId"
+						variant="outline"
+						theme="red"
+						@click="handleDeleteFailedInvoice"
 					>
-						Try Again
+						Delete Invoice
 					</Button>
+					<div v-else></div>
+					<div class="flex space-x-2">
+						<Button variant="subtle" @click="showErrorDialog = false">
+							Close
+						</Button>
+						<Button
+							v-if="errorRetryAction"
+							variant="solid"
+							@click="handleErrorRetry"
+						>
+							Try Again
+						</Button>
+					</div>
 				</div>
 			</template>
 		</Dialog>
@@ -447,12 +485,12 @@ import CouponDialog from "@/components/sale/CouponDialog.vue"
 import OffersDialog from "@/components/sale/OffersDialog.vue"
 import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
 import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
+import OfflineInvoicesDialog from "@/components/sale/OfflineInvoicesDialog.vue"
 import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
 import ItemSelectionDialog from "@/components/sale/ItemSelectionDialog.vue"
 import { printInvoiceByName } from "@/utils/printInvoice"
 import { saveDraft, getDraftsCount, deleteDraft } from "@/utils/draftManager"
-import { offlineWorker } from "@/utils/offline/workerClient"
-import { cacheItemsFromServer, cacheCustomersFromServer } from "@/utils/offline"
+import { cacheItemsFromServer, cacheCustomersFromServer, cachePaymentMethodsFromServer } from "@/utils/offline"
 
 const LEFT_PANEL_MIN = 320
 const RIGHT_PANEL_MIN = 360
@@ -466,8 +504,11 @@ const {
 	isSyncing,
 	saveInvoiceOffline,
 	syncPending,
+	getPending,
+	deletePending,
 	cacheData,
 	searchItems: searchCachedItems,
+	checkCacheReady,
 	getCacheStats,
 } = useOffline()
 
@@ -506,6 +547,7 @@ const { isOpen: showCouponDialog } = useDialog('coupon')
 const { isOpen: showOffersDialog } = useDialog('offers')
 const { isOpen: showBatchSerialDialog } = useDialog('batchSerial')
 const { isOpen: showHistoryDialog } = useDialog('history')
+const { isOpen: showOfflineInvoicesDialog } = useDialog('offlineInvoices')
 const { isOpen: showCreateCustomerDialog } = useDialog('createCustomer')
 const { isOpen: showClearCartDialog } = useDialog('clearCart')
 const { isOpen: showLogoutDialog } = useDialog('logout')
@@ -524,6 +566,7 @@ const errorDialogMessage = ref("")
 const errorDetails = ref("")
 const errorType = ref("error") // 'error', 'warning', 'validation'
 const errorRetryAction = ref(null)
+const errorRetryActionData = ref(null)
 const isLoading = ref(true)
 const currentTime = ref("")
 const shiftDuration = ref("")
@@ -536,6 +579,7 @@ const autoAppliedOffer = ref(null)
 const appliedCoupon = ref(null)
 const pendingPaymentAfterCustomer = ref(false)
 const selectionMode = ref('uom') // 'uom' or 'variant'
+const pendingInvoicesList = ref([])
 
 // Get global dialog state for divider behavior
 const { isAnyDialogOpen } = useDialogState()
@@ -589,9 +633,9 @@ onMounted(async () => {
 
 				// Pre-load data for offline use if online and needed
 				if (!isOffline.value) {
-					// Check cache status via worker
-					const cacheReady = await offlineWorker.isCacheReady()
-					const stats = await offlineWorker.getCacheStats()
+					// Check cache status
+					const cacheReady = await checkCacheReady()
+					const stats = await getCacheStats()
 					const needsRefresh = !stats.lastSync || (Date.now() - stats.lastSync) > (24 * 60 * 60 * 1000)
 
 					if (!cacheReady || needsRefresh) {
@@ -603,17 +647,15 @@ onMounted(async () => {
 						})
 
 						try {
-							// Fetch from server (main thread - uses window.frappe.call)
-							const [itemsData, customersData] = await Promise.all([
+							// Fetch from server
+							const [itemsData, customersData, paymentMethodsData] = await Promise.all([
 								cacheItemsFromServer(currentProfile.value.name),
-								cacheCustomersFromServer(currentProfile.value.name)
+								cacheCustomersFromServer(currentProfile.value.name),
+								cachePaymentMethodsFromServer(currentProfile.value.name)
 							])
 
-							// Cache via worker (background thread)
-							await Promise.all([
-								offlineWorker.cacheItems(itemsData.items || []),
-								offlineWorker.cacheCustomers(customersData.customers || [])
-							])
+							// Cache data using composable
+							await cacheData(itemsData.items || [], customersData.customers || [])
 
 							toast.create({
 								title: "Sync Complete",
@@ -633,7 +675,7 @@ onMounted(async () => {
 					}
 				} else {
 					// Check if cache is available when offline
-					const cacheReady = await offlineWorker.isCacheReady()
+					const cacheReady = await checkCacheReady()
 					if (!cacheReady) {
 						// Show warning if offline and no cache
 						toast.create({
@@ -863,12 +905,47 @@ function handleProceedToPayment() {
 	showPaymentDialog.value = true
 }
 
-function handleErrorRetry() {
+async function handleDeleteFailedInvoice() {
+	if (!errorRetryActionData.value?.failedInvoiceId) return
+
+	const invoiceId = errorRetryActionData.value.failedInvoiceId
+	showErrorDialog.value = false
+
+	try {
+		await deletePending(invoiceId)
+		await loadPendingInvoices()
+
+		toast.create({
+			title: "Invoice Deleted",
+			text: "Failed invoice has been removed from the offline queue",
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} catch (error) {
+		console.error('Error deleting failed invoice:', error)
+		toast.create({
+			title: "Delete Failed",
+			text: error.message || "Failed to delete the invoice",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
+}
+
+async function handleErrorRetry() {
 	showErrorDialog.value = false
 	if (errorRetryAction.value === 'payment') {
 		// Retry payment
 		setTimeout(() => {
 			showPaymentDialog.value = true
+		}, 300)
+	} else if (errorRetryAction.value === 'sync') {
+		// Refresh pending invoices before retrying sync
+		await loadPendingInvoices()
+
+		// Retry sync
+		setTimeout(() => {
+			handleSyncClick()
 		}, 300)
 	}
 }
@@ -901,12 +978,18 @@ async function handlePaymentCompleted(paymentData) {
 		}
 
 		if (isOffline.value) {
-			await saveInvoiceOffline({
+			// Serialize data to plain objects (remove Vue reactivity)
+			const invoiceData = {
 				pos_profile: posProfile.value,
 				customer: customerValue || currentProfile.value?.customer,
-				items: invoiceItems.value,
-				payments: payments.value,
-			})
+				items: JSON.parse(JSON.stringify(invoiceItems.value)),
+				payments: JSON.parse(JSON.stringify(payments.value)),
+				grand_total: grandTotal.value,
+				total_tax: totalTax.value,
+				total_discount: totalDiscount.value,
+			}
+
+			await saveInvoiceOffline(invoiceData)
 
 			lastInvoiceName.value = `OFFLINE-${Date.now()}`
 			lastInvoiceTotal.value = grandTotal.value
@@ -1458,23 +1541,105 @@ function handleRefresh() {
 }
 
 
-async function handleSyncClick() {
-	if (isOffline.value) {
+async function loadPendingInvoices() {
+	try {
+		pendingInvoicesList.value = await getPending()
+	} catch (error) {
+		console.error('Error loading pending invoices:', error)
+		pendingInvoicesList.value = []
+	}
+}
+
+async function handleEditOfflineInvoice(invoice) {
+	try {
+		// Clear current cart
+		clearCart()
+
+		// Restore invoice data to cart
+		const invoiceData = invoice.data
+
+		// Set customer
+		if (invoiceData.customer) {
+			customer.value = invoiceData.customer
+		}
+
+		// Restore items to cart
+		if (invoiceData.items && invoiceData.items.length > 0) {
+			for (const item of invoiceData.items) {
+				addItem(item)
+			}
+		}
+
+		// Delete the offline invoice since we're editing it
+		await deletePending(invoice.id)
+		await loadPendingInvoices()
+
 		toast.create({
-			title: "Offline Mode",
-			text: `${pendingInvoicesCount.value} invoice(s) pending sync`,
-			icon: "alert-circle",
-			iconClasses: "text-orange-600",
+			title: "Invoice Restored",
+			text: "Invoice loaded to cart for editing",
+			icon: "check",
+			iconClasses: "text-blue-600",
 		})
+	} catch (error) {
+		console.error('Error editing offline invoice:', error)
+		toast.create({
+			title: "Restore Failed",
+			text: error.message || "Failed to restore invoice",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
+}
+
+async function handleDeleteOfflineInvoice(invoiceId) {
+	try {
+		await deletePending(invoiceId)
+		await loadPendingInvoices()
+		toast.create({
+			title: "Invoice Deleted",
+			text: "Offline invoice deleted successfully",
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} catch (error) {
+		console.error('Error deleting offline invoice:', error)
+		toast.create({
+			title: "Delete Failed",
+			text: error.message || "Failed to delete offline invoice",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
+}
+
+async function handleSyncClick() {
+	// Always open the offline invoices dialog if there are pending invoices
+	if (pendingInvoicesCount.value > 0) {
+		await loadPendingInvoices()
+		showOfflineInvoicesDialog.value = true
 		return
 	}
 
+	// If no pending invoices, show success message
 	if (pendingInvoicesCount.value === 0) {
 		toast.create({
 			title: "All Synced",
 			text: "No pending invoices to sync",
 			icon: "check",
 			iconClasses: "text-green-600",
+		})
+		return
+	}
+}
+
+// Sync all pending invoices (called from dialog)
+async function handleSyncAll() {
+	if (isOffline.value) {
+		toast.create({
+			title: "Offline Mode",
+			text: "Cannot sync while offline",
+			icon: "alert-circle",
+			iconClasses: "text-orange-600",
 		})
 		return
 	}
@@ -1489,9 +1654,23 @@ async function handleSyncClick() {
 				icon: "check",
 				iconClasses: "text-green-600",
 			})
+			// Reload pending invoices list
+			await loadPendingInvoices()
 		}
 
-		if (result.failed > 0) {
+		if (result.failed > 0 && result.errors && result.errors.length > 0) {
+			// Show error dialog for the first failed invoice with details
+			const firstError = result.errors[0]
+			const errorContext = parseError(firstError.error)
+
+			errorDialogTitle.value = errorContext.title
+			errorDialogMessage.value = `Failed to sync invoice for ${firstError.customer}\n\n${errorContext.message}\n\nYou can delete this invoice from the offline queue if you don't need it.`
+			errorDetails.value = errorContext.technicalDetails || `Invoice ID: ${firstError.invoiceId}`
+			errorRetryAction.value = 'sync'
+			errorRetryActionData.value = { failedInvoiceId: firstError.invoiceId }
+			showErrorDialog.value = true
+		} else if (result.failed > 0) {
+			// Fallback toast if no error details
 			toast.create({
 				title: "Partial Sync",
 				text: `${result.failed} invoice(s) failed to sync`,
@@ -1501,12 +1680,13 @@ async function handleSyncClick() {
 		}
 	} catch (error) {
 		console.error('Sync error:', error)
-		toast.create({
-			title: "Sync Failed",
-			text: error.message || "Failed to sync invoices",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		const errorContext = parseError(error)
+
+		errorDialogTitle.value = errorContext.title
+		errorDialogMessage.value = errorContext.message
+		errorDetails.value = errorContext.technicalDetails
+		errorRetryAction.value = 'sync'
+		showErrorDialog.value = true
 	}
 }
 

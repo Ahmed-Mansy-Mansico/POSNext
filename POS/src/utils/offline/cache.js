@@ -8,6 +8,7 @@ const CACHE_STRUCTURE = {
 	customers: ['name', 'customer_name', 'mobile_no', 'email_id'],
 	item_prices: ['price_list', 'item_code', 'price'],
 	local_stock: ['item_code', 'warehouse', 'actual_qty'],
+	payment_methods: ['mode_of_payment', 'pos_profile', 'default', 'allow_in_returns', 'type'],
 }
 
 // Generate cache version from structure hash
@@ -53,10 +54,12 @@ export const memory = {
 	customers: [],
 	item_prices: {},
 	local_stock: {},
+	payment_methods: [],
 
 	// Metadata
 	items_last_sync: null,
 	customers_last_sync: null,
+	payment_methods_last_sync: null,
 	cache_ready: false,
 	stock_cache_ready: false,
 	manual_offline: false,
@@ -328,6 +331,58 @@ export const getCacheStats = async () => {
 			stockReady: false,
 			lastSync: 'Error'
 		}
+	}
+}
+
+/**
+ * Cache payment methods from server
+ * @param {string} posProfile - POS Profile name
+ * @returns {Promise<object>} - Result with payment methods array
+ */
+export async function cachePaymentMethodsFromServer(posProfile) {
+	try {
+		const result = await call('pos_next.api.pos_profile.get_payment_methods', { pos_profile: posProfile })
+		const paymentMethods = result?.message || result || []
+
+		// Add pos_profile to each method for indexing
+		const methodsWithProfile = paymentMethods.map(method => ({
+			...method,
+			pos_profile: posProfile
+		}))
+
+		// Store in IndexedDB
+		await db.payment_methods.bulkPut(methodsWithProfile)
+
+		// Update last sync timestamp
+		const timestamp = Date.now()
+		await setSetting('payment_methods_last_sync', timestamp)
+		memory.payment_methods_last_sync = timestamp
+
+		console.log(`Cached ${paymentMethods.length} payment methods for ${posProfile}`)
+
+		return { payment_methods: paymentMethods }
+	} catch (error) {
+		console.error('Error caching payment methods:', error)
+		throw error
+	}
+}
+
+/**
+ * Get cached payment methods for a POS Profile
+ * @param {string} posProfile - POS Profile name
+ * @returns {Promise<Array>} - Array of payment methods
+ */
+export async function getCachedPaymentMethods(posProfile) {
+	try {
+		const methods = await db.payment_methods
+			.where('pos_profile')
+			.equals(posProfile)
+			.toArray()
+
+		return methods
+	} catch (error) {
+		console.error('Error getting cached payment methods:', error)
+		return []
 	}
 }
 

@@ -22,6 +22,7 @@ declare module 'vue' {
     ItemsSelector: typeof import('./src/components/sale/ItemsSelector.vue')['default']
     LoadingSpinner: typeof import('./src/components/common/LoadingSpinner.vue')['default']
     OffersDialog: typeof import('./src/components/sale/OffersDialog.vue')['default']
+    OfflineInvoicesDialog: typeof import('./src/components/sale/OfflineInvoicesDialog.vue')['default']
     PaymentDialog: typeof import('./src/components/sale/PaymentDialog.vue')['default']
     POSHeader: typeof import('./src/components/pos/POSHeader.vue')['default']
     ReturnInvoiceDialog: typeof import('./src/components/sale/ReturnInvoiceDialog.vue')['default']

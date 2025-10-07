@@ -207,6 +207,7 @@
 import { ref, computed, watch } from "vue"
 import { Dialog, Input, Button, createResource } from "frappe-ui"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { getCachedPaymentMethods } from "@/utils/offline"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -218,6 +219,10 @@ const props = defineProps({
 	currency: {
 		type: String,
 		default: 'USD'
+	},
+	isOffline: {
+		type: Boolean,
+		default: false
 	}
 })
 
@@ -248,6 +253,24 @@ const paymentMethodsResource = createResource({
 		}
 	},
 })
+
+// Load payment methods - from cache if offline, from server if online
+async function loadPaymentMethods() {
+	if (props.isOffline) {
+		// Load from cache when offline
+		const cached = await getCachedPaymentMethods(props.posProfile)
+		if (cached && cached.length > 0) {
+			paymentMethods.value = cached
+			if (paymentMethods.value.length > 0) {
+				const defaultMethod = paymentMethods.value.find((m) => m.default)
+				lastSelectedMethod.value = defaultMethod || paymentMethods.value[0]
+			}
+		}
+	} else {
+		// Load from server when online
+		paymentMethodsResource.reload()
+	}
+}
 
 const totalPaid = computed(() => {
 	return paymentEntries.value.reduce((sum, entry) => sum + (entry.amount || 0), 0)
@@ -316,7 +339,7 @@ watch(show, (newVal) => {
 
 		// Load payment methods
 		if (props.posProfile) {
-			paymentMethodsResource.reload()
+			loadPaymentMethods()
 		}
 	}
 })

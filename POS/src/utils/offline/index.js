@@ -41,6 +41,8 @@ export {
 	toggleManualOffline,
 	cacheItemsFromServer,
 	cacheCustomersFromServer,
+	cachePaymentMethodsFromServer,
+	getCachedPaymentMethods,
 	searchCachedItems,
 	searchCachedCustomers,
 	getCachedItem,

@@ -1,4 +1,5 @@
 import { db, getSetting, setSetting } from './db'
+import { call } from '@/utils/apiWrapper'
 
 // Server connectivity state
 if (typeof window !== 'undefined') {
@@ -133,25 +134,34 @@ export const syncOfflineInvoices = async () => {
 
 	let successCount = 0
 	let failedCount = 0
+	const errors = []
 
 	for (const invoice of pendingInvoices) {
 		try {
 			// Submit invoice to server
-			const response = await window.frappe.call({
-				method: 'pos_next.api.invoices.submit_invoice',
-				args: {
-					invoice_data: invoice.data
-				}
+			// The API expects 'data' parameter with nested 'invoice' and 'data' keys
+			const response = await call('pos_next.api.invoices.submit_invoice', {
+				data: JSON.stringify({
+					invoice: invoice.data,
+					data: {}
+				})
 			})
 
-			if (response.message) {
+			if (response.message || response.name) {
 				// Mark as synced
 				await db.invoice_queue.update(invoice.id, { synced: true })
 				successCount++
-				console.log(`Invoice ${invoice.id} synced successfully`)
+				console.log(`Invoice ${invoice.id} synced successfully as ${response.name || response.message}`)
 			}
 		} catch (error) {
 			console.error(`Error syncing invoice ${invoice.id}:`, error)
+
+			// Store error details
+			errors.push({
+				invoiceId: invoice.id,
+				customer: invoice.data.customer || 'Walk-in Customer',
+				error: error
+			})
 
 			// Increment retry count
 			await db.invoice_queue.update(invoice.id, {
@@ -176,7 +186,7 @@ export const syncOfflineInvoices = async () => {
 		.filter(item => item.synced === true && item.timestamp < weekAgo)
 		.delete()
 
-	return { success: successCount, failed: failedCount }
+	return { success: successCount, failed: failedCount, errors }
 }
 
 // Delete offline invoice
