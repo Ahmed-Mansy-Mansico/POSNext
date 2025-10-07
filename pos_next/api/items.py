@@ -114,6 +114,7 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
 		"item_code": item.get("item_code"),
 		"company": item.get("company"),
 		"qty": item.get("qty", 1),
+		"uom": item.get("uom"),  # Include UOM to fetch correct price list rate
 		"selling_price_list": item.get("selling_price_list"),
 		"price_list_currency": item.get("price_list_currency"),
 		"plc_conversion_rate": item.get("plc_conversion_rate"),
@@ -171,12 +172,21 @@ def search_by_barcode(barcode, pos_profile):
 		if not pos_profile:
 			frappe.throw(_("POS Profile is required"))
 
-		# Search for item by barcode
-		item_code = frappe.db.get_value("Item Barcode", {"barcode": barcode}, "parent")
+		# Search for item by barcode - also get UOM if barcode has specific UOM
+		barcode_data = frappe.db.get_value(
+			"Item Barcode",
+			{"barcode": barcode},
+			["parent", "uom"],
+			as_dict=True
+		)
 
-		if not item_code:
+		if barcode_data:
+			item_code = barcode_data.parent
+			barcode_uom = barcode_data.uom
+		else:
 			# Try searching in item code field directly
 			item_code = frappe.db.get_value("Item", {"name": barcode})
+			barcode_uom = None
 
 		if not item_code:
 			frappe.throw(_("Item with barcode {0} not found").format(barcode))
@@ -207,6 +217,10 @@ def search_by_barcode(barcode, pos_profile):
 			"is_stock_item": item_doc.is_stock_item or 0,
 			"pos_profile": pos_profile
 		}
+
+		# Include UOM from barcode if available
+		if barcode_uom:
+			item["uom"] = barcode_uom
 
 		# Get item details
 		item_details = get_item_detail(
@@ -308,6 +322,134 @@ def get_batch_serial_details(item_code, warehouse):
 
 
 @frappe.whitelist()
+def get_item_variants(template_item, pos_profile):
+	"""Get all variants for a template item with prices and stock"""
+	try:
+		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
+
+		# Get all variants of this template
+		variants = frappe.get_all(
+			"Item",
+			filters={
+				"variant_of": template_item,
+				"disabled": 0,
+				"is_sales_item": 1
+			},
+			fields=[
+				"name as item_code",
+				"item_name",
+				"stock_uom",
+				"image",
+				"has_batch_no",
+				"has_serial_no"
+			]
+		)
+
+		# If no variants found, return empty with helpful message
+		if not variants:
+			frappe.msgprint(_(f"No variants created for template item '{template_item}'. Please create variants first."))
+			return []
+
+		# Get UOMs for all variants in a single query
+		variant_codes = [v["item_code"] for v in variants]
+		uom_map = {}
+		if variant_codes:
+			uoms = frappe.db.sql(
+				"""
+				SELECT parent, uom, conversion_factor
+				FROM `tabUOM Conversion Detail`
+				WHERE parent IN %s
+				ORDER BY parent, idx
+				""",
+				[variant_codes],
+				as_dict=1
+			)
+			for uom in uoms:
+				if uom["parent"] not in uom_map:
+					uom_map[uom["parent"]] = []
+				uom_map[uom["parent"]].append({
+					"uom": uom["uom"],
+					"conversion_factor": uom["conversion_factor"]
+				})
+
+		# Get all UOM-specific prices for variants
+		uom_prices_map = {}
+		if variant_codes:
+			prices = frappe.db.sql(
+				"""
+				SELECT item_code, uom, price_list_rate
+				FROM `tabItem Price`
+				WHERE item_code IN %s AND price_list = %s
+				ORDER BY item_code, uom
+				""",
+				[variant_codes, pos_profile_doc.selling_price_list],
+				as_dict=1
+			)
+			for price in prices:
+				if price["item_code"] not in uom_prices_map:
+					uom_prices_map[price["item_code"]] = {}
+				uom_prices_map[price["item_code"]][price["uom"]] = price["price_list_rate"]
+
+		# Get all variant attributes in a single query (performance optimization)
+		attributes_map = {}
+		if variant_codes:
+			attributes = frappe.get_all(
+				"Item Variant Attribute",
+				filters={"parent": ["in", variant_codes]},
+				fields=["parent", "attribute", "attribute_value"]
+			)
+			for attr in attributes:
+				if attr["parent"] not in attributes_map:
+					attributes_map[attr["parent"]] = {}
+				attributes_map[attr["parent"]][attr["attribute"]] = attr["attribute_value"]
+
+		# Enrich each variant with attributes, price, stock, and UOMs
+		for variant in variants:
+			# Get variant attributes from preloaded map
+			variant["attributes"] = attributes_map.get(variant["item_code"], {})
+
+			# Get price from preloaded map (check stock UOM first, then any UOM)
+			variant_prices = uom_prices_map.get(variant["item_code"], {})
+			price = variant_prices.get(variant["stock_uom"])
+			if not price and variant_prices:
+				# Fallback to first available price if stock UOM price not found
+				price = next(iter(variant_prices.values()), None)
+			variant["rate"] = price or 0
+
+			# Get stock
+			if pos_profile_doc.warehouse:
+				stock = frappe.db.get_value(
+					"Bin",
+					{
+						"item_code": variant["item_code"],
+						"warehouse": pos_profile_doc.warehouse
+					},
+					"actual_qty"
+				)
+				variant["actual_qty"] = stock or 0
+			else:
+				variant["actual_qty"] = 0
+
+			# Add warehouse
+			variant["warehouse"] = pos_profile_doc.warehouse
+
+			# Add UOMs (exclude stock UOM to avoid duplicates)
+			all_uoms = uom_map.get(variant["item_code"], [])
+			variant["item_uoms"] = [
+				uom for uom in all_uoms
+				if uom["uom"] != variant["stock_uom"]
+			]
+
+			# Add UOM-specific prices
+			variant["uom_prices"] = uom_prices_map.get(variant["item_code"], {})
+
+		return variants
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Item Variants Error")
+		frappe.throw(_("Error fetching item variants: {0}").format(str(e)))
+
+
+@frappe.whitelist()
 def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20):
 	"""Get items for POS with stock, price, and tax details"""
 	try:
@@ -315,9 +457,14 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 
 		filters = {
 			"disabled": 0,
-			"has_variants": 0,
-			"is_sales_item": 1  # Only show items with "Allow Sales" enabled
+			"is_sales_item": 1,  # Only show items with "Allow Sales" enabled
+			"ifnull(variant_of, '')": ""  # Exclude items that are variants of a template
 		}
+
+		# IMPORTANT: Filtering logic explained:
+		# - Template items (has_variants=1) are shown → users select variants via dialog
+		# - Regular items (has_variants=0, variant_of is null) are shown → direct add to cart
+		# - Variant items (has_variants=0, variant_of is not null) are HIDDEN from main list
 
 		# Add item group filter if provided
 		if item_group:
@@ -346,7 +493,8 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 				"is_stock_item",
 				"has_batch_no",
 				"has_serial_no",
-				"item_group"
+				"item_group",
+				"has_variants"
 			],
 			start=start,
 			page_length=limit,
@@ -369,17 +517,86 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			)
 			barcode_map = {b["parent"]: b["barcode"] for b in barcodes}
 
-		# Enrich items with price, stock, and barcode data
+		# Get all UOMs for these items in a single query (performance optimization)
+		uom_map = {}
+		if item_codes:
+			uoms = frappe.db.sql(
+				"""
+				SELECT parent, uom, conversion_factor
+				FROM `tabUOM Conversion Detail`
+				WHERE parent IN %s
+				ORDER BY parent, idx
+				""",
+				[item_codes],
+				as_dict=1
+			)
+			for uom in uoms:
+				if uom["parent"] not in uom_map:
+					uom_map[uom["parent"]] = []
+				uom_map[uom["parent"]].append({
+					"uom": uom["uom"],
+					"conversion_factor": uom["conversion_factor"]
+				})
+
+		# Get all UOM-specific prices for these items in a single query (performance optimization)
+		uom_prices_map = {}
+		if item_codes:
+			prices = frappe.db.sql(
+				"""
+				SELECT item_code, uom, price_list_rate
+				FROM `tabItem Price`
+				WHERE item_code IN %s AND price_list = %s
+				ORDER BY item_code, uom
+				""",
+				[item_codes, pos_profile_doc.selling_price_list],
+				as_dict=1
+			)
+			for price in prices:
+				if price["item_code"] not in uom_prices_map:
+					uom_prices_map[price["item_code"]] = {}
+				uom_prices_map[price["item_code"]][price["uom"]] = price["price_list_rate"]
+
+		# Enrich items with price, stock, barcode, and UOM data
 		for item in items:
-			# Get price
+			# Get price for stock UOM (default price for item display)
 			price = frappe.db.get_value(
 				"Item Price",
 				{
 					"item_code": item["item_code"],
-					"price_list": pos_profile_doc.selling_price_list
+					"price_list": pos_profile_doc.selling_price_list,
+					"uom": item["stock_uom"]  # Get price for stock UOM
 				},
 				"price_list_rate"
 			)
+			# If no price for stock UOM, try without UOM filter (backwards compatibility)
+			if not price:
+				price = frappe.db.get_value(
+					"Item Price",
+					{
+						"item_code": item["item_code"],
+						"price_list": pos_profile_doc.selling_price_list
+					},
+					"price_list_rate"
+				)
+
+			# If template item with no price, get price range from variants
+			if not price and item.get("has_variants"):
+				variant_prices = frappe.db.sql(
+					"""
+					SELECT MIN(ip.price_list_rate) as min_price, MAX(ip.price_list_rate) as max_price
+					FROM `tabItem Price` ip
+					INNER JOIN `tabItem` i ON i.name = ip.item_code
+					WHERE i.variant_of = %s
+					AND ip.price_list = %s
+					AND i.disabled = 0
+					""",
+					[item["item_code"], pos_profile_doc.selling_price_list],
+					as_dict=1
+				)
+				if variant_prices and variant_prices[0].get("min_price"):
+					# Use minimum price for display
+					price = variant_prices[0]["min_price"]
+
 			item["rate"] = price or 0
 
 			# Get stock if warehouse specified
@@ -399,6 +616,17 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			# Add barcode from map
 			item["barcode"] = barcode_map.get(item["item_code"], "")
 
+			# Add UOMs from map, but exclude the stock UOM (to avoid duplicates)
+			# Only show alternative UOMs that are different from the stock UOM
+			all_uoms = uom_map.get(item["item_code"], [])
+			item["item_uoms"] = [
+				uom for uom in all_uoms
+				if uom["uom"] != item["stock_uom"]
+			]
+
+			# Add UOM-specific prices
+			item["uom_prices"] = uom_prices_map.get(item["item_code"], {})
+
 		return items
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get Items Error")
@@ -406,7 +634,7 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 
 
 @frappe.whitelist()
-def get_item_details(item_code, pos_profile, customer=None, qty=1):
+def get_item_details(item_code, pos_profile, customer=None, qty=1, uom=None):
 	"""Get detailed item info including price, tax, stock"""
 	try:
 		# Parse pos_profile if it's a JSON string
@@ -439,6 +667,10 @@ def get_item_details(item_code, pos_profile, customer=None, qty=1):
 			"pos_profile": pos_profile,
 			"qty": qty
 		}
+
+		# Include UOM if provided to fetch correct price list rate
+		if uom:
+			item["uom"] = uom
 
 		return get_item_detail(
 			item=json.dumps(item),

@@ -184,9 +184,32 @@
 									<h4 class="text-xs font-semibold text-gray-900 truncate">
 										{{ item.item_name }}
 									</h4>
-									<p class="text-[10px] text-gray-500">
-										{{ formatCurrency(item.rate) }} / {{ item.stock_uom || 'Nos' }}
-									</p>
+									<div class="flex items-center space-x-2 mt-0.5">
+										<p class="text-[10px] text-gray-500">
+											{{ formatCurrency(item.rate) }} /
+										</p>
+										<!-- UOM Selector (if multiple UOMs available) -->
+										<select
+											v-if="item.item_uoms && item.item_uoms.length > 0"
+											:value="item.uom"
+											@change="handleUomChange(item, $event.target.value)"
+											class="text-[10px] text-gray-700 font-medium bg-transparent border-0 border-b border-dashed border-gray-300 hover:border-blue-500 focus:outline-none focus:border-blue-500 px-0 py-0 cursor-pointer"
+											@click.stop
+										>
+											<option :value="item.stock_uom">{{ item.stock_uom }}</option>
+											<option
+												v-for="uomData in item.item_uoms"
+												:key="uomData.uom"
+												:value="uomData.uom"
+											>
+												{{ uomData.uom }}
+											</option>
+										</select>
+										<!-- Static UOM (if only one UOM) -->
+										<span v-else class="text-[10px] text-gray-500">
+											{{ item.uom || item.stock_uom || 'Nos' }}
+										</span>
+									</div>
 								</div>
 								<button
 									@click="$emit('remove-item', item.item_code)"
@@ -408,6 +431,7 @@ const emit = defineEmits([
 	"show-coupons",
 	"show-offers",
 	"remove-offer",
+	"update-uom",
 ])
 
 const customerSearch = ref("")
@@ -638,6 +662,10 @@ function applyTopOffer() {
 
 function removeAppliedOffer() {
 	emit('remove-offer')
+}
+
+function handleUomChange(item, newUom) {
+	emit("update-uom", item.item_code, newUom)
 }
 
 // Close dropdown when clicking outside

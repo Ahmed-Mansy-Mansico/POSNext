@@ -290,6 +290,7 @@
 					@apply-coupon="showCouponDialog = true"
 					@show-offers="showOffersDialog = true"
 					@remove-offer="handleOfferRemoved"
+					@update-uom="handleUomChange"
 				/>
 			</div>
 		</div>
@@ -410,6 +411,16 @@
 			:quantity="pendingItemQty"
 			:warehouse="currentProfile?.warehouse"
 			@batch-serial-selected="handleBatchSerialSelected"
+		/>
+
+		<!-- Generic Item Selection Dialog (for UOMs and Variants) -->
+		<ItemSelectionDialog
+			v-model="showItemSelectionDialog"
+			:item="pendingItem"
+			:mode="selectionMode"
+			:pos-profile="currentProfile?.name"
+			:currency="currentProfile?.currency"
+			@option-selected="handleOptionSelected"
 		/>
 
 		<!-- Invoice History Dialog -->
@@ -542,6 +553,7 @@ import OffersDialog from "@/components/sale/OffersDialog.vue"
 import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
 import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
 import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
+import ItemSelectionDialog from "@/components/sale/ItemSelectionDialog.vue"
 import { printInvoiceByName } from "@/utils/printInvoice"
 import { saveDraft, getDraftsCount, deleteDraft } from "@/utils/draftManager"
 import { offlineWorker } from "@/utils/offline/workerClient"
@@ -583,6 +595,8 @@ const {
 	applyDiscount,
 	removeDiscount,
 	applyOffersResource,
+	getItemDetailsResource,
+	recalculateItem,
 } = useInvoice()
 
 // Use dialog composable for automatic global tracking
@@ -600,6 +614,7 @@ const { isOpen: showHistoryDialog } = useDialog('history')
 const { isOpen: showCreateCustomerDialog } = useDialog('createCustomer')
 const { isOpen: showClearCartDialog } = useDialog('clearCart')
 const { isOpen: showLogoutDialog } = useDialog('logout')
+const { isOpen: showItemSelectionDialog } = useDialog('itemSelection')
 
 // Other refs
 const itemsSelectorRef = ref(null)
@@ -620,6 +635,7 @@ const isResizing = ref(false)
 const autoAppliedOffer = ref(null)
 const appliedCoupon = ref(null)
 const pendingPaymentAfterCustomer = ref(false)
+const selectionMode = ref('uom') // 'uom' or 'variant'
 
 // Get global dialog state for divider behavior
 const { isAnyDialogOpen } = useDialogState()
@@ -827,12 +843,31 @@ function handleShiftClosed() {
 }
 
 function handleItemSelected(item) {
-	// Check if item requires batch/serial selection
+	// Priority 1: Check if item is a template with variants
+	if (item.has_variants) {
+		pendingItem.value = item
+		pendingItemQty.value = 1
+		selectionMode.value = 'variant'
+		showItemSelectionDialog.value = true
+		return
+	}
+
+	// Priority 2: Check if item has multiple UOMs
+	if (item.item_uoms && item.item_uoms.length > 0) {
+		pendingItem.value = item
+		pendingItemQty.value = 1
+		selectionMode.value = 'uom'
+		showItemSelectionDialog.value = true
+		return
+	}
+
+	// Priority 3: Check if item requires batch/serial selection
 	if (item.has_batch_no || item.has_serial_no) {
 		pendingItem.value = item
 		pendingItemQty.value = 1
 		showBatchSerialDialog.value = true
 	} else {
+		// Direct add to cart
 		addItem(item)
 		toast.create({
 			title: "Item Added",
@@ -1026,6 +1061,129 @@ function confirmClearCart() {
 		icon: "check",
 		iconClasses: "text-green-600",
 	})
+}
+
+async function handleOptionSelected(option) {
+	if (!pendingItem.value) return
+
+	try {
+		if (option.type === 'variant') {
+			// Handle variant selection
+			const variant = option.data
+
+			// Check if variant needs UOM selection
+			if (variant.item_uoms && variant.item_uoms.length > 0) {
+				// Switch to UOM selection for this variant
+				pendingItem.value = variant
+				selectionMode.value = 'uom'
+				// Dialog stays open, will reload with UOM options
+				return
+			}
+
+			// Check if variant needs batch/serial
+			if (variant.has_batch_no || variant.has_serial_no) {
+				pendingItem.value = variant
+				showItemSelectionDialog.value = false
+				showBatchSerialDialog.value = true
+			} else {
+				// Add variant directly
+				addItem(variant, pendingItemQty.value)
+				showItemSelectionDialog.value = false
+				pendingItem.value = null
+				toast.create({
+					title: "Variant Added",
+					text: `${variant.item_name} added to cart`,
+					icon: "check",
+					iconClasses: "text-green-600",
+				})
+			}
+		} else if (option.type === 'uom') {
+			// Handle UOM selection
+			const itemDetails = await getItemDetailsResource.submit({
+				item_code: pendingItem.value.item_code,
+				pos_profile: posProfile.value,
+				customer: customer.value?.name || customer.value,
+				qty: pendingItemQty.value,
+				uom: option.uom
+			})
+
+			const itemToAdd = {
+				...pendingItem.value,
+				uom: option.uom,
+				conversion_factor: option.conversion_factor,
+				rate: itemDetails.price_list_rate || itemDetails.rate,
+				price_list_rate: itemDetails.price_list_rate
+			}
+
+			// Check if it needs batch/serial after UOM selection
+			if (itemToAdd.has_batch_no || itemToAdd.has_serial_no) {
+				pendingItem.value = itemToAdd
+				showItemSelectionDialog.value = false
+				showBatchSerialDialog.value = true
+			} else {
+				addItem(itemToAdd, pendingItemQty.value)
+				showItemSelectionDialog.value = false
+				pendingItem.value = null
+				toast.create({
+					title: "Item Added",
+					text: `${itemToAdd.item_name} (${option.uom}) added to cart`,
+					icon: "check",
+					iconClasses: "text-green-600",
+				})
+			}
+		}
+	} catch (error) {
+		console.error("Error handling option selection:", error)
+		toast.create({
+			title: "Error",
+			text: "Failed to process selection. Please try again.",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
+}
+
+async function handleUomChange(itemCode, newUom) {
+	try {
+		// Find the item in cart first to get actual quantity
+		const cartItem = invoiceItems.value.find(i => i.item_code === itemCode)
+		if (!cartItem) return
+
+		// Fetch item details with new UOM and actual cart quantity
+		const itemDetails = await getItemDetailsResource.submit({
+			item_code: itemCode,
+			pos_profile: posProfile.value,
+			customer: customer.value?.name || customer.value,
+			qty: cartItem.quantity,
+			uom: newUom
+		})
+
+		// Find conversion factor from item_uoms
+		const uomData = cartItem.item_uoms?.find(u => u.uom === newUom)
+
+		cartItem.uom = newUom
+		cartItem.conversion_factor = uomData?.conversion_factor || itemDetails.conversion_factor || 1
+		cartItem.rate = itemDetails.price_list_rate || itemDetails.rate
+		cartItem.price_list_rate = itemDetails.price_list_rate
+
+		// Recalculate taxes, discounts, and totals for this item
+		recalculateItem(cartItem)
+
+		toast.create({
+			title: "UOM Updated",
+			text: `Unit changed to ${newUom}`,
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} catch (error) {
+		console.error("Error changing UOM:", error)
+		toast.create({
+			title: "Error",
+			text: "Failed to update UOM. Please try again.",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
 }
 
 function handleCloseShift() {
