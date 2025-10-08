@@ -4,6 +4,7 @@
 
 from __future__ import unicode_literals
 import json
+from collections import defaultdict
 import frappe
 from frappe import _, as_json
 from frappe.utils import flt, nowdate
@@ -356,6 +357,7 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 		# Get all barcodes for these items in a single query (performance optimization)
 		item_codes = [item["item_code"] for item in items]
 		barcode_map = {}
+		conversion_map = defaultdict(dict)
 		if item_codes:
 			barcodes = frappe.db.sql(
 				"""
@@ -369,6 +371,16 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			)
 			barcode_map = {b["parent"]: b["barcode"] for b in barcodes}
 
+			conversions = frappe.get_all(
+				"UOM Conversion Detail",
+				filters={"parent": ["in", item_codes]},
+				fields=["parent", "uom", "conversion_factor"],
+			)
+
+			for row in conversions:
+				if row.uom:
+					conversion_map[row.parent][row.uom] = row.conversion_factor
+
 		# Enrich items with price, stock, and barcode data
 		for item in items:
 			# Get price
@@ -378,9 +390,42 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 					"item_code": item["item_code"],
 					"price_list": pos_profile_doc.selling_price_list
 				},
-				"price_list_rate"
+				["price_list_rate", "uom"],
+				as_dict=1,
 			)
-			item["rate"] = price or 0
+
+			if price:
+				price_rate_raw = flt(price.get("price_list_rate") or 0)
+				price_rate = price_rate_raw
+				price_uom = price.get("uom") or item.get("stock_uom")
+				display_uom = item.get("stock_uom") or price_uom
+				price_uom_conversion = None
+
+				if price_uom and display_uom and price_uom != display_uom:
+					conversion_factor = conversion_map[item["item_code"]].get(price_uom) or 0
+
+					if conversion_factor:
+						price_rate = price_rate_raw / flt(conversion_factor)
+						price_uom_conversion = conversion_factor
+					else:
+						# Without a conversion factor, fall back to price UOM to avoid mismatched rate
+						display_uom = price_uom
+
+				item["rate"] = price_rate
+				item["price_list_rate"] = price_rate
+				item["uom"] = display_uom
+				item["price_uom"] = price_uom
+				item["conversion_factor"] = 1
+				item["price_list_rate_price_uom"] = price_rate_raw
+				if price_uom_conversion:
+					item["price_uom_conversion_factor"] = price_uom_conversion
+			else:
+				item["rate"] = 0
+				item["price_list_rate"] = 0
+				item["uom"] = item.get("stock_uom")
+				item["price_uom"] = item.get("stock_uom")
+				item["conversion_factor"] = 1
+				item["price_list_rate_price_uom"] = 0
 
 			# Get stock if warehouse specified
 			if pos_profile_doc.warehouse and item.get("is_stock_item"):
