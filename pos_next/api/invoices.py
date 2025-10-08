@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 import json
 import frappe
 from frappe import _
-from frappe.utils import flt, cint, nowdate, nowtime, get_datetime
+from frappe.utils import flt, cint, nowdate, nowtime, get_datetime, cstr
 from erpnext.stock.doctype.batch.batch import get_batch_qty, get_batch_no
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 
@@ -821,14 +821,37 @@ def search_invoices_for_return(
 # ==========================================
 
 @frappe.whitelist()
-def apply_offers(invoice_data):
-        """Calculate and apply promotional offers using ERPNext Pricing Rules."""
+def apply_offers(invoice_data, selected_offers=None):
+        """Calculate and apply promotional offers using ERPNext Pricing Rules.
+
+        Args:
+                invoice_data (str | dict): Sales Invoice payload used for offer evaluation.
+                selected_offers (str | list | None): Optional collection of Pricing Rule names
+                        that should be considered. When provided, only the specified rules are
+                        eligible and any other automatically applicable rules are ignored. This
+                        is primarily used when a cashier manually picks an offer from the POS UI.
+        """
         try:
                 if isinstance(invoice_data, str):
                         invoice_data = json.loads(invoice_data or "{}")
 
                 invoice = frappe._dict(invoice_data or {})
                 items = invoice.get("items") or []
+
+                if isinstance(selected_offers, str):
+                        try:
+                                selected_offers = json.loads(selected_offers)
+                        except ValueError:
+                                selected_offers = [selected_offers]
+
+                if isinstance(selected_offers, (list, tuple, set)):
+                        selected_offer_names = {
+                                cstr(name)
+                                for name in selected_offers
+                                if cstr(name)
+                        }
+                else:
+                        selected_offer_names = set()
 
                 if not items:
                         return {"items": []}
@@ -959,12 +982,21 @@ def apply_offers(invoice_data):
                                         "name",
                                         "promotional_scheme",
                                         "coupon_code_based",
+                                        "promotional_scheme_id",
                                         "price_or_product_discount",
                                 ],
                         )
                         for record in rule_records:
                                 if record.promotional_scheme and not record.coupon_code_based:
                                         rule_map[record.name] = record
+
+                if selected_offer_names:
+                        # Restrict available rules to the ones explicitly selected from the UI.
+                        rule_map = {
+                                name: details
+                                for name, details in rule_map.items()
+                                if name in selected_offer_names
+                        }
 
                 if not rule_map:
                         return {"items": items}

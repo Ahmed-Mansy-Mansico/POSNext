@@ -6,10 +6,12 @@
 		<template #body-content>
 			<div class="space-y-4">
 				<!-- Loading State -->
-				<div v-if="loading" class="py-8 text-center">
-					<div class="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500 mx-auto"></div>
-					<p class="mt-3 text-sm text-gray-500">Loading offers...</p>
-				</div>
+                                <div v-if="loading || applyingOffer" class="py-8 text-center">
+                                        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500 mx-auto"></div>
+                                        <p class="mt-3 text-sm text-gray-500">
+                                                {{ loading ? 'Loading offers...' : 'Applying offer...' }}
+                                        </p>
+                                </div>
 
 				<!-- Empty State -->
 				<div v-else-if="eligibleOffers.length === 0" class="py-12 text-center">
@@ -149,18 +151,20 @@
 						</div>
 
 						<!-- Apply Button -->
-						<button
-							v-if="checkOfferEligibility(offer)"
-							@click.stop="selectOffer(offer)"
-							:class="[
-								'mt-3 w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all',
-								appliedOffer?.code === offer.name
-									? 'bg-red-600 hover:bg-red-700 text-white'
-									: 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg'
-							]"
-						>
-							{{ appliedOffer?.code === offer.name ? 'Remove Offer' : 'Apply Offer' }}
-						</button>
+                                                <button
+                                                        v-if="checkOfferEligibility(offer)"
+                                                        @click.stop="selectOffer(offer)"
+                                                        :disabled="applyingOffer"
+                                                        :class="[
+                                                                'mt-3 w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all',
+                                                                appliedOffer?.code === offer.name
+                                                                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                                                                        : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg',
+                                                                applyingOffer ? 'opacity-70 cursor-not-allowed' : ''
+                                                        ]"
+                                                >
+                                                        {{ appliedOffer?.code === offer.name ? 'Remove Offer' : 'Apply Offer' }}
+                                                </button>
 					</div>
 				</div>
 			</div>
@@ -195,13 +199,17 @@ const props = defineProps({
 		type: String,
 		default: 'USD'
 	},
-	appliedOffer: {
-		type: Object,
-		default: null
-	}
+        appliedOffer: {
+                type: Object,
+                default: null
+        },
+        applyingOffer: {
+                type: Boolean,
+                default: false
+        }
 })
 
-const emit = defineEmits(['update:modelValue', 'offer-applied', 'offer-removed'])
+const emit = defineEmits(['update:modelValue', 'offer-selected', 'offer-removed'])
 
 const show = ref(props.modelValue)
 const allOffers = ref([])
@@ -235,15 +243,15 @@ const offersResource = createResource({
 
 // Computed eligible offers
 const eligibleOffers = computed(() => {
-	if (!allOffers.value) return []
+        if (!allOffers.value) return []
 
-	// Filter for auto-apply offers only (not coupon-based)
-	return allOffers.value
-		.filter(offer => offer.auto && !offer.coupon_based)
-		.sort((a, b) => {
-			// Sort by eligibility first (eligible offers on top)
-			const aEligible = checkOfferEligibility(a)
-			const bEligible = checkOfferEligibility(b)
+        // Exclude coupon-based offers (handled via coupon flow)
+        return allOffers.value
+                .filter(offer => !offer.coupon_based)
+                .sort((a, b) => {
+                        // Sort by eligibility first (eligible offers on top)
+                        const aEligible = checkOfferEligibility(a)
+                        const bEligible = checkOfferEligibility(b)
 			if (aEligible !== bEligible) return bEligible ? 1 : -1
 
 			// Then sort by discount value (higher discounts first)
@@ -287,28 +295,26 @@ async function loadOffers() {
 	if (!props.posProfile) return
 	loading.value = true
 	try {
-		await offersResource.reload()
-	} catch (error) {
-		console.error('Error loading offers:', error)
-		loading.value = false
-	}
+                await offersResource.reload()
+        } catch (error) {
+                console.error('Error loading offers:', error)
+                loading.value = false
+        }
 }
 
 function selectOffer(offer) {
-	// Toggle offer - if already applied, remove it
-	if (appliedOffer.value?.code === offer.name) {
-		emit('offer-removed')
-		toast.create({
-			title: 'Offer Removed',
-			text: 'Offer has been removed from your cart',
-			icon: 'info',
-			iconClasses: 'text-blue-600'
-		})
-		return
-	}
+        if (props.applyingOffer) {
+                return
+        }
 
-	// Check eligibility before applying
-	if (!checkOfferEligibility(offer)) {
+        // Toggle offer - if already applied, remove it
+        if (appliedOffer.value?.code === offer.name) {
+                emit('offer-removed')
+                return
+        }
+
+        // Check eligibility before applying
+        if (!checkOfferEligibility(offer)) {
 		toast.create({
 			title: 'Not Eligible',
 			text: 'Your cart does not meet the requirements for this offer',
@@ -318,39 +324,7 @@ function selectOffer(offer) {
 		return
 	}
 
-	// Calculate discount on subtotal (before tax)
-	const discountData = {
-		percentage: offer.discount_percentage || 0,
-		amount: offer.discount_amount || 0
-	}
-
-	let discountAmount = 0
-	if (discountData.percentage > 0) {
-		discountAmount = (props.subtotal * discountData.percentage) / 100
-	} else if (discountData.amount > 0) {
-		discountAmount = discountData.amount
-	}
-
-	// Clamp discount to subtotal to prevent negative totals
-	discountAmount = Math.min(discountAmount, props.subtotal)
-
-	const offerData = {
-		name: offer.title || offer.name,
-		code: offer.name,
-		percentage: discountData.percentage,
-		amount: discountAmount,
-		type: offer.discount_type,
-		offer: offer
-	}
-
-	emit('offer-applied', offerData)
-
-	toast.create({
-		title: 'Offer Applied!',
-		text: `${offer.title || offer.name} applied successfully`,
-		icon: 'check',
-		iconClasses: 'text-green-600'
-	})
+        emit('offer-selected', offer)
 }
 
 function formatCurrency(amount) {
