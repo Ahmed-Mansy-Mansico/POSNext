@@ -23,6 +23,9 @@ const CURRENT_SCHEMA = {
 	// Local stock cache
 	stock: '&[item_code+warehouse], item_code, warehouse',
 
+	// Payment methods cache
+	payment_methods: '&mode_of_payment, pos_profile',
+
 	// Payment queue for offline payments
 	payment_queue: '++id, timestamp, synced',
 

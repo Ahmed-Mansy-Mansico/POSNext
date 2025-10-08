@@ -116,8 +116,10 @@ async function saveOfflineInvoice(invoiceData) {
 			retry_count: 0,
 		})
 
-		// Update local stock
-		await updateLocalStock(invoiceData.items)
+		// NOTE: We don't update local stock here because:
+		// 1. The invoice hasn't been submitted to server yet
+		// 2. When we sync, the server will handle stock reduction
+		// 3. Updating stock locally causes NegativeStockError on sync
 
 		return { success: true, id }
 	} catch (error) {
@@ -132,6 +134,11 @@ async function updateLocalStock(items) {
 		const db = await initDB()
 
 		for (const item of items) {
+			// Skip if no warehouse specified
+			if (!item.warehouse || !item.item_code) {
+				continue
+			}
+
 			const currentStock = await db.stock.get({
 				item_code: item.item_code,
 				warehouse: item.warehouse

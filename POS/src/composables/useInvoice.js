@@ -29,6 +29,15 @@ export function useInvoice() {
 			}
 		},
 		auto: false,
+		onError(error) {
+			// Store the full error details for later access
+			console.error("submitInvoiceResource onError:", error)
+
+			// Attach the resource's error data to the error object
+			if (submitInvoiceResource.error) {
+				error.resourceError = submitInvoiceResource.error
+			}
+		},
 	})
 
 	const validateCartItemsResource = createResource({
@@ -138,6 +147,7 @@ export function useInvoice() {
 				has_serial_no: item.has_serial_no || 0,
 				batch_no: item.batch_no,
 				serial_no: item.serial_no,
+				item_uoms: item.item_uoms || [],  // Available UOMs for this item
 			}
 			invoiceItems.value.push(newItem)
 			// Recalculate the newly added item to apply taxes
@@ -421,15 +431,70 @@ export function useInvoice() {
 			change_amount: remainingAmount.value < 0 ? Math.abs(remainingAmount.value) : 0,
 		}
 
-		const result = await submitInvoiceResource.submit({
-			invoice: invoiceDoc,
-			data: submitData,
-		})
+		try {
+			const result = await submitInvoiceResource.submit({
+				invoice: invoiceDoc,
+				data: submitData,
+			})
 
-		resetInvoice()
-		return result
+			// Check if resource has error (frappe-ui pattern)
+			if (submitInvoiceResource.error) {
+				const resourceError = submitInvoiceResource.error
+				console.error("Submit invoice resource error:", resourceError)
+
+				// Create a detailed error object
+				const detailedError = new Error(resourceError.message || "Invoice submission failed")
+				detailedError.exc_type = resourceError.exc_type
+				detailedError._server_messages = resourceError._server_messages
+				detailedError.httpStatus = resourceError.httpStatus
+				detailedError.messages = resourceError.messages
+
+				throw detailedError
+			}
+
+			resetInvoice()
+			return result
+		} catch (error) {
+			// Preserve original error object with all its properties
+			console.error("Submit invoice error:", error)
+			console.log("submitInvoiceResource.error:", submitInvoiceResource.error)
+
+			// If resource has error data, extract and attach it
+			if (submitInvoiceResource.error) {
+				const resourceError = submitInvoiceResource.error
+				console.log("Resource error details:", {
+					exc_type: resourceError.exc_type,
+					_server_messages: resourceError._server_messages,
+					httpStatus: resourceError.httpStatus,
+					messages: resourceError.messages,
+					messagesContent: JSON.stringify(resourceError.messages),
+					data: resourceError.data,
+					exception: resourceError.exception,
+					keys: Object.keys(resourceError)
+				})
+
+				// The messages array likely contains the detailed error info
+				if (resourceError.messages && resourceError.messages.length > 0) {
+					console.log("First message:", resourceError.messages[0])
+				}
+
+				// Attach all resource error properties to the error
+				error.exc_type = resourceError.exc_type || error.exc_type
+				error._server_messages = resourceError._server_messages
+				error.httpStatus = resourceError.httpStatus
+				error.messages = resourceError.messages
+				error.exception = resourceError.exception
+				error.data = resourceError.data
+
+				console.log("After attaching, error.messages:", error.messages)
+			}
+
+			throw error
+		}
 	} catch (error) {
-		throw new Error(`Failed to submit invoice: ${error.message}`)
+		// Outer catch to ensure error propagates
+		console.error("Submit invoice outer error:", error)
+		throw error
 		}
 	}
 
@@ -504,6 +569,7 @@ export function useInvoice() {
 		resetInvoice,
 		clearCart,
 		loadTaxRules,
+		recalculateItem,
 
 		// Resources
 		updateInvoiceResource,
