@@ -62,17 +62,19 @@
 						@input="handleSearchInput"
 						@keydown="handleKeyDown"
 						type="text"
-						:placeholder="scannerEnabled ? 'Scanner Ready - Scan barcode now' : 'Search by item code, name or scan barcode'"
+						:placeholder="searchPlaceholder"
 						:class="[
-							'w-full text-sm border rounded-md px-3 py-2 pl-10 pr-10 focus:outline-none transition-all',
-							scannerEnabled
+							'w-full text-sm border rounded-md px-3 py-2 pl-10 pr-28 focus:outline-none transition-all',
+							autoAddEnabled
+								? 'border-blue-400 bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+								: scannerEnabled
 								? 'border-green-400 bg-green-50 focus:ring-2 focus:ring-green-500 focus:border-transparent'
 								: 'border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 						]"
 						aria-label="Search items"
 					/>
-					<!-- Barcode Scan Icon -->
-					<div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+					<!-- Barcode Scan Icon and Auto-Add Toggle -->
+					<div class="absolute inset-y-0 right-0 pr-3 flex items-center gap-1">
 						<button
 							@click="toggleBarcodeScanner"
 							:class="[
@@ -86,6 +88,21 @@
 							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
 							</svg>
+						</button>
+						<button
+							@click="toggleAutoAdd"
+							:class="[
+								'p-1 rounded transition-all flex items-center gap-1 text-xs font-medium px-2',
+								autoAddEnabled
+									? 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+									: 'hover:bg-gray-100 text-gray-600'
+							]"
+							:title="autoAddEnabled ? 'Auto-Add: ON - Press Enter to add items to cart' : 'Auto-Add: OFF - Click to enable automatic cart addition on Enter'"
+						>
+							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+							</svg>
+							<span>Auto</span>
 						</button>
 					</div>
 				</div>
@@ -392,8 +409,11 @@ const lastKeyTime = ref(0)
 const barcodeBuffer = ref("")
 const searchInputRef = ref(null)
 const scannerEnabled = ref(false)
+const autoAddEnabled = ref(false)
 const itemThreshold = ref(50) // Threshold for auto-switching to list view
 const userManuallySetView = ref(false) // Track if user manually changed view mode
+const scannerInputDetected = ref(false) // Track if current input is from scanner
+const autoSearchTimer = ref(null) // Timer for auto-search when typing stops
 
 // Pagination state
 const currentPage = ref(1)
@@ -412,6 +432,26 @@ const totalPages = computed(() => {
 	if (!filteredItems.value) return 0
 	return Math.ceil(filteredItems.value.length / itemsPerPage.value)
 })
+
+const SEARCH_PLACEHOLDERS = Object.freeze({
+	auto: "Auto-Add ON - Type or scan barcode",
+	scanner: "Scanner ON - Enable Auto for automatic addition",
+	default: "Search by item code, name or scan barcode",
+})
+
+const searchMode = computed(() => {
+	if (autoAddEnabled.value) {
+		return "auto"
+	}
+
+	if (scannerEnabled.value) {
+		return "scanner"
+	}
+
+	return "default"
+})
+
+const searchPlaceholder = computed(() => SEARCH_PLACEHOLDERS[searchMode.value])
 
 // Watch for cart items and pos profile changes
 watch(
@@ -475,21 +515,43 @@ function handleKeyDown(event) {
 	const currentTime = Date.now()
 	const timeDiff = currentTime - lastKeyTime.value
 
-	// If Enter is pressed, always trigger search
+	// If Enter/newline is pressed, trigger barcode search
 	if (event.key === "Enter") {
 		event.preventDefault()
-		handleBarcodeSearch()
+
+		const isFromScanner = scannerInputDetected.value
+
+		// Auto-add if Auto-Add mode is enabled (regardless of manual typing vs scanner)
+		if (autoAddEnabled.value) {
+			// Auto-add enabled - add item directly to cart
+			handleBarcodeSearch(true) // Pass true to indicate auto-add
+		} else {
+			// Auto-add disabled - normal search behavior
+			handleBarcodeSearch(false)
+		}
+
+		// Reset detection
 		barcodeBuffer.value = ""
+		scannerInputDetected.value = false
+
+		// Clear auto-search timer since Enter was pressed
+		if (autoSearchTimer.value) {
+			clearTimeout(autoSearchTimer.value)
+			autoSearchTimer.value = null
+		}
+
 		return
 	}
 
 	// Barcode scanners typically input very fast (< 50ms between characters)
 	// If time between keystrokes is very short, it's likely a barcode scanner
-	if (timeDiff < 50 && event.key.length === 1) {
+	if (timeDiff < 50 && event.key.length === 1 && barcodeBuffer.value.length > 0) {
 		barcodeBuffer.value += event.key
-	} else {
+		scannerInputDetected.value = true // Mark as scanner input
+	} else if (event.key.length === 1) {
 		// Manual typing - reset buffer
-		barcodeBuffer.value = event.key.length === 1 ? event.key : ""
+		barcodeBuffer.value = event.key
+		scannerInputDetected.value = false // Mark as manual input
 	}
 
 	lastKeyTime.value = currentTime
@@ -499,36 +561,61 @@ function handleKeyDown(event) {
 function handleSearchInput(event) {
 	const value = event.target.value
 	itemStore.setSearchTerm(value)
+
+	// Clear any existing timer
+	if (autoSearchTimer.value) {
+		clearTimeout(autoSearchTimer.value)
+		autoSearchTimer.value = null
+	}
+
+	// If Auto-Add is enabled and user is typing, automatically trigger search after they stop
+	if (autoAddEnabled.value && value.trim().length > 0) {
+		// Wait 500ms after user stops typing, then auto-search and add
+		autoSearchTimer.value = setTimeout(() => {
+			handleBarcodeSearch(true) // Auto-add mode
+		}, 500) // 500ms delay after typing stops
+	}
 }
 
 function handleItemClick(item) {
 	emit("item-selected", item)
 }
 
-async function handleBarcodeSearch() {
+async function handleBarcodeSearch(forceAutoAdd = false) {
 	const barcode = searchTerm.value.trim()
 
 	if (!barcode) {
 		return
 	}
 
-	// If scanner is enabled, always try to add to cart automatically
-	const shouldAutoAdd = scannerEnabled.value
+	// Auto-add if explicitly requested (from scanner newline detection)
+	// OR if both scanner and auto-add modes are enabled
+	const shouldAutoAdd = forceAutoAdd || (scannerEnabled.value && autoAddEnabled.value)
 
 	try {
 		// First try exact barcode lookup via API
 		const item = await itemStore.searchByBarcode(barcode)
 
 		if (item) {
-			// Item found by barcode - add to cart immediately
-			emit("item-selected", item)
+			// Item found by barcode - add to cart immediately with auto-add flag
+			emit("item-selected", item, shouldAutoAdd)
 			itemStore.clearSearch()
-			toast.create({
-				title: "Item Added",
-				text: `${item.item_name} added to cart`,
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
+
+			if (shouldAutoAdd) {
+				toast.create({
+					title: "✓ Auto-Added",
+					text: `${item.item_name} added to cart`,
+					icon: "check",
+					iconClasses: "text-blue-600",
+				})
+			} else {
+				toast.create({
+					title: "Item Added",
+					text: `${item.item_name} added to cart`,
+					icon: "check",
+					iconClasses: "text-green-600",
+				})
+			}
 			return
 		}
 	} catch (error) {
@@ -537,14 +624,24 @@ async function handleBarcodeSearch() {
 
 	// Fallback: If only one item matches in filtered results, auto-select it
 	if (filteredItems.value.length === 1) {
-		emit("item-selected", filteredItems.value[0])
+		emit("item-selected", filteredItems.value[0], shouldAutoAdd)
 		itemStore.clearSearch()
-		toast.create({
-			title: "Item Added",
-			text: `${filteredItems.value[0].item_name} added to cart`,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+
+		if (shouldAutoAdd) {
+			toast.create({
+				title: "✓ Auto-Added",
+				text: `${filteredItems.value[0].item_name} added to cart`,
+				icon: "check",
+				iconClasses: "text-blue-600",
+			})
+		} else {
+			toast.create({
+				title: "Item Added",
+				text: `${filteredItems.value[0].item_name} added to cart`,
+				icon: "check",
+				iconClasses: "text-green-600",
+			})
+		}
 	} else if (filteredItems.value.length === 0) {
 		toast.create({
 			title: "Item Not Found",
@@ -580,6 +677,11 @@ async function handleBarcodeSearch() {
 function toggleBarcodeScanner() {
 	scannerEnabled.value = !scannerEnabled.value
 
+	// Disable auto-add when scanner is disabled
+	if (!scannerEnabled.value) {
+		autoAddEnabled.value = false
+	}
+
 	// Focus on search input when enabling scanner
 	if (scannerEnabled.value) {
 		const input = searchInputRef.value || document.getElementById("item-search")
@@ -589,7 +691,7 @@ function toggleBarcodeScanner() {
 
 		toast.create({
 			title: "Barcode Scanner Enabled",
-			text: "Scan barcode to automatically add items to cart",
+			text: "Click 'Auto' button to automatically add items when you press Enter",
 			icon: "check",
 			iconClasses: "text-green-600",
 		})
@@ -597,6 +699,44 @@ function toggleBarcodeScanner() {
 		toast.create({
 			title: "Barcode Scanner Disabled",
 			text: "Scanner mode turned off",
+			icon: "alert-circle",
+			iconClasses: "text-gray-600",
+		})
+	}
+}
+
+function toggleAutoAdd() {
+	// Auto-add works independently - no need for scanner mode
+	autoAddEnabled.value = !autoAddEnabled.value
+
+	// Auto-enable scanner mode when auto-add is enabled
+	if (autoAddEnabled.value && !scannerEnabled.value) {
+		scannerEnabled.value = true
+	}
+
+	// Clear any pending timer when toggling off
+	if (!autoAddEnabled.value && autoSearchTimer.value) {
+		clearTimeout(autoSearchTimer.value)
+		autoSearchTimer.value = null
+	}
+
+	if (autoAddEnabled.value) {
+		toast.create({
+			title: "Auto-Add Enabled",
+			text: "Type or scan barcode - items will be added automatically after 0.5s",
+			icon: "check",
+			iconClasses: "text-blue-600",
+		})
+
+		// Focus on search input
+		const input = searchInputRef.value || document.getElementById("item-search")
+		if (input) {
+			input.focus()
+		}
+	} else {
+		toast.create({
+			title: "Auto-Add Disabled",
+			text: "Items will require manual selection",
 			icon: "alert-circle",
 			iconClasses: "text-gray-600",
 		})

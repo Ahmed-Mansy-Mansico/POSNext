@@ -782,7 +782,59 @@ function handleShiftClosed() {
 	}, 500)
 }
 
-function handleItemSelected(item) {
+function handleItemSelected(item, autoAdd = false) {
+	// When auto-add mode is active, skip all dialogs and add with defaults
+	if (autoAdd) {
+		// Check stock availability before adding to cart
+		const warehouse = item.warehouse || currentProfile.value?.warehouse
+		const actualQty = item.actual_qty !== undefined ? item.actual_qty : (item.stock_qty || 0)
+
+		// Check if item has stock information and validate
+		if (warehouse && actualQty !== undefined && actualQty !== null) {
+			const stockCheck = checkStockAvailability({
+				itemCode: item.item_code,
+				qty: 1,
+				warehouse: warehouse,
+				actualQty: actualQty
+			})
+
+			if (!stockCheck.available) {
+				const errorMsg = formatStockError(
+					item.item_name,
+					1,
+					stockCheck.actualQty,
+					warehouse
+				)
+
+				// Show error but don't block in auto-add mode
+				toast.create({
+					title: "Insufficient Stock",
+					text: errorMsg,
+					icon: "alert-circle",
+					iconClasses: "text-red-600",
+				})
+
+				return
+			}
+		}
+
+		// Add to cart directly with default UOM (stock UOM)
+		addItem(item)
+
+		// Show toast AFTER successful add
+		setTimeout(() => {
+			toast.create({
+				title: "✓ Auto-Added to Cart",
+				text: `${item.item_name} added to cart`,
+				icon: "check",
+				iconClasses: "text-blue-600",
+			})
+		}, 100)
+
+		return
+	}
+
+	// Normal mode: Show dialogs as needed
 	// Priority 1: Check if item is a template with variants
 	if (item.has_variants) {
 		pendingItem.value = item
