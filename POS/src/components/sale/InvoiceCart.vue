@@ -163,6 +163,7 @@
 								v-if="item.image"
 								:src="item.image"
 								:alt="item.item_name"
+								loading="lazy"
 								class="w-full h-full object-cover"
 							/>
 							<svg
