@@ -51,13 +51,21 @@ export function useInvoice() {
 		auto: false,
 	})
 
-	const applyOffersResource = createResource({
-		url: "pos_next.api.invoices.apply_offers",
-		makeParams({ invoice_data }) {
-			return { invoice_data: JSON.stringify(invoice_data) }
-		},
-		auto: false,
-	})
+        const applyOffersResource = createResource({
+                url: "pos_next.api.invoices.apply_offers",
+                makeParams({ invoice_data, selected_offers }) {
+                        const params = {
+                                invoice_data: JSON.stringify(invoice_data),
+                        }
+
+                        if (selected_offers && selected_offers.length) {
+                                params.selected_offers = JSON.stringify(selected_offers)
+                        }
+
+                        return params
+                },
+                auto: false,
+        })
 
 	const getItemDetailsResource = createResource({
 		url: "pos_next.api.items.get_item_details",

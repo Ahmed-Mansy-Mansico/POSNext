@@ -8,223 +8,72 @@ from frappe.utils import flt, nowdate, getdate
 
 @frappe.whitelist()
 def get_offers(pos_profile):
-	"""
-	Get all active offers for a POS Profile
-	Includes both custom POS Offers and ERPNext Pricing Rules
-	"""
-	profile = frappe.get_doc("POS Profile", pos_profile)
-	company = profile.company
-	warehouse = profile.warehouse
-	date = nowdate()
+    """Fetch auto-applicable offers for the POS profile."""
+    profile = frappe.get_doc("POS Profile", pos_profile)
+    date = nowdate()
 
-	offers = []
-
-	# Get POS Offers if POSAwesome is installed
-	if frappe.db.table_exists("POS Offer"):
-		pos_offers = _get_pos_offers(pos_profile, company, warehouse, date)
-		offers.extend(pos_offers)
-
-	# Get ERPNext Pricing Rules
-	pricing_rules = _get_pricing_rules(company, date)
-	offers.extend(pricing_rules)
-
-	# Get Promotional Schemes if available
-	if frappe.db.table_exists("Promotional Scheme"):
-		promo_offers = _get_promotional_schemes(profile, date)
-		offers.extend(promo_offers)
-
-	return offers
+    # Promotional Schemes generate pricing rules automatically, so we
+    # only need to fetch the relevant pricing rules.
+    return _get_pricing_rules(profile, date)
 
 
-def _get_pos_offers(pos_profile, company, warehouse, date):
-	"""Get offers from POS Offer doctype (POSAwesome pattern)"""
-	values = {
-		"company": company,
-		"pos_profile": pos_profile,
-		"warehouse": warehouse,
-		"valid_from": date,
-		"valid_upto": date,
-	}
+def _get_pricing_rules(pos_profile, date):
+    """Return Pricing Rules generated via Promotional Schemes."""
+    filters = {
+        "company": pos_profile.company,
+        "date": date,
+    }
 
-	offers = frappe.db.sql(
-		"""
-		SELECT
-			name, title, description, apply_on, offer, company,
-			pos_profile, warehouse, item, item_group, brand,
-			valid_from, valid_upto, coupon_based, auto,
-			min_qty, max_qty, min_amt, max_amt,
-			apply_type, apply_item_code, apply_item_group,
-			discount_type, rate, discount_amount, discount_percentage,
-			given_qty, replace_item, replace_cheapest_item
-		FROM `tabPOS Offer`
-		WHERE
-			disable = 0 AND
-			company = %(company)s AND
-			(pos_profile IS NULL OR pos_profile = '' OR pos_profile = %(pos_profile)s) AND
-			(warehouse IS NULL OR warehouse = '' OR warehouse = %(warehouse)s) AND
-			(valid_from IS NULL OR valid_from = '' OR valid_from <= %(valid_from)s) AND
-			(valid_upto IS NULL OR valid_upto = '' OR valid_upto >= %(valid_upto)s)
-		ORDER BY title
-		""",
-		values=values,
-		as_dict=1,
-	) or []
+    pricing_rules = frappe.db.sql(
+        """
+        SELECT
+                name, title, apply_on, selling, promotional_scheme,
+                promotional_scheme_id, coupon_code_based,
+                min_qty, max_qty, min_amt, max_amt,
+                price_or_product_discount, rate_or_discount,
+                rate, discount_amount, discount_percentage,
+                priority, valid_from, valid_upto
+        FROM `tabPricing Rule`
+        WHERE
+                disable = 0
+                AND selling = 1
+                AND promotional_scheme IS NOT NULL
+                AND company = %(company)s
+                AND (valid_from IS NULL OR valid_from <= %(date)s)
+                AND (valid_upto IS NULL OR valid_upto >= %(date)s)
+        ORDER BY priority DESC, name
+        """,
+        filters,
+        as_dict=1,
+    ) or []
 
-	return offers
+    offers = []
+    for rule in pricing_rules:
+        offer = {
+            "name": rule.name,
+            "title": rule.title or rule.promotional_scheme or rule.name,
+            "description": rule.title or rule.promotional_scheme,
+            "apply_on": rule.apply_on,
+            "offer": "Item Price" if rule.price_or_product_discount == "Price" else "Give Product",
+            "auto": 1,
+            "coupon_based": 1 if rule.coupon_code_based else 0,
+            "min_qty": flt(rule.min_qty),
+            "max_qty": flt(rule.max_qty),
+            "min_amt": flt(rule.min_amt),
+            "max_amt": flt(rule.max_amt),
+            "discount_type": rule.rate_or_discount,
+            "rate": flt(rule.rate),
+            "discount_amount": flt(rule.discount_amount),
+            "discount_percentage": flt(rule.discount_percentage),
+            "valid_from": rule.valid_from,
+            "valid_upto": rule.valid_upto,
+            "source": "Promotional Scheme",
+            "promotional_scheme": rule.promotional_scheme,
+            "promotional_scheme_id": rule.promotional_scheme_id,
+        }
+        offers.append(offer)
 
-
-def _get_pricing_rules(company, date):
-	"""Get active Pricing Rules from ERPNext"""
-	pricing_rules = frappe.db.sql(
-		"""
-		SELECT
-			name, title, apply_on, selling,
-			min_qty, max_qty, min_amt, max_amt,
-			price_or_product_discount, rate_or_discount,
-			rate, discount_amount, discount_percentage,
-			priority, valid_from, valid_upto
-		FROM `tabPricing Rule`
-		WHERE
-			disable = 0 AND
-			selling = 1 AND
-			company = %(company)s AND
-			(valid_from IS NULL OR valid_from <= %(date)s) AND
-			(valid_upto IS NULL OR valid_upto >= %(date)s)
-		ORDER BY priority DESC, name
-		""",
-		{"company": company, "date": date},
-		as_dict=1,
-	) or []
-
-	# Transform to standard offer format
-	offers = []
-	for rule in pricing_rules:
-		offer = {
-			"name": rule.name,
-			"title": rule.title or rule.name,
-			"description": rule.title,
-			"apply_on": rule.apply_on,
-			"offer": "Item Price" if rule.price_or_product_discount == "Price" else "Give Product",
-			"auto": 1,
-			"coupon_based": 0,
-			"min_qty": flt(rule.min_qty),
-			"max_qty": flt(rule.max_qty),
-			"min_amt": flt(rule.min_amt),
-			"max_amt": flt(rule.max_amt),
-			"discount_type": rule.rate_or_discount,
-			"rate": flt(rule.rate),
-			"discount_amount": flt(rule.discount_amount),
-			"discount_percentage": flt(rule.discount_percentage),
-			"valid_from": rule.valid_from,
-			"valid_upto": rule.valid_upto,
-			"source": "Pricing Rule",
-		}
-		offers.append(offer)
-
-	return offers
-
-
-def _get_promotional_schemes(pos_profile, date):
-	"""Get active Promotional Schemes"""
-	schemes = frappe.db.sql(
-		"""
-		SELECT name, apply_on, company, valid_from, valid_upto
-		FROM `tabPromotional Scheme`
-		WHERE
-			disable = 0 AND
-			selling = 1 AND
-			company = %(company)s AND
-			(valid_from IS NULL OR valid_from <= %(date)s) AND
-			(valid_upto IS NULL OR valid_upto >= %(date)s)
-		""",
-		{"company": pos_profile.company, "date": date},
-		as_dict=1,
-	) or []
-
-	offers = []
-	for scheme_data in schemes:
-		try:
-			scheme = frappe.get_doc("Promotional Scheme", scheme_data.name)
-			offers.extend(_parse_promotional_scheme(scheme, pos_profile))
-		except Exception:
-			frappe.log_error(
-				frappe.get_traceback(),
-				f"Failed to load Promotional Scheme {scheme_data.name}"
-			)
-			continue
-
-	return offers
-
-
-def _parse_promotional_scheme(scheme, pos_profile):
-	"""Parse promotional scheme into offers"""
-	# Skip unsupported configurations
-	if scheme.applicable_for or scheme.apply_rule_on_other:
-		return []
-
-	if scheme.mixed_conditions or scheme.is_cumulative:
-		return []
-
-	offers = []
-
-	# Price discount slabs
-	for slab in scheme.get("price_discount_slabs", []):
-		if slab.disable:
-			continue
-
-		offer = {
-			"name": f"promo-{scheme.name}-{slab.name}",
-			"title": scheme.name,
-			"description": slab.rule_description or scheme.name,
-			"apply_on": scheme.apply_on,
-			"offer": "Grand Total" if scheme.apply_on == "Transaction" else "Item Price",
-			"auto": 1,
-			"coupon_based": 0,
-			"min_qty": flt(slab.min_qty),
-			"max_qty": flt(slab.max_qty),
-			"min_amt": flt(slab.min_amount),
-			"max_amt": flt(slab.max_amount),
-			"discount_type": slab.rate_or_discount,
-			"rate": flt(slab.rate),
-			"discount_amount": flt(slab.discount_amount),
-			"discount_percentage": flt(slab.discount_percentage),
-			"valid_from": scheme.valid_from,
-			"valid_upto": scheme.valid_upto,
-			"source": "Promotional Scheme",
-		}
-		offers.append(offer)
-
-	# Product discount slabs (free items)
-	for slab in scheme.get("product_discount_slabs", []):
-		if slab.disable or flt(slab.free_qty) <= 0:
-			continue
-
-		offer = {
-			"name": f"promo-{scheme.name}-{slab.name}",
-			"title": scheme.name,
-			"description": slab.rule_description or scheme.name,
-			"apply_on": scheme.apply_on,
-			"offer": "Give Product",
-			"auto": 1,
-			"coupon_based": 0,
-			"min_qty": flt(slab.min_qty),
-			"max_qty": flt(slab.max_qty),
-			"min_amt": flt(slab.min_amount),
-			"max_amt": flt(slab.max_amount),
-			"given_qty": flt(slab.free_qty),
-			"give_item": slab.free_item,
-			"discount_type": "Rate" if flt(slab.free_item_rate) else "Discount Percentage",
-			"rate": flt(slab.free_item_rate),
-			"discount_percentage": 100 if not flt(slab.free_item_rate) else 0,
-			"valid_from": scheme.valid_from,
-			"valid_upto": scheme.valid_upto,
-			"source": "Promotional Scheme",
-		}
-		offers.append(offer)
-
-	return offers
-
-
+    return offers
 @frappe.whitelist()
 def validate_coupon(coupon_code, customer=None, company=None):
 	"""
