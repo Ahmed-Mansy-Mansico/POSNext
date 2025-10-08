@@ -18,8 +18,8 @@
 		<!-- Dropdown Menu -->
 		<div
 			v-if="isOpen"
-			@click.stop
-			class="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50"
+			@click="handleMenuItemClick"
+			class="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-[250]"
 		>
 			<!-- User Info Header -->
 			<div class="px-4 py-3 border-b border-gray-100">
@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
 	userName: {
@@ -78,7 +78,7 @@ const props = defineProps({
 	}
 })
 
-const emit = defineEmits(['logout'])
+const emit = defineEmits(['logout', 'menu-opened', 'menu-closed'])
 
 const isOpen = ref(false)
 
@@ -89,6 +89,19 @@ const userInitials = computed(() => {
 	}
 	return props.userName.substring(0, 2).toUpperCase()
 })
+
+// Watch isOpen and emit events
+watch(isOpen, (newValue) => {
+	if (newValue) {
+		emit('menu-opened')
+	} else {
+		emit('menu-closed')
+	}
+})
+
+function handleMenuItemClick() {
+	isOpen.value = false
+}
 
 function handleLogout() {
 	isOpen.value = false

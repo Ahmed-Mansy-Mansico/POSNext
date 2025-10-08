@@ -1,10 +1,10 @@
 <template>
 	<div class="flex flex-col h-full bg-white">
                 <!-- Header with Customer -->
-                <div class="px-3 py-2.5 border-b border-gray-200">
+                <div class="px-2 sm:px-3 py-2 sm:py-2.5 border-b border-gray-200">
                         <!-- Inline Customer Search/Selection -->
-                        <div ref="customerSearchContainer" class="relative mb-3">
-                                <div v-if="customer" class="flex items-center justify-between bg-blue-50 rounded-lg p-2">
+                        <div ref="customerSearchContainer" class="relative mb-2 sm:mb-3">
+                                <div v-if="customer" class="flex items-center justify-between bg-blue-50 rounded-lg p-1.5 sm:p-2">
                                         <div class="flex items-center space-x-2">
                                                 <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                                                         <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -23,7 +23,7 @@
 					<button
 						type="button"
 						@click="clearCustomer"
-						class="text-sm text-red-600 hover:text-red-700 flex-shrink-0"
+						class="text-sm text-red-600 hover:text-red-700 flex-shrink-0 p-1 touch-manipulation"
 					>
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -47,7 +47,7 @@
 						@input="handleSearchInput"
 						type="text"
 						placeholder="Search customer by name or mobile"
-						class="w-full pl-10 text-xs border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						class="w-full pl-8 sm:pl-10 text-[11px] sm:text-xs border border-gray-300 rounded-md px-2 sm:px-3 py-1.5 sm:py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						:disabled="!customersLoaded"
 						@keydown="handleKeydown"
 						aria-label="Search customer in cart"
@@ -108,29 +108,30 @@
                                 </div>
                         </div>
                         <div class="flex items-center justify-between">
-                                <h2 class="text-sm font-semibold text-gray-900">Item Cart</h2>
+                                <h2 class="text-xs sm:text-sm font-semibold text-gray-900">Item Cart</h2>
                                 <button
                                         v-if="items.length > 0"
                                         @click="$emit('clear-cart')"
-                                        class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-red-600 transition-colors hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
+                                        class="inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-red-600 transition-colors hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200 touch-manipulation"
                                         type="button"
                                         title="Clear all items from the cart"
                                         aria-label="Clear all items from the cart"
                                 >
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v2M4 7h16"/>
                                         </svg>
-                                        <span>Clear Cart</span>
+                                        <span class="hidden sm:inline">Clear Cart</span>
+                                        <span class="sm:hidden">Clear</span>
                                 </button>
                         </div>
                 </div>
 
 		<!-- Cart Items -->
-		<div class="flex-1 overflow-y-auto p-2.5 bg-gray-50">
-			<div v-if="items.length === 0" class="text-center py-12">
-				<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+		<div class="flex-1 overflow-y-auto p-1 sm:p-2.5 bg-gray-50">
+			<div v-if="items.length === 0" class="text-center py-8 sm:py-12">
+				<div class="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
 					<svg
-						class="h-8 w-8 text-gray-400"
+						class="h-6 w-6 sm:h-8 sm:w-8 text-gray-400"
 						fill="none"
 						stroke="currentColor"
 						viewBox="0 0 24 24"
@@ -143,21 +144,21 @@
 						/>
 					</svg>
 				</div>
-				<p class="text-xs font-medium text-gray-900">Your cart is empty</p>
+				<p class="text-[11px] sm:text-xs font-medium text-gray-900">Your cart is empty</p>
 				<p class="text-[10px] text-gray-500 mt-1">
 					Select items to start
 				</p>
 			</div>
 
-			<div v-else class="space-y-2">
+			<div v-else class="space-y-1 sm:space-y-2">
 				<div
 					v-for="(item, index) in items"
 					:key="index"
-					class="bg-white border border-gray-200 rounded-lg p-2 hover:shadow-sm transition-shadow"
+					class="bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2 hover:shadow-md transition-all active:scale-[0.99]"
 				>
-					<div class="flex items-start space-x-2 mb-2">
+					<div class="flex items-start space-x-1.5 sm:space-x-2 mb-1 sm:mb-2">
 						<!-- Item Image Thumbnail -->
-						<div class="w-10 h-10 bg-gray-100 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden">
+						<div class="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
 							<img
 								v-if="item.image"
 								:src="item.image"
@@ -166,7 +167,7 @@
 							/>
 							<svg
 								v-else
-								class="h-5 w-5 text-gray-400"
+								class="h-5 w-5 sm:h-6 sm:w-6 text-gray-400"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -182,14 +183,14 @@
 
 						<!-- Item Info -->
 						<div class="flex-1 min-w-0">
-							<div class="flex items-start justify-between">
+							<div class="flex items-start justify-between gap-1">
 								<div class="flex-1 min-w-0">
-									<h4 class="text-xs font-semibold text-gray-900 truncate">
+									<h4 class="text-[11px] sm:text-xs font-semibold text-gray-900 truncate leading-tight">
 										{{ item.item_name }}
 									</h4>
 									<!-- Merged: show rate + UOM selector (fallback to static text) -->
-									<div class="flex items-center space-x-2 mt-0.5">
-										<p class="text-[10px] text-gray-500">
+									<div class="flex items-center space-x-1 sm:space-x-2 mt-0.5">
+										<p class="text-[10px] text-gray-500 leading-tight">
 											{{ formatCurrency(item.rate) }} /
 										</p>
 										<!-- UOM Selector (if multiple UOMs available) -->
@@ -197,7 +198,7 @@
 											v-if="item.item_uoms && item.item_uoms.length > 0"
 											:value="item.uom || item.stock_uom"
 											@change="handleUomChange(item, $event.target.value)"
-											class="text-[10px] text-gray-700 font-medium bg-transparent border-0 border-b border-dashed border-gray-300 hover:border-blue-500 focus:outline-none focus:border-blue-500 px-0 py-0 cursor-pointer"
+											class="text-[10px] text-gray-700 font-medium bg-transparent border-0 border-b border-dashed border-gray-300 hover:border-blue-500 focus:outline-none focus:border-blue-500 px-0 py-0 cursor-pointer touch-manipulation"
 											@click.stop
 										>
 											<option :value="item.stock_uom">{{ item.stock_uom }}</option>
@@ -218,9 +219,10 @@
 								<button
 									type="button"
 									@click="$emit('remove-item', item.item_code)"
-									class="text-gray-400 hover:text-red-600 ml-1 transition-colors flex-shrink-0"
+									class="text-gray-400 hover:text-red-600 active:text-red-700 ml-0.5 transition-colors flex-shrink-0 p-1 touch-manipulation active:scale-90"
+									:aria-label="'Remove ' + item.item_name"
 								>
-									<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<svg class="h-4 w-4 sm:h-4.5 sm:w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
 									</svg>
 								</button>
@@ -229,12 +231,13 @@
 					</div>
 
 					<!-- Quantity Controls and Total -->
-					<div class="flex items-center justify-between">
-						<div class="flex items-center space-x-1.5">
+					<div class="flex items-center justify-between gap-2">
+						<div class="flex items-center space-x-1">
 							<button
 								type="button"
 								@click="decrementQuantity(item)"
-								class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-700 text-sm transition-colors"
+								class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 flex items-center justify-center font-bold text-gray-700 text-base transition-all touch-manipulation active:scale-95"
+								:aria-label="'Decrease quantity'"
 							>
 								−
 							</button>
@@ -244,18 +247,20 @@
 								type="number"
 								min="1"
 								step="1"
-								class="w-10 text-center border border-gray-300 rounded px-1 py-0.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+								class="w-12 sm:w-14 text-center border border-gray-300 rounded-lg px-1 py-1.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+								:aria-label="'Quantity'"
 							/>
 							<button
 								type="button"
 								@click="incrementQuantity(item)"
-								class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-700 text-sm transition-colors"
+								class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 flex items-center justify-center font-bold text-gray-700 text-base transition-all touch-manipulation active:scale-95"
+								:aria-label="'Increase quantity'"
 							>
 								+
 							</button>
 						</div>
 						<div class="text-right">
-							<p class="text-xs font-bold text-gray-900">
+							<p class="text-xs sm:text-sm font-bold text-blue-600">
 								{{ formatCurrency(item.amount || item.rate * item.quantity) }}
 							</p>
 						</div>
@@ -276,13 +281,14 @@
 		</div>
 
 		<!-- Coupons & Offers Buttons -->
-		<div v-if="items.length > 0" class="px-2.5 pt-2.5 pb-1 bg-gray-50">
-			<div class="flex gap-2">
+		<div v-if="items.length > 0" class="px-1.5 sm:px-2.5 pt-1.5 sm:pt-2.5 pb-1 bg-gray-50">
+			<div class="flex gap-1.5 sm:gap-2">
 				<!-- View All Offers Button -->
 				<button
 					type="button"
 					@click="$emit('show-offers')"
-					class="relative flex-1 flex items-center justify-between px-2 py-2 rounded-lg bg-white border-2 border-green-300 hover:border-green-500 hover:bg-green-50 transition-all group min-w-0"
+					class="relative flex-1 flex items-center justify-between px-2 sm:px-2.5 py-2 sm:py-2.5 rounded-lg bg-white border-2 border-green-300 hover:border-green-500 active:border-green-600 hover:bg-green-50 active:bg-green-100 transition-all group min-w-0 touch-manipulation active:scale-95"
+					:aria-label="'View all available offers'"
 				>
 					<div class="flex items-center space-x-1.5 min-w-0 flex-1">
 						<div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors flex-shrink-0">
@@ -301,7 +307,8 @@
 				<button
 					type="button"
 					@click="$emit('apply-coupon')"
-					class="relative flex-1 flex items-center px-2 py-2 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 hover:bg-purple-50 transition-all group min-w-0"
+					class="relative flex-1 flex items-center px-2 sm:px-2.5 py-2 sm:py-2.5 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 active:border-purple-600 hover:bg-purple-50 active:bg-purple-100 transition-all group min-w-0 touch-manipulation active:scale-95"
+					:aria-label="'Apply coupon code'"
 				>
 					<div class="flex items-center space-x-1 min-w-0 flex-1">
 						<div class="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors flex-shrink-0">
@@ -319,7 +326,7 @@
 		</div>
 
 		<!-- Totals Summary -->
-		<div class="p-2.5 bg-white border-t border-gray-200">
+		<div class="p-2 sm:p-2.5 bg-white border-t border-gray-200">
 			<!-- Summary Details -->
 			<div v-if="items.length > 0" class="mb-2.5">
 				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
@@ -364,27 +371,35 @@
 			</div>
 
 			<!-- Action Buttons -->
-			<div class="space-y-1.5">
+			<div class="space-y-1.5 sm:space-y-2">
 				<button
 					type="button"
 					@click="$emit('proceed-to-payment')"
 					:disabled="items.length === 0"
 					:class="[
-						'w-full py-2 px-3 rounded-lg font-semibold text-sm text-white transition-all flex items-center justify-center',
+						'w-full py-3 sm:py-3.5 px-4 rounded-xl font-bold text-sm sm:text-base text-white transition-all flex items-center justify-center touch-manipulation',
 						items.length === 0
 							? 'bg-gray-300 cursor-not-allowed'
-							: 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
+							: 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-lg hover:shadow-xl active:scale-95'
 					]"
+					:aria-label="'Proceed to payment'"
 				>
+					<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+					</svg>
 					<span>Checkout</span>
 				</button>
 				<button
 					type="button"
 					v-if="items.length > 0"
 					@click="$emit('save-draft')"
-					class="w-full py-1.5 px-3 rounded-lg font-medium text-xs text-orange-600 bg-orange-50 hover:bg-orange-100 transition-all"
+					class="w-full py-2 sm:py-2.5 px-3 rounded-lg font-semibold text-xs sm:text-sm text-orange-700 bg-orange-50 hover:bg-orange-100 active:bg-orange-200 transition-all touch-manipulation active:scale-95"
+					:aria-label="'Hold order as draft'"
 				>
-					Hold
+					<svg class="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+					</svg>
+					Hold Order
 				</button>
 			</div>
 		</div>

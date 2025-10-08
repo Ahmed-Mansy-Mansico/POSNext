@@ -1,18 +1,18 @@
 <template>
 	<div class="flex flex-col h-full bg-gray-50">
 		<!-- Item Groups Filter Tabs -->
-		<div class="px-3 pt-3 pb-2 bg-white border-b border-gray-200">
-			<div class="flex items-center space-x-2 overflow-x-auto pb-1">
+		<div class="px-1.5 sm:px-3 pt-1.5 sm:pt-3 pb-1.5 sm:pb-2 bg-white border-b border-gray-200">
+			<div class="flex items-center space-x-1 sm:space-x-2 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory">
 				<button
 					@click="itemStore.setSelectedItemGroup(null)"
 					:class="[
-						'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+						'flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium whitespace-nowrap transition-all touch-manipulation active:scale-95 snap-start flex-shrink-0',
 						!selectedItemGroup
-							? 'bg-blue-50 text-blue-600 border border-blue-200'
-							: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50',
+							? 'bg-blue-50 text-blue-600 border-2 border-blue-500 shadow-sm'
+							: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 active:bg-gray-100',
 					]"
 				>
-					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
 					</svg>
 					<span>All Items</span>
@@ -22,10 +22,10 @@
 					:key="group.item_group"
 					@click="itemStore.setSelectedItemGroup(group.item_group)"
 					:class="[
-						'flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+						'flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium whitespace-nowrap transition-all touch-manipulation active:scale-95 snap-start flex-shrink-0',
 						selectedItemGroup === group.item_group
-							? 'bg-blue-50 text-blue-600 border border-blue-200'
-							: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50',
+							? 'bg-blue-50 text-blue-600 border-2 border-blue-500 shadow-sm'
+							: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 active:bg-gray-100',
 					]"
 				>
 					<span>{{ group.item_group }}</span>
@@ -34,13 +34,13 @@
 		</div>
 
 		<!-- Search Bar with Barcode Scanner and View Controls -->
-		<div class="px-3 py-2 bg-white border-b border-gray-200">
-			<div class="flex items-center space-x-2">
-				<div class="flex-1 relative">
+		<div class="px-1.5 sm:px-3 py-1.5 sm:py-2 bg-white border-b border-gray-200">
+			<div class="flex items-center space-x-1 sm:space-x-2">
+				<div class="flex-1 relative min-w-0">
 					<!-- Search Icon -->
-					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+					<div class="absolute inset-y-0 left-0 pl-2 sm:pl-3 flex items-center pointer-events-none">
 						<svg
-							class="h-4 w-4 text-gray-400"
+							class="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -64,7 +64,7 @@
 						type="text"
 						:placeholder="searchPlaceholder"
 						:class="[
-							'w-full text-sm border rounded-md px-3 py-2 pl-10 pr-28 focus:outline-none transition-all',
+							'w-full text-[11px] sm:text-sm border rounded-lg px-2 sm:px-3 py-2 pl-7 sm:pl-10 pr-16 sm:pr-24 focus:outline-none transition-all',
 							autoAddEnabled
 								? 'border-blue-400 bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 								: scannerEnabled
@@ -74,60 +74,64 @@
 						aria-label="Search items"
 					/>
 					<!-- Barcode Scan Icon and Auto-Add Toggle -->
-					<div class="absolute inset-y-0 right-0 pr-3 flex items-center gap-1">
+					<div class="absolute inset-y-0 right-0 pr-1 sm:pr-2 flex items-center gap-0.5">
 						<button
 							@click="toggleBarcodeScanner"
 							:class="[
-								'p-1 rounded transition-all',
+								'p-1 sm:p-1.5 rounded transition-all touch-manipulation active:scale-95',
 								scannerEnabled
-									? 'bg-green-100 hover:bg-green-200 text-green-700'
-									: 'hover:bg-gray-100 text-gray-600'
+									? 'bg-green-100 hover:bg-green-200 active:bg-green-300 text-green-700'
+									: 'hover:bg-gray-100 active:bg-gray-200 text-gray-600'
 							]"
 							:title="scannerEnabled ? 'Barcode Scanner: ON (Click to disable)' : 'Barcode Scanner: OFF (Click to enable)'"
+							:aria-label="scannerEnabled ? 'Disable barcode scanner' : 'Enable barcode scanner'"
 						>
-							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
 							</svg>
 						</button>
 						<button
 							@click="toggleAutoAdd"
 							:class="[
-								'p-1 rounded transition-all flex items-center gap-1 text-xs font-medium px-2',
+								'p-1 sm:p-1.5 rounded transition-all flex items-center gap-0.5 text-[9px] sm:text-xs font-medium px-1 sm:px-2 touch-manipulation active:scale-95',
 								autoAddEnabled
-									? 'bg-blue-100 hover:bg-blue-200 text-blue-700'
-									: 'hover:bg-gray-100 text-gray-600'
+									? 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-700'
+									: 'hover:bg-gray-100 active:bg-gray-200 text-gray-600'
 							]"
 							:title="autoAddEnabled ? 'Auto-Add: ON - Press Enter to add items to cart' : 'Auto-Add: OFF - Click to enable automatic cart addition on Enter'"
+							:aria-label="autoAddEnabled ? 'Disable auto-add' : 'Enable auto-add'"
 						>
-							<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
 							</svg>
-							<span>Auto</span>
+							<span class="hidden xs:inline">Auto</span>
 						</button>
 					</div>
 				</div>
-				<div class="flex items-center space-x-0.5 bg-gray-100 rounded-md p-0.5">
+				<div class="flex items-center space-x-0.5 bg-gray-100 rounded-lg p-0.5 flex-shrink-0">
 					<button
 						@click="setViewMode('grid')"
 						:class="[
-							'p-1.5 rounded transition-all',
-							viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+							'p-1.5 sm:p-2 rounded transition-all touch-manipulation active:scale-95',
+							viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 active:bg-gray-300'
 						]"
 						title="Grid View"
+						:aria-label="'Switch to grid view'"
 					>
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg class="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
 						</svg>
 					</button>
 					<button
 						@click="setViewMode('list')"
 						:class="[
-							'p-1.5 rounded transition-all',
-							viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+							'p-1.5 sm:p-2 rounded transition-all touch-manipulation active:scale-95',
+							viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 active:bg-gray-300'
 						]"
 						title="List View"
+						:aria-label="'Switch to list view'"
 					>
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<svg class="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
 						</svg>
 					</button>
@@ -171,20 +175,20 @@
 
 		<!-- Grid View -->
 		<div v-else-if="viewMode === 'grid'" class="flex-1 flex flex-col overflow-hidden">
-			<div class="flex-1 overflow-y-auto p-3">
-				<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+			<div class="flex-1 overflow-y-auto p-1.5 sm:p-3">
+				<div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 sm:gap-2.5">
 					<div
 						v-for="item in paginatedItems"
 						:key="item.item_code"
 						@click="handleItemClick(item)"
-						class="relative bg-white border border-gray-200 rounded-lg p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+						class="relative bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-lg transition-all touch-manipulation active:scale-95 active:shadow-xl"
 					>
 						<!-- Item Image with Stock Badge -->
-						<div class="relative aspect-square bg-gray-100 rounded-md mb-2 flex items-center justify-center overflow-hidden">
+						<div class="relative aspect-square bg-gray-100 rounded-md mb-1.5 sm:mb-2 flex items-center justify-center overflow-hidden">
 							<!-- Stock Badge -->
 							<div
 								:class="[
-									'absolute top-1 right-1 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+									'absolute top-0.5 right-0.5 sm:top-1 sm:right-1 text-white text-[9px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full shadow-sm',
 									(item.actual_qty || item.stock_qty || 0) > 0 ? 'bg-green-500' : 'bg-red-500'
 								]"
 							>
@@ -201,7 +205,7 @@
 							/>
 							<svg
 								v-else
-								class="h-10 w-10 text-gray-300"
+								class="h-8 w-8 sm:h-10 sm:w-10 text-gray-300"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -216,12 +220,12 @@
 						</div>
 
 						<!-- Item Details -->
-						<div>
-							<h3 class="text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
+						<div class="min-w-0">
+							<h3 class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
 								{{ item.item_name }}
 							</h3>
-                                                        <p class="text-[10px] text-gray-500">
-                                                                {{ formatCurrency(item.rate || item.price_list_rate || 0) }}
+                                                        <p class="text-[9px] sm:text-[10px] text-gray-500 leading-tight">
+                                                                <span class="font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</span>
                                                                 <span class="text-gray-400">/ {{ item.uom || item.stock_uom || 'Nos' }}</span>
                                                         </p>
 						</div>
@@ -230,35 +234,38 @@
 			</div>
 
 			<!-- Pagination Controls for Grid View -->
-			<div v-if="totalPages > 1" class="px-3 py-2 bg-white border-t border-gray-200">
-				<div class="flex items-center justify-between">
-					<div class="text-xs text-gray-600">
-						Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredItems.length) }} of {{ filteredItems.length }} items
+			<div v-if="totalPages > 1" class="px-2 sm:px-3 py-2 bg-white border-t border-gray-200">
+				<div class="flex flex-col sm:flex-row items-center justify-between gap-2">
+					<div class="text-[10px] sm:text-xs text-gray-600 order-2 sm:order-1">
+						{{ ((currentPage - 1) * itemsPerPage) + 1 }}-{{ Math.min(currentPage * itemsPerPage, filteredItems.length) }} of {{ filteredItems.length }}
 					</div>
-					<div class="flex items-center space-x-1">
+					<div class="flex items-center space-x-1 order-1 sm:order-2">
 						<button
 							@click="previousPage"
 							:disabled="currentPage === 1"
 							:class="[
-								'px-2 py-1 text-xs rounded border transition-all',
+								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
 								currentPage === 1
 									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
 							]"
+							:aria-label="'Go to previous page'"
 						>
-							Previous
+							<span class="hidden xs:inline">Previous</span>
+							<span class="xs:hidden">‹</span>
 						</button>
-						<div class="flex items-center space-x-1">
+						<div class="flex items-center space-x-0.5 sm:space-x-1">
 							<button
 								v-for="page in getPaginationRange()"
 								:key="page"
 								@click="goToPage(page)"
 								:class="[
-									'px-2.5 py-1 text-xs rounded border transition-all',
+									'min-w-[28px] sm:min-w-[32px] px-1.5 sm:px-2.5 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
 									currentPage === page
 										? 'bg-blue-600 text-white border-blue-600'
-										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
 								]"
+								:aria-label="'Go to page ' + page"
 							>
 								{{ page }}
 							</button>
@@ -267,13 +274,15 @@
 							@click="nextPage"
 							:disabled="currentPage === totalPages"
 							:class="[
-								'px-2 py-1 text-xs rounded border transition-all',
+								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
 								currentPage === totalPages
 									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
 							]"
+							:aria-label="'Go to next page'"
 						>
-							Next
+							<span class="hidden xs:inline">Next</span>
+							<span class="xs:hidden">›</span>
 						</button>
 					</div>
 				</div>
@@ -282,16 +291,16 @@
 
 		<!-- Table View -->
 		<div v-else class="flex-1 flex flex-col overflow-hidden">
-			<div class="flex-1 overflow-y-auto">
+			<div class="flex-1 overflow-x-auto overflow-y-auto">
 				<table class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50 sticky top-0 z-0">
 						<tr>
-							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Image</th>
-							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Name</th>
-							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Code</th>
-							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Rate</th>
-							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Available QTY</th>
-							<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">UOM</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Image</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Name</th>
+							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Code</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Rate</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Qty</th>
+							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">UOM</th>
 						</tr>
 					</thead>
 					<tbody class="bg-white divide-y divide-gray-200">
@@ -299,25 +308,25 @@
 							v-for="item in paginatedItems"
 							:key="item.item_code"
 							@click="handleItemClick(item)"
-							class="cursor-pointer hover:bg-blue-50 transition-colors"
+							class="cursor-pointer hover:bg-blue-50 transition-colors touch-manipulation active:bg-blue-100"
 						>
-							<td class="px-3 py-2 whitespace-nowrap">
-								<div class="w-10 h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
+							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
+								<div class="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
 									<img v-if="item.image" :src="item.image" :alt="item.item_name" loading="lazy" class="w-full h-full object-cover" @error="handleImageError" />
-									<svg v-else class="h-5 w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<svg v-else class="h-4 w-4 sm:h-5 sm:w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
 									</svg>
 								</div>
 							</td>
-							<td class="px-3 py-2"><div class="text-sm font-medium text-gray-900">{{ item.item_name }}</div></td>
-							<td class="px-3 py-2 whitespace-nowrap"><div class="text-sm text-gray-500">{{ item.item_code }}</div></td>
-							<td class="px-3 py-2 whitespace-nowrap"><div class="text-sm font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</div></td>
-							<td class="px-3 py-2 whitespace-nowrap">
-								<span :class="['text-sm font-medium', (item.actual_qty || item.stock_qty || 0) > 0 ? 'text-green-600' : 'text-red-600']">
+							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{{ item.item_name }}</div></td>
+							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.item_code }}</div></td>
+							<td class="px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</div></td>
+							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
+								<span :class="['text-xs sm:text-sm font-medium', (item.actual_qty || item.stock_qty || 0) > 0 ? 'text-green-600' : 'text-red-600']">
 									{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
 								</span>
 							</td>
-                                                        <td class="px-3 py-2 whitespace-nowrap"><div class="text-sm text-gray-500">{{ item.uom || item.stock_uom || 'Nos' }}</div></td>
+                                                        <td class="hidden md:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.uom || item.stock_uom || 'Nos' }}</div></td>
 						</tr>
 					</tbody>
 				</table>
@@ -325,35 +334,38 @@
 			</div>
 
 			<!-- Pagination Controls for List View -->
-			<div v-if="totalPages > 1" class="px-3 py-2 bg-white border-t border-gray-200">
-				<div class="flex items-center justify-between">
-					<div class="text-xs text-gray-600">
-						Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to {{ Math.min(currentPage * itemsPerPage, filteredItems.length) }} of {{ filteredItems.length }} items
+			<div v-if="totalPages > 1" class="px-2 sm:px-3 py-2 bg-white border-t border-gray-200">
+				<div class="flex flex-col sm:flex-row items-center justify-between gap-2">
+					<div class="text-[10px] sm:text-xs text-gray-600 order-2 sm:order-1">
+						{{ ((currentPage - 1) * itemsPerPage) + 1 }}-{{ Math.min(currentPage * itemsPerPage, filteredItems.length) }} of {{ filteredItems.length }}
 					</div>
-					<div class="flex items-center space-x-1">
+					<div class="flex items-center space-x-1 order-1 sm:order-2">
 						<button
 							@click="previousPage"
 							:disabled="currentPage === 1"
 							:class="[
-								'px-2 py-1 text-xs rounded border transition-all',
+								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
 								currentPage === 1
 									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
 							]"
+							:aria-label="'Go to previous page'"
 						>
-							Previous
+							<span class="hidden xs:inline">Previous</span>
+							<span class="xs:hidden">‹</span>
 						</button>
-						<div class="flex items-center space-x-1">
+						<div class="flex items-center space-x-0.5 sm:space-x-1">
 							<button
 								v-for="page in getPaginationRange()"
 								:key="page"
 								@click="goToPage(page)"
 								:class="[
-									'px-2.5 py-1 text-xs rounded border transition-all',
+									'min-w-[28px] sm:min-w-[32px] px-1.5 sm:px-2.5 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
 									currentPage === page
 										? 'bg-blue-600 text-white border-blue-600'
-										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
 								]"
+								:aria-label="'Go to page ' + page"
 							>
 								{{ page }}
 							</button>
@@ -362,13 +374,15 @@
 							@click="nextPage"
 							:disabled="currentPage === totalPages"
 							:class="[
-								'px-2 py-1 text-xs rounded border transition-all',
+								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
 								currentPage === totalPages
 									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
 							]"
+							:aria-label="'Go to next page'"
 						>
-							Next
+							<span class="hidden xs:inline">Next</span>
+							<span class="xs:hidden">›</span>
 						</button>
 					</div>
 				</div>
@@ -518,8 +532,6 @@ function handleKeyDown(event) {
 	// If Enter/newline is pressed, trigger barcode search
 	if (event.key === "Enter") {
 		event.preventDefault()
-
-		const isFromScanner = scannerInputDetected.value
 
 		// Auto-add if Auto-Add mode is enabled (regardless of manual typing vs scanner)
 		if (autoAddEnabled.value) {
@@ -813,3 +825,16 @@ function getPaginationRange() {
 	return range
 }
 </script>
+
+<style scoped>
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+</style>

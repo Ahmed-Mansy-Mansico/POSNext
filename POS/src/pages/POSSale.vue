@@ -15,6 +15,7 @@
 				:is-offline="isOffline"
 				:is-syncing="isSyncing"
 				:pending-invoices-count="pendingInvoicesCount"
+				:is-any-dialog-open="isAnyDialogOpen"
 				@sync-click="handleSyncClick"
 				@printer-click="showHistoryDialog = true"
 				@refresh-click="handleRefresh"
@@ -88,16 +89,67 @@
 				</template>
 			</POSHeader>
 
-		<!-- Main Content: Two Column Layout -->
+		<!-- Main Content: Responsive Layout -->
 		<div
 			v-if="hasOpenShift"
 			ref="containerRef"
-			class="flex-1 flex overflow-hidden relative"
+			class="flex-1 flex flex-col lg:flex-row overflow-hidden relative"
 		>
-			<!-- Left: Items Selector -->
+			<!-- Mobile Tab Navigation -->
 			<div
-				:style="{ width: leftPanelWidth + 'px' }"
-				class="flex flex-col bg-white overflow-hidden flex-shrink-0"
+				class="lg:hidden bg-white border-b border-gray-200 flex shadow-sm sticky top-0 transition-all z-[100]"
+			>
+				<button
+					@click="mobileActiveTab = 'items'"
+					:class="[
+						'flex-1 px-3 py-3 text-sm font-semibold transition-all relative touch-manipulation active:scale-95',
+						mobileActiveTab === 'items'
+							? 'text-blue-600 border-b-3 border-blue-600 bg-blue-50'
+							: 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-100'
+					]"
+					:aria-label="'View items'"
+					:aria-selected="mobileActiveTab === 'items'"
+					role="tab"
+				>
+					<div class="flex items-center justify-center space-x-1.5">
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+						</svg>
+						<span>Items</span>
+					</div>
+				</button>
+				<button
+					@click="mobileActiveTab = 'cart'"
+					:class="[
+						'flex-1 px-3 py-3 text-sm font-semibold transition-all relative touch-manipulation active:scale-95',
+						mobileActiveTab === 'cart'
+							? 'text-blue-600 border-b-3 border-blue-600 bg-blue-50'
+							: 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-100'
+					]"
+					:aria-label="'View cart'"
+					:aria-selected="mobileActiveTab === 'cart'"
+					role="tab"
+				>
+					<div class="flex items-center justify-center space-x-1.5">
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+						</svg>
+						<span>Cart</span>
+						<span v-if="invoiceItems.length > 0" class="bg-blue-600 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center shadow-sm">
+							{{ invoiceItems.length }}
+						</span>
+					</div>
+				</button>
+			</div>
+
+			<!-- Left: Items Selector (Desktop) / Tab Content (Mobile) -->
+			<div
+				:style="{ width: isDesktop ? leftPanelWidth + 'px' : '100%' }"
+				:class="[
+					'flex flex-col bg-white overflow-hidden',
+					isDesktop ? 'flex-shrink-0' : '',
+					mobileActiveTab === 'items' ? 'flex-1' : 'hidden lg:flex'
+				]"
 				style="will-change: width; contain: layout;"
 			>
 				<ItemsSelector
@@ -109,8 +161,9 @@
 				/>
 			</div>
 
-			<!-- Draggable Divider -->
+			<!-- Draggable Divider (Desktop Only) -->
 			<div
+				v-if="isDesktop"
 				ref="dividerRef"
 				role="separator"
 				aria-orientation="vertical"
@@ -118,7 +171,7 @@
 				@pointermove="handleResize"
 				@pointerup="stopResize"
 				@pointercancel="stopResize"
-				class="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize relative flex-shrink-0 transition-all duration-100"
+				class="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize relative flex-shrink-0 transition-all duration-100 hidden lg:block"
 				:class="{
 					'bg-blue-500': isResizing,
 					'pointer-events-none opacity-0': isAnyDialogOpen,
@@ -138,9 +191,13 @@
 				></div>
 			</div>
 
-			<!-- Right: Invoice Cart -->
+			<!-- Right: Invoice Cart (Desktop) / Tab Content (Mobile) -->
 			<div
-				class="flex-1 flex flex-col bg-gray-50 overflow-hidden"
+				:class="[
+					'flex flex-col bg-gray-50 overflow-hidden',
+					isDesktop ? 'flex-1' : '',
+					mobileActiveTab === 'cart' ? 'flex-1' : 'hidden lg:flex lg:flex-1'
+				]"
 				style="min-width: 300px; contain: layout;"
 			>
 				<InvoiceCart
@@ -166,6 +223,23 @@
 					@update-uom="handleUomChange"
 				/>
 			</div>
+
+			<!-- Mobile Floating Cart Button (when on items tab) -->
+			<button
+				v-if="!isDesktop && mobileActiveTab === 'items' && invoiceItems.length > 0"
+				@click="mobileActiveTab = 'cart'"
+				class="lg:hidden fixed bottom-6 right-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full p-4 shadow-2xl hover:shadow-3xl hover:from-blue-700 hover:to-blue-800 active:from-blue-800 active:to-blue-900 transition-all z-50 touch-manipulation active:scale-95 ring-4 ring-blue-100"
+				:aria-label="'View cart with ' + invoiceItems.length + ' items'"
+			>
+				<div class="relative">
+					<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+					</svg>
+					<span class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] px-1 flex items-center justify-center shadow-lg animate-pulse">
+						{{ invoiceItems.length }}
+					</span>
+				</div>
+			</button>
 		</div>
 
 		<!-- No Shift Placeholder -->
@@ -583,6 +657,13 @@ const pendingPaymentAfterCustomer = ref(false)
 const selectionMode = ref('uom') // 'uom' or 'variant'
 const pendingInvoicesList = ref([])
 
+// Mobile responsiveness
+const mobileActiveTab = ref('items') // 'items' or 'cart'
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
+
+// Computed property for desktop detection
+const isDesktop = computed(() => windowWidth.value >= 1024)
+
 // Get global dialog state for divider behavior
 const { isAnyDialogOpen } = useDialogState()
 
@@ -605,7 +686,13 @@ function updateShiftDuration() {
 }
 
 onMounted(async () => {
-	window.addEventListener('resize', updateLayoutBounds)
+	// Window resize listeners
+	const handleResize = () => {
+		windowWidth.value = window.innerWidth
+		updateLayoutBounds()
+	}
+	window.addEventListener('resize', handleResize)
+
 	try {
 		// Update time and shift duration every second
 		setInterval(() => {
@@ -689,12 +776,12 @@ onMounted(async () => {
 					}
 				}
 			}
-		}
+	}
 
-		requestAnimationFrame(updateLayoutBounds)
+	updateLayoutBounds()
 
-		// Update drafts count
-		await updateDraftsCount()
+	// Update drafts count
+	await updateDraftsCount()
 	} catch (error) {
 		console.error("Error checking shift:", error)
 	} finally {
@@ -704,7 +791,7 @@ onMounted(async () => {
 
 watch(hasOpenShift, value => {
 	if (value && typeof window !== 'undefined') {
-		requestAnimationFrame(updateLayoutBounds)
+		updateLayoutBounds()
 	}
 })
 
@@ -746,7 +833,11 @@ watch(invoiceItems, async () => {
 
 onUnmounted(() => {
 	// Clean up event listeners
-	window.removeEventListener('resize', updateLayoutBounds)
+	const handleResize = () => {
+		windowWidth.value = window.innerWidth
+		updateLayoutBounds()
+	}
+	window.removeEventListener('resize', handleResize)
 	stopResize()
 })
 
@@ -820,6 +911,11 @@ function handleItemSelected(item, autoAdd = false) {
 
 		// Add to cart directly with default UOM (stock UOM)
 		addItem(item)
+
+		// Auto-switch to cart tab on mobile after adding item
+		if (!isDesktop.value) {
+			mobileActiveTab.value = 'cart'
+		}
 
 		// Show toast AFTER successful add
 		setTimeout(() => {
@@ -895,6 +991,12 @@ function handleItemSelected(item, autoAdd = false) {
 
 	// Add to cart
 	addItem(item)
+
+	// Auto-switch to cart tab on mobile after adding item
+	if (!isDesktop.value) {
+		mobileActiveTab.value = 'cart'
+	}
+
 	toast.create({
 		title: "Item Added",
 		text: `${item.item_name} added to cart`,
