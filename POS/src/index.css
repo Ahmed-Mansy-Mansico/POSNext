@@ -6,3 +6,13 @@
 body {
 	font-family: 'saudi-riyal-symbol', 'Inter', sans-serif;
 }
+
+/* Ensure frappe-ui dialogs render above sticky mobile navigation */
+.dialog-overlay {
+	z-index: 400 !important;
+}
+
+.dialog-overlay .dialog-content,
+.dialog-content {
+	z-index: 500 !important;
+}
