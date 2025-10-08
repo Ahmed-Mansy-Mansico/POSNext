@@ -14,8 +14,6 @@ declare module 'vue' {
     CreateCustomerDialog: typeof import('./src/components/sale/CreateCustomerDialog.vue')['default']
     CustomerDialog: typeof import('./src/components/sale/CustomerDialog.vue')['default']
     DraftInvoicesDialog: typeof import('./src/components/sale/DraftInvoicesDialog.vue')['default']
-    ErrorDialog: typeof import('./src/components/ErrorDialog.vue')['default']
-    'ErrorDialog.example': typeof import('./src/components/ErrorDialog.example.vue')['default']
     InvoiceCart: typeof import('./src/components/sale/InvoiceCart.vue')['default']
     InvoiceHistoryDialog: typeof import('./src/components/sale/InvoiceHistoryDialog.vue')['default']
     ItemSelectionDialog: typeof import('./src/components/sale/ItemSelectionDialog.vue')['default']
@@ -31,7 +29,6 @@ declare module 'vue' {
     ShiftClosingDialog: typeof import('./src/components/ShiftClosingDialog.vue')['default']
     ShiftOpeningDialog: typeof import('./src/components/ShiftOpeningDialog.vue')['default']
     StatusBadge: typeof import('./src/components/common/StatusBadge.vue')['default']
-    UomSelectionDialog: typeof import('./src/components/sale/UomSelectionDialog.vue')['default']
     UserMenu: typeof import('./src/components/common/UserMenu.vue')['default']
   }
 }

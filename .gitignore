@@ -45,7 +45,7 @@ dist/
 dist-ssr/
 build/
 out/
-
+dev-dist/
 # Environment variables
 .env
 .env.local

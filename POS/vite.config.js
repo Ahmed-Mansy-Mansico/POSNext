@@ -30,7 +30,7 @@ export default defineConfig({
 		}),
 		VitePWA({
 			registerType: 'autoUpdate',
-			includeAssets: ['favicon.png', 'robots.txt', 'offline.html', 'icon.svg', 'icon-maskable.svg'],
+			includeAssets: ['favicon.png', 'icon.svg', 'icon-maskable.svg'],
 			manifest: {
 				name: 'POSNext',
 				short_name: 'POSNext',
@@ -69,8 +69,8 @@ export default defineConfig({
 			},
 			workbox: {
 				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-				navigateFallback: '/assets/pos_next/pos/offline.html',
-				navigateFallbackDenylist: [/^\/api/, /^\/app/, /^\/assets/, /^\/pos(?:\/.*)?$/],
+				navigateFallback: null,
+				navigateFallbackDenylist: [/^\/api/, /^\/app/],
 				runtimeCaching: [
 					{
 						urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -128,20 +128,14 @@ export default defineConfig({
 					},
 					{
 						urlPattern: ({ request, url }) => request.mode === 'navigate' && url.pathname.startsWith('/pos'),
-						handler: 'StaleWhileRevalidate',
+						handler: 'NetworkFirst',
 						options: {
 							cacheName: 'pos-page-cache',
+							networkTimeoutSeconds: 3,
 							expiration: {
 								maxEntries: 1,
 								maxAgeSeconds: 60 * 60 * 24, // 24 hours
-							},
-							plugins: [
-								{
-									handlerDidError: async () => {
-										return caches.match('/assets/pos_next/pos/offline.html');
-									}
-								}
-							]
+							}
 						}
 					}
 				],
@@ -151,8 +145,7 @@ export default defineConfig({
 			},
 			devOptions: {
 				enabled: true,
-				type: 'module',
-				navigateFallback: '/assets/pos_next/pos/offline.html'
+				type: 'module'
 			}
 		})
 	],
