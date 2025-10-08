@@ -77,6 +77,11 @@ export function useInvoice() {
 		auto: false,
 	})
 
+	const cleanupDraftsResource = createResource({
+		url: "pos_next.api.invoices.cleanup_old_drafts",
+		auto: false,
+	})
+
 	// Computed
 	const subtotal = computed(() => {
 		return invoiceItems.value.reduce((sum, item) => {
@@ -506,11 +511,22 @@ export function useInvoice() {
 		couponCode.value = null
 	}
 
-	function clearCart() {
+	async function clearCart() {
 		invoiceItems.value = []
 		payments.value = []
 		additionalDiscount.value = 0
 		couponCode.value = null
+
+		// Cleanup old draft invoices (older than 1 hour) in background
+		try {
+			await cleanupDraftsResource.submit({
+				pos_profile: posProfile.value,
+				max_age_hours: 1
+			})
+		} catch (error) {
+			// Silent fail - don't block cart clearing
+			console.warn("Failed to cleanup old drafts:", error)
+		}
 	}
 
 	async function loadTaxRules(profileName) {

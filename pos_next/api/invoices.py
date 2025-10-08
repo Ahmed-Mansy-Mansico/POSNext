@@ -474,9 +474,29 @@ def submit_invoice(invoice=None, data=None):
 		frappe.flags.ignore_account_permission = True
 		invoice_doc.save()
 
-		# Submit invoice
-		invoice_doc.submit()
+		# Submit invoice with error handling
+		try:
+			invoice_doc.submit()
+		except Exception as submit_error:
+			# If submission fails, cleanup the invoice to prevent stock reservation issues
+			try:
+				# Reload to get current state
+				current_doc = frappe.get_doc("Sales Invoice", invoice_doc.name)
 
+				# If already submitted, must cancel before deleting
+				if current_doc.docstatus == 1:
+					current_doc.flags.ignore_permissions = True
+					current_doc.cancel()
+
+				# Now delete the cancelled/draft invoice
+				frappe.delete_doc("Sales Invoice", invoice_doc.name, force=True, ignore_permissions=True)
+				frappe.db.commit()
+			except Exception:
+				# Silent fail on cleanup - don't hide original error
+				pass
+
+			# Re-raise the original submission error
+			raise submit_error
 
 		# Return complete invoice details
 		return {
@@ -538,6 +558,51 @@ def delete_invoice(invoice):
 
 	frappe.delete_doc(doctype, invoice, force=1)
 	return _("Invoice {0} Deleted").format(invoice)
+
+
+@frappe.whitelist()
+def cleanup_old_drafts(pos_profile=None, max_age_hours=24):
+	"""
+	Clean up old draft invoices to prevent stock reservation issues.
+	Deletes drafts older than max_age_hours (default 24 hours).
+	"""
+	from datetime import datetime, timedelta
+
+	doctype = "Sales Invoice"
+	cutoff_time = datetime.now() - timedelta(hours=int(max_age_hours))
+
+	filters = {
+		"docstatus": 0,  # Draft only
+		"modified": ["<", cutoff_time.strftime("%Y-%m-%d %H:%M:%S")],
+	}
+
+	# Optionally filter by POS profile
+	if pos_profile:
+		filters["pos_profile"] = pos_profile
+
+	# Get old drafts
+	old_drafts = frappe.get_all(
+		doctype,
+		filters=filters,
+		fields=["name", "modified"],
+		limit_page_length=100,  # Safety limit
+	)
+
+	deleted_count = 0
+	for draft in old_drafts:
+		try:
+			frappe.delete_doc(doctype, draft["name"], force=True, ignore_permissions=True)
+			deleted_count += 1
+		except Exception as e:
+			frappe.log_error(f"Failed to delete draft {draft['name']}: {str(e)}", "Draft Cleanup Error")
+
+	if deleted_count > 0:
+		frappe.db.commit()
+
+	return {
+		"deleted": deleted_count,
+		"message": f"Cleaned up {deleted_count} old draft invoices"
+	}
 
 
 # ==========================================
@@ -930,6 +995,28 @@ def apply_offers(invoice_data, selected_offers=None):
                         "Company", profile.company, "default_currency"
                 )
 
+                # Get customer details if customer is provided
+                customer = invoice.get("customer")
+                customer_group = invoice.get("customer_group")
+                territory = invoice.get("territory")
+
+                if customer and not customer_group:
+                        # Fetch customer_group from customer
+                        try:
+                                customer_data = frappe.get_cached_value(
+                                        "Customer", customer, ["customer_group", "territory"], as_dict=1
+                                )
+                                if customer_data:
+                                        customer_group = customer_data.get("customer_group")
+                                        if not territory:
+                                                territory = customer_data.get("territory")
+                        except Exception:
+                                pass
+
+                # If still no customer_group, use default
+                if not customer_group:
+                        customer_group = "All Customer Groups"
+
                 pricing_args = frappe._dict(
                         {
                                 "doctype": invoice.get("doctype") or "Sales Invoice",
@@ -943,9 +1030,9 @@ def apply_offers(invoice_data, selected_offers=None):
                                 "conversion_rate": flt(invoice.get("conversion_rate") or 1) or 1,
                                 "plc_conversion_rate": flt(invoice.get("plc_conversion_rate") or 1) or 1,
                                 "price_list": invoice.get("price_list") or profile.get("selling_price_list"),
-                                "customer": invoice.get("customer"),
-                                "customer_group": invoice.get("customer_group"),
-                                "territory": invoice.get("territory"),
+                                "customer": customer,
+                                "customer_group": customer_group,
+                                "territory": territory,
                                 "items": pricing_items,
                         }
                 )
@@ -1038,8 +1125,28 @@ def apply_offers(invoice_data, selected_offers=None):
                                 or 0
                         )
 
+                        # Get discount from result or fetch from pricing rule
                         discount_percentage = flt(result.get("discount_percentage") or 0)
                         per_unit_discount = flt(result.get("discount_amount") or 0)
+
+                        # If ERPNext didn't calculate discount (validate_applied_rule=1),
+                        # we need to fetch and apply it manually
+                        if not discount_percentage and not per_unit_discount and applicable_rule_names:
+                                for rule_name in applicable_rule_names:
+                                        rule_doc = rule_map.get(rule_name)
+                                        if not rule_doc:
+                                                continue
+
+                                        # Fetch full pricing rule to get discount values
+                                        full_rule = frappe.get_cached_doc("Pricing Rule", rule_name)
+
+                                        if full_rule.rate_or_discount == "Discount Percentage" and full_rule.discount_percentage:
+                                                discount_percentage += flt(full_rule.discount_percentage)
+                                        elif full_rule.rate_or_discount == "Discount Amount" and full_rule.discount_amount:
+                                                per_unit_discount += flt(full_rule.discount_amount)
+                                        elif full_rule.rate_or_discount == "Rate" and full_rule.rate:
+                                                # Apply fixed rate
+                                                price_list_rate = flt(full_rule.rate)
 
                         line_discount_amount = 0
                         if discount_percentage and qty and price_list_rate:
@@ -1059,6 +1166,7 @@ def apply_offers(invoice_data, selected_offers=None):
                         item_doc.price_list_rate = price_list_rate
                         item_doc.rate = flt(item_doc.get("rate") or price_list_rate)
                         item_doc.pricing_rules = applicable_rule_names
+
                         item_doc.applied_promotional_schemes = list(
                                 {
                                         rule_map[name].promotional_scheme

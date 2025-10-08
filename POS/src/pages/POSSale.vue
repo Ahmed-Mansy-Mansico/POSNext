@@ -162,7 +162,7 @@
 					@save-draft="handleSaveDraft"
 					@apply-coupon="showCouponDialog = true"
 					@show-offers="showOffersDialog = true"
-					@remove-offer="handleOfferRemoved"
+					@remove-offer="handleRemoveOffer"
 					@update-uom="handleUomChange"
 				/>
 			</div>
@@ -266,6 +266,7 @@
 
 		<!-- Offers Dialog -->
                 <OffersDialog
+                        ref="offersDialogRef"
                         v-model="showOffersDialog"
                         :subtotal="subtotal"
                         :items="invoiceItems"
@@ -274,9 +275,8 @@
                         :company="currentProfile?.company"
                         :currency="currentProfile?.currency || 'USD'"
                         :applied-offer="autoAppliedOffer"
-                        :applying-offer="isApplyingOffer"
-                        @offer-selected="handleOfferSelected"
-                        @offer-removed="handleOfferRemoved"
+                        @apply-offer="handleApplyOffer"
+                        @remove-offer="handleRemoveOffer"
                 />
 
 		<!-- Batch/Serial Dialog -->
@@ -557,6 +557,7 @@ const { isOpen: showErrorDialog } = useDialog('invoiceError')
 
 // Other refs
 const itemsSelectorRef = ref(null)
+const offersDialogRef = ref(null)
 const initialCustomerName = ref("")
 const pendingItem = ref(null)
 const pendingItemQty = ref(1)
@@ -577,7 +578,6 @@ const dividerRef = ref(null)
 const leftPanelWidth = ref(800) // Start with 800px width
 const isResizing = ref(false)
 const autoAppliedOffer = ref(null)
-const isApplyingOffer = ref(false)
 const appliedCoupon = ref(null)
 const pendingPaymentAfterCustomer = ref(false)
 const selectionMode = ref('uom') // 'uom' or 'variant'
@@ -708,64 +708,43 @@ watch(hasOpenShift, value => {
 	}
 })
 
-// Watch cart changes to auto-apply eligible offers with debouncing
-let autoApplyTimeout = null
+// Watch for cart changes - clear offers if cart is emptied, re-apply if items added
 let suppressOfferReapply = false
-watch([invoiceItems, subtotal], async (newVal, oldVal) => {
-	// Clear any pending auto-apply
-	if (autoApplyTimeout) {
-		clearTimeout(autoApplyTimeout)
-	}
-
-	// Only auto-apply if:
-	// 1. Cart is not empty
-	// 2. POS profile is set
-	// 3. No offer is currently applied (to avoid overwriting manual selections)
-	if (invoiceItems.value.length > 0 && posProfile.value && !autoAppliedOffer.value) {
-		// Debounce for 500ms to avoid excessive API calls
-		autoApplyTimeout = setTimeout(async () => {
-			await autoApplyOffers()
-		}, 500)
-	} else if (invoiceItems.value.length === 0) {
-		// Clear auto-applied offers when cart is emptied
-		autoAppliedOffer.value = null
-	}
-}, { deep: true })
-
-// Watch for cart changes and re-apply any active offer rules
 watch(invoiceItems, async () => {
         if (suppressOfferReapply) {
                 suppressOfferReapply = false
                 return
         }
 
-        if (isApplyingOffer.value || !autoAppliedOffer.value || invoiceItems.value.length === 0) {
+        // Clear offers when cart is empty
+        if (invoiceItems.value.length === 0 && autoAppliedOffer.value) {
+                autoAppliedOffer.value = null
                 return
         }
 
-        if (autoAppliedOffer.value.source === 'manual' && autoAppliedOffer.value.rules?.length) {
-                await applyOffersWithRules(autoAppliedOffer.value.rules, {
-                        offerMeta: {
-                                name: autoAppliedOffer.value.name,
-                                code: autoAppliedOffer.value.code,
-                                offer: autoAppliedOffer.value.offer,
-                                source: autoAppliedOffer.value.source,
-                        },
-                        silent: true,
-                })
-        } else if (autoAppliedOffer.value.source === 'auto') {
-                await autoApplyOffers({ silent: true })
-        } else if (autoAppliedOffer.value.percentage || autoAppliedOffer.value.amount) {
-                applyDiscount(autoAppliedOffer.value)
+        // Re-apply offer when items are added and an offer is already applied
+        if (invoiceItems.value.length > 0 && autoAppliedOffer.value) {
+                try {
+                        const invoiceData = buildInvoiceDataForOffers()
+                        const offerNames = [autoAppliedOffer.value.code]
+
+                        const response = await applyOffersResource.submit({
+                                invoice_data: invoiceData,
+                                selected_offers: offerNames,
+                        })
+
+                        const payload = response?.message || response || {}
+                        const responseItems = payload.items || []
+
+                        suppressOfferReapply = true
+                        applyServerDiscounts(responseItems)
+                } catch (error) {
+                        console.error("Error re-applying offer:", error)
+                }
         }
 }, { deep: true })
 
 onUnmounted(() => {
-	// Clean up timeout
-	if (autoApplyTimeout) {
-		clearTimeout(autoApplyTimeout)
-	}
-
 	// Clean up event listeners
 	window.removeEventListener('resize', updateLayoutBounds)
 	stopResize()
@@ -1417,6 +1396,9 @@ function buildInvoiceDataForOffers() {
                 doctype: "Sales Invoice",
                 pos_profile: posProfile.value,
                 customer: customer.value?.name || customer.value || currentProfile.value?.customer,
+                company: currentProfile.value?.company,
+                selling_price_list: currentProfile.value?.selling_price_list,
+                currency: currentProfile.value?.currency,
                 items: invoiceItems.value.map(item => ({
                         item_code: item.item_code,
                         item_name: item.item_name,
@@ -1425,6 +1407,7 @@ function buildInvoiceDataForOffers() {
                         uom: item.uom,
                         warehouse: item.warehouse,
                         conversion_factor: item.conversion_factor || 1,
+                        price_list_rate: item.price_list_rate || item.rate,
                 })),
         }
 }
@@ -1461,187 +1444,106 @@ function applyServerDiscounts(serverItems) {
         return hasDiscounts
 }
 
-async function applyOffersWithRules(ruleNames, { offerMeta, silent = false } = {}) {
-        const cleanedRules = Array.isArray(ruleNames)
-                ? ruleNames.map(rule => String(rule).trim()).filter(Boolean)
-                : []
-
-        if (cleanedRules.length === 0) {
-                return false
+/**
+ * Apply offer to cart items
+ */
+async function handleApplyOffer(offer) {
+        if (!offer) {
+                console.error('No offer provided')
+                offersDialogRef.value?.resetApplyingState()
+                return
         }
 
         if (!posProfile.value || invoiceItems.value.length === 0) {
-                if (!silent) {
-                        toast.create({
-                                title: "Offer Unavailable",
-                                text: "Add items to the cart before applying an offer.",
-                                icon: "alert-circle",
-                                iconClasses: "text-orange-600",
-                        })
-                }
-                return false
+                toast.create({
+                        title: "Offer Unavailable",
+                        text: "Add items to the cart before applying an offer.",
+                        icon: "alert-circle",
+                        iconClasses: "text-orange-600",
+                })
+                offersDialogRef.value?.resetApplyingState()
+                return
         }
-
-        if (isApplyingOffer.value) {
-                return false
-        }
-
-        isApplyingOffer.value = true
 
         try {
                 const invoiceData = buildInvoiceDataForOffers()
+                const offerNames = [offer.name]
+
                 const response = await applyOffersResource.submit({
                         invoice_data: invoiceData,
-                        selected_offers: cleanedRules,
+                        selected_offers: offerNames,
                 })
 
                 const payload = response?.message || response || {}
                 const responseItems = payload.items || []
-                const appliedRules = payload.applied_pricing_rules?.length
-                        ? payload.applied_pricing_rules
-                        : cleanedRules
+                const appliedRules = payload.applied_pricing_rules || offerNames
 
+                // Temporarily disable watchers while applying discounts
                 suppressOfferReapply = true
                 const hasDiscounts = applyServerDiscounts(responseItems)
 
                 if (hasDiscounts) {
-                        const baseMeta = offerMeta
-                                ? {
-                                        name: offerMeta.name,
-                                        code: offerMeta.code,
-                                        offer: offerMeta.offer,
-                                        source: offerMeta.source || "manual",
-                                }
-                                : { source: "manual" }
-
+                        // Store applied offer metadata
                         autoAppliedOffer.value = {
-                                ...baseMeta,
+                                name: offer.title || offer.name,
+                                code: offer.name,
+                                offer: offer,
+                                source: "manual",
                                 applied: true,
                                 rules: appliedRules,
                         }
 
-                        if (!silent) {
-                                toast.create({
-                                        title: "Offer Applied",
-                                        text: `${baseMeta.name || "Offer"} applied successfully`,
-                                        icon: "check",
-                                        iconClasses: "text-green-600",
-                                })
-                        }
+                        toast.create({
+                                title: "Offer Applied",
+                                text: `${offer.title || offer.name} applied successfully`,
+                                icon: "check",
+                                iconClasses: "text-green-600",
+                        })
 
-                        return true
-                }
-
-                if (!silent) {
+                        // Close the dialog after successful application
+                        showOffersDialog.value = false
+                } else {
                         toast.create({
                                 title: "Offer Not Eligible",
-                                text: "Your cart no longer meets the requirements for this offer.",
+                                text: "Your cart doesn't meet the requirements for this offer.",
                                 icon: "alert-circle",
                                 iconClasses: "text-orange-600",
                         })
+                        offersDialogRef.value?.resetApplyingState()
                 }
-
-                autoAppliedOffer.value = null
-                removeDiscount()
-
-                return false
         } catch (error) {
-                console.error("Error applying selected offer:", error)
-                if (!silent) {
-                        toast.create({
-                                title: "Error",
-                                text: "Failed to apply the selected offer. Please try again.",
-                                icon: "x",
-                                iconClasses: "text-red-600",
-                        })
-                }
-                return false
-        } finally {
-                isApplyingOffer.value = false
+                console.error("Error applying offer:", error)
+                toast.create({
+                        title: "Error",
+                        text: "Failed to apply offer. Please try again.",
+                        icon: "x",
+                        iconClasses: "text-red-600",
+                })
+                offersDialogRef.value?.resetApplyingState()
         }
 }
 
-async function handleOfferSelected(offer) {
-        if (!offer) {
-                return
-        }
-
-        const applied = await applyOffersWithRules([offer.name], {
-                offerMeta: {
-                        name: offer.title || offer.name,
-                        code: offer.name,
-                        offer,
-                        source: "manual",
-                },
-        })
-
-        if (applied) {
-                showOffersDialog.value = false
-        }
-}
-
-function handleOfferRemoved() {
-        // Use the composable's removeDiscount function
+/**
+ * Remove currently applied offer
+ */
+function handleRemoveOffer() {
+        // Temporarily disable watchers
         suppressOfferReapply = true
+
+        // Clear offer metadata
         autoAppliedOffer.value = null
+
+        // Remove discounts from items
         removeDiscount()
 
         toast.create({
                 title: "Offer Removed",
                 text: "Offer has been removed from cart",
-		icon: "check",
-		iconClasses: "text-blue-600",
-	})
+                icon: "check",
+                iconClasses: "text-blue-600",
+        })
 }
 
-async function autoApplyOffers({ silent = false } = {}) {
-        // Automatically apply eligible offers from the backend
-        if (isApplyingOffer.value) {
-                return
-        }
-
-        try {
-                // Clear auto-applied flag if cart is empty
-                if (invoiceItems.value.length === 0 || !posProfile.value) {
-                        autoAppliedOffer.value = null
-                        return
-                }
-
-                isApplyingOffer.value = true
-
-                const invoiceData = buildInvoiceDataForOffers()
-                const result = await applyOffersResource.submit({ invoice_data: invoiceData })
-                const payload = result?.message || result || {}
-
-                suppressOfferReapply = true
-                const hasDiscounts = applyServerDiscounts(payload.items || [])
-
-                if (hasDiscounts) {
-                        autoAppliedOffer.value = {
-                                name: "Auto Offer",
-                                applied: true,
-                                source: "auto",
-                                rules: payload.applied_pricing_rules || [],
-                        }
-
-                        if (!silent) {
-                                toast.create({
-                                        title: "Offers Applied",
-                                        text: "Eligible offers have been applied to your cart",
-                                        icon: "check",
-                                        iconClasses: "text-green-600",
-                                })
-                        }
-                } else {
-                        autoAppliedOffer.value = null
-                }
-        } catch (error) {
-                // Silently fail - don't interrupt the user experience
-                console.error("Error auto-applying offers:", error)
-        } finally {
-                isApplyingOffer.value = false
-        }
-}
 
 function handleBatchSerialSelected(batchSerial) {
 	if (pendingItem.value) {

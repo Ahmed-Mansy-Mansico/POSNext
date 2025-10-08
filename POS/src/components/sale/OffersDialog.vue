@@ -6,12 +6,16 @@
 		<template #body-content>
 			<div class="space-y-4">
 				<!-- Loading State -->
-                                <div v-if="loading || applyingOffer" class="py-8 text-center">
-                                        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500 mx-auto"></div>
-                                        <p class="mt-3 text-sm text-gray-500">
-                                                {{ loading ? 'Loading offers...' : 'Applying offer...' }}
-                                        </p>
-                                </div>
+				<div v-if="loading" class="py-8 text-center">
+					<div class="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500 mx-auto"></div>
+					<p class="mt-3 text-sm text-gray-500">Loading offers...</p>
+				</div>
+
+				<!-- Applying State -->
+				<div v-else-if="applyingOffer" class="py-8 text-center">
+					<div class="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500 mx-auto"></div>
+					<p class="mt-3 text-sm text-gray-500">Applying offer...</p>
+				</div>
 
 				<!-- Empty State -->
 				<div v-else-if="eligibleOffers.length === 0" class="py-12 text-center">
@@ -31,15 +35,11 @@
 					<div
 						v-for="offer in eligibleOffers"
 						:key="offer.name"
-						@click="checkOfferEligibility(offer) ? selectOffer(offer) : null"
 						:class="[
 							'relative rounded-xl p-4 transition-all duration-200 border-2',
-							checkOfferEligibility(offer) ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
 							appliedOffer?.code === offer.name
 								? 'bg-green-50 border-green-500 shadow-md'
-								: checkOfferEligibility(offer)
-									? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:border-green-400 hover:shadow-lg'
-									: 'bg-gray-50 border-gray-300'
+								: 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:border-green-400 hover:shadow-lg cursor-pointer'
 						]"
 					>
 						<!-- Applied Badge -->
@@ -151,20 +151,20 @@
 						</div>
 
 						<!-- Apply Button -->
-                                                <button
-                                                        v-if="checkOfferEligibility(offer)"
-                                                        @click.stop="selectOffer(offer)"
-                                                        :disabled="applyingOffer"
-                                                        :class="[
-                                                                'mt-3 w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all',
-                                                                appliedOffer?.code === offer.name
-                                                                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                                                                        : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg',
-                                                                applyingOffer ? 'opacity-70 cursor-not-allowed' : ''
-                                                        ]"
-                                                >
-                                                        {{ appliedOffer?.code === offer.name ? 'Remove Offer' : 'Apply Offer' }}
-                                                </button>
+						<button
+							type="button"
+							@click.prevent="handleApplyOffer(offer)"
+							:disabled="applyingOffer"
+							:class="[
+								'mt-3 w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all',
+								appliedOffer?.code === offer.name
+									? 'bg-red-600 hover:bg-red-700 text-white'
+									: 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg',
+								applyingOffer ? 'opacity-70 cursor-not-allowed' : ''
+							]"
+						>
+							{{ appliedOffer?.code === offer.name ? 'Remove Offer' : 'Apply Offer' }}
+						</button>
 					</div>
 				</div>
 			</div>
@@ -199,22 +199,18 @@ const props = defineProps({
 		type: String,
 		default: 'USD'
 	},
-        appliedOffer: {
-                type: Object,
-                default: null
-        },
-        applyingOffer: {
-                type: Boolean,
-                default: false
-        }
+	appliedOffer: {
+		type: Object,
+		default: null
+	}
 })
 
-const emit = defineEmits(['update:modelValue', 'offer-selected', 'offer-removed'])
+const emit = defineEmits(['update:modelValue', 'apply-offer', 'remove-offer'])
 
 const show = ref(props.modelValue)
 const allOffers = ref([])
-const appliedOffer = computed(() => props.appliedOffer)
 const loading = ref(false)
+const applyingOffer = ref(false)
 
 // Resource to load offers
 const offersResource = createResource({
@@ -232,7 +228,7 @@ const offersResource = createResource({
 	onError(error) {
 		console.error('Error loading offers:', error)
 		loading.value = false
-		toast.create({
+		toast({
 			title: 'Error',
 			text: 'Failed to load offers',
 			icon: 'x',
@@ -241,20 +237,15 @@ const offersResource = createResource({
 	}
 })
 
-// Computed eligible offers
+// Computed eligible offers - only show offers the user is eligible for
 const eligibleOffers = computed(() => {
-        if (!allOffers.value) return []
+	if (!allOffers.value) return []
 
-        // Exclude coupon-based offers (handled via coupon flow)
-        return allOffers.value
-                .filter(offer => !offer.coupon_based)
-                .sort((a, b) => {
-                        // Sort by eligibility first (eligible offers on top)
-                        const aEligible = checkOfferEligibility(a)
-                        const bEligible = checkOfferEligibility(b)
-			if (aEligible !== bEligible) return bEligible ? 1 : -1
-
-			// Then sort by discount value (higher discounts first)
+	// Filter to only show eligible, non-coupon offers
+	return allOffers.value
+		.filter(offer => !offer.coupon_based && checkOfferEligibility(offer))
+		.sort((a, b) => {
+			// Sort by discount value (higher discounts first)
 			const aValue = a.discount_percentage || a.discount_amount || 0
 			const bValue = b.discount_percentage || b.discount_amount || 0
 			return bValue - aValue
@@ -270,6 +261,10 @@ watch(() => props.modelValue, (val) => {
 
 watch(show, (val) => {
 	emit('update:modelValue', val)
+	// Reset applying state when dialog closes
+	if (!val) {
+		applyingOffer.value = false
+	}
 })
 
 function checkOfferEligibility(offer) {
@@ -295,37 +290,50 @@ async function loadOffers() {
 	if (!props.posProfile) return
 	loading.value = true
 	try {
-                await offersResource.reload()
-        } catch (error) {
-                console.error('Error loading offers:', error)
-                loading.value = false
-        }
+		await offersResource.reload()
+	} catch (error) {
+		console.error('Error loading offers:', error)
+		loading.value = false
+	}
 }
 
-function selectOffer(offer) {
-        if (props.applyingOffer) {
-                return
-        }
-
-        // Toggle offer - if already applied, remove it
-        if (appliedOffer.value?.code === offer.name) {
-                emit('offer-removed')
-                return
-        }
-
-        // Check eligibility before applying
-        if (!checkOfferEligibility(offer)) {
-		toast.create({
-			title: 'Not Eligible',
-			text: 'Your cart does not meet the requirements for this offer',
-			icon: 'alert-circle',
-			iconClasses: 'text-orange-600'
-		})
+async function handleApplyOffer(offer) {
+	if (applyingOffer.value) {
 		return
 	}
 
-        emit('offer-selected', offer)
+	// Toggle offer - if already applied, remove it
+	if (props.appliedOffer?.code === offer.name) {
+		applyingOffer.value = true
+		try {
+			emit('remove-offer')
+			// Close dialog after successful removal
+			await new Promise(resolve => setTimeout(resolve, 500))
+			show.value = false
+		} finally {
+			applyingOffer.value = false
+		}
+		return
+	}
+
+	applyingOffer.value = true
+	try {
+		// Emit event to parent to handle the actual API call
+		emit('apply-offer', offer)
+		// Don't close dialog yet - parent will close it after successful application
+	} catch (error) {
+		console.error('Error in handleApplyOffer:', error)
+		applyingOffer.value = false
+	}
 }
+
+// Expose method for parent to reset applying state
+function resetApplyingState() {
+	applyingOffer.value = false
+}
+
+// Expose for parent component
+defineExpose({ resetApplyingState })
 
 function formatCurrency(amount) {
 	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)

@@ -3,7 +3,7 @@
                 <!-- Header with Customer -->
                 <div class="px-3 py-2.5 border-b border-gray-200">
                         <!-- Inline Customer Search/Selection -->
-                        <div class="relative mb-3">
+                        <div ref="customerSearchContainer" class="relative mb-3">
                                 <div v-if="customer" class="flex items-center justify-between bg-blue-50 rounded-lg p-2">
                                         <div class="flex items-center space-x-2">
                                                 <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -21,6 +21,7 @@
 						</div>
 					</div>
 					<button
+						type="button"
 						@click="clearCustomer"
 						class="text-sm text-red-600 hover:text-red-700 flex-shrink-0"
 					>
@@ -60,6 +61,7 @@
 						<!-- Customer Results -->
 						<div v-if="customerResults.length > 0" class="max-h-64 overflow-y-auto">
 							<button
+								type="button"
 								v-for="(cust, index) in customerResults"
 								:key="cust.name"
 								@click="selectCustomer(cust)"
@@ -87,6 +89,7 @@
 
 						<!-- Create New Customer Option -->
 						<button
+							type="button"
 							v-if="customerSearch.trim().length >= 2"
 							@click="createNewCustomer"
 							class="w-full text-left px-3 py-2.5 hover:bg-green-50 flex items-center space-x-2 transition-colors border-t border-gray-200"
@@ -213,6 +216,7 @@
 									</div>
 								</div>
 								<button
+									type="button"
 									@click="$emit('remove-item', item.item_code)"
 									class="text-gray-400 hover:text-red-600 ml-1 transition-colors flex-shrink-0"
 								>
@@ -228,6 +232,7 @@
 					<div class="flex items-center justify-between">
 						<div class="flex items-center space-x-1.5">
 							<button
+								type="button"
 								@click="decrementQuantity(item)"
 								class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-700 text-sm transition-colors"
 							>
@@ -242,6 +247,7 @@
 								class="w-10 text-center border border-gray-300 rounded px-1 py-0.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
 							/>
 							<button
+								type="button"
 								@click="incrementQuantity(item)"
 								class="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-700 text-sm transition-colors"
 							>
@@ -274,6 +280,7 @@
 			<div class="flex gap-2">
 				<!-- View All Offers Button -->
 				<button
+					type="button"
 					@click="$emit('show-offers')"
 					class="relative flex-1 flex items-center justify-between px-2 py-2 rounded-lg bg-white border-2 border-green-300 hover:border-green-500 hover:bg-green-50 transition-all group min-w-0"
 				>
@@ -292,6 +299,7 @@
 
 				<!-- Enter Coupon Code Button -->
 				<button
+					type="button"
 					@click="$emit('apply-coupon')"
 					class="relative flex-1 flex items-center px-2 py-2 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 hover:bg-purple-50 transition-all group min-w-0"
 				>
@@ -358,6 +366,7 @@
 			<!-- Action Buttons -->
 			<div class="space-y-1.5">
 				<button
+					type="button"
 					@click="$emit('proceed-to-payment')"
 					:disabled="items.length === 0"
 					:class="[
@@ -370,6 +379,7 @@
 					<span>Checkout</span>
 				</button>
 				<button
+					type="button"
 					v-if="items.length > 0"
 					@click="$emit('save-draft')"
 					class="w-full py-1.5 px-3 rounded-lg font-medium text-xs text-orange-600 bg-orange-50 hover:bg-orange-100 transition-all"
@@ -382,7 +392,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { createResource } from "frappe-ui"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
@@ -436,12 +446,12 @@ const emit = defineEmits([
 ])
 
 const customerSearch = ref("")
+const customerSearchContainer = ref(null)
 const allCustomers = ref([])
 const customersLoaded = ref(false)
 const selectedIndex = ref(-1)
-const availableOffers = ref([])
+const rawOffers = ref([])
 const availableGiftCards = ref([])
-const appliedOfferPreview = computed(() => props.appliedOffer)
 
 // Load customers into memory on mount for instant filtering
 // Load customers resource
@@ -460,7 +470,6 @@ const customersResource = createResource({
 		const customers = data?.message || data || []
 		allCustomers.value = customers
 		customersLoaded.value = true
-		console.log(`✓ Loaded ${customers.length} customers for instant search`)
 
 		// Also cache in worker for offline support
 		await offlineWorker.cacheCustomers(customers)
@@ -471,6 +480,7 @@ const customersResource = createResource({
 })
 
 // Load offers resource
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const offersResource = createResource({
 	url: "pos_next.api.offers.get_offers",
 	makeParams() {
@@ -480,17 +490,7 @@ const offersResource = createResource({
 	},
 	auto: true,
 	onSuccess(data) {
-		const offers = data?.message || data || []
-		console.log("✓ Loaded offers:", offers.length, offers)
-
-		// Filter only auto-apply offers that are eligible
-		const eligible = offers.filter(
-			(offer) =>
-				offer.auto && !offer.coupon_based && checkOfferEligibility(offer),
-		)
-
-		console.log("✓ Eligible offers:", eligible.length, eligible)
-		availableOffers.value = eligible.slice(0, 3) // Show top 3
+		rawOffers.value = data?.message || data || []
 	},
 	onError(error) {
 		console.error("Error loading offers:", error)
@@ -524,29 +524,6 @@ watch(
 	},
 )
 
-// Watch for cart changes to update eligible offers
-watch(
-	() => props.grandTotal,
-	() => {
-		if (offersResource.data) {
-			const offers = offersResource.data?.message || offersResource.data || []
-			availableOffers.value = offers
-				.filter(
-					(offer) =>
-						offer.auto && !offer.coupon_based && checkOfferEligibility(offer),
-				)
-				.slice(0, 3)
-		}
-	},
-)
-
-// Computed top offer for preview
-const topOffer = computed(() => {
-	if (availableOffers.value.length === 0) return null
-	// Return the offer with highest discount
-	return availableOffers.value[0]
-})
-
 function checkOfferEligibility(offer) {
 	// Check eligibility based on SUBTOTAL (before tax)
 	if (offer.min_amt && props.subtotal < offer.min_amt) {
@@ -557,6 +534,15 @@ function checkOfferEligibility(offer) {
 	}
 	return true
 }
+
+const availableOffers = computed(() =>
+	rawOffers.value
+		.filter(
+			(offer) =>
+				offer.auto && !offer.coupon_based && checkOfferEligibility(offer),
+		)
+		.slice(0, 3),
+)
 
 // Direct computed results - zero latency filtering!
 const customerResults = computed(() => {
@@ -671,28 +657,29 @@ function updateQuantity(item, value) {
 	}
 }
 
-function applyTopOffer() {
-	if (!topOffer.value) return
-
-	// Just open the offers dialog - don't set preview yet
-	// Preview will be set when user actually selects an offer in the dialog
-	emit("show-offers")
-}
-
-function removeAppliedOffer() {
-	emit("remove-offer")
-}
-
 function handleUomChange(item, newUom) {
 	emit("update-uom", item.item_code, newUom)
 }
 
-// Close dropdown when clicking outside
-if (typeof document !== "undefined") {
-	document.addEventListener("click", (e) => {
-		if (!e.target.closest(".relative")) {
-			customerSearch.value = ""
-		}
-	})
+function handleOutsideClick(event) {
+	const target = event.target
+	if (
+		!customerSearchContainer.value ||
+		!(target instanceof Node) ||
+		customerSearchContainer.value.contains(target)
+	) {
+		return
+	}
+	customerSearch.value = ""
 }
+
+onMounted(() => {
+	if (typeof document === "undefined") return
+	document.addEventListener("click", handleOutsideClick)
+})
+
+onBeforeUnmount(() => {
+	if (typeof document === "undefined") return
+	document.removeEventListener("click", handleOutsideClick)
+})
 </script>
