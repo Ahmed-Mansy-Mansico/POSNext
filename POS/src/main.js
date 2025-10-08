@@ -23,6 +23,29 @@ import {
 
 import "./index.css"
 
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+	window.addEventListener('load', () => {
+		import('virtual:pwa-register').then(({ registerSW }) => {
+			registerSW({
+				immediate: true,
+				onNeedRefresh() {
+					console.log('New content available, reloading...')
+				},
+				onOfflineReady() {
+					console.log('App ready to work offline')
+				},
+				onRegistered(registration) {
+					console.log('Service Worker registered:', registration)
+				},
+				onRegisterError(error) {
+					console.error('Service Worker registration error:', error)
+				}
+			})
+		})
+	})
+}
+
 const globalComponents = {
 	Button,
 	TextInput,
