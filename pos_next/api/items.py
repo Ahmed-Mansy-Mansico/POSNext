@@ -613,6 +613,9 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			else:
 				item["actual_qty"] = 0
 
+			# Add warehouse to item (needed for stock validation)
+			item["warehouse"] = pos_profile_doc.warehouse
+
 			# Add barcode from map
 			item["barcode"] = barcode_map.get(item["item_code"], "")
 
