@@ -43,7 +43,7 @@ def get_customers(search_term="", pos_profile=None, limit=20):
 			limit=limit,
 			order_by="customer_name asc"
 		)
-		print(f"DEBUG: get_customers returned {len(result)} customers")
+		frappe.logger().debug(f"get_customers returned {len(result)} customers")
 		return result
 	except Exception as e:
 		frappe.logger().error(f"Error in get_customers: {str(e)}")

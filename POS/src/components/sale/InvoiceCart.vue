@@ -234,10 +234,10 @@
 					<!-- Discount Badge if any -->
 					<div
 						v-if="item.discount_amount && item.discount_amount > 0"
-						class="mt-1.5 inline-flex items-center px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium"
+						class="mt-1.5 inline-flex items-center px-1.5 py-0.5 bg-red-50 text-red-700 rounded text-[10px] font-medium"
 					>
 						<svg class="w-2.5 h-2.5 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
 						</svg>
 						{{ item.discount_percentage }}% off
 					</div>
@@ -248,39 +248,39 @@
 		<!-- Coupons & Offers Buttons -->
 		<div v-if="items.length > 0" class="px-2.5 pt-2.5 pb-1 bg-gray-50">
 			<div class="flex gap-2">
-				<!-- Coupons Button -->
-				<button
-					@click="$emit('show-coupons')"
-					class="relative flex-1 flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-purple-300 hover:border-purple-500 hover:bg-purple-50 transition-all group"
-				>
-					<div class="flex items-center space-x-2">
-						<div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-							<svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-								<path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
-							</svg>
-						</div>
-						<span class="text-xs font-semibold text-gray-900">Coupons</span>
-					</div>
-					<span v-if="availableGiftCards.length > 0" class="bg-purple-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-						{{ availableGiftCards.length }}
-					</span>
-				</button>
-
-				<!-- Offers Button -->
+				<!-- View All Offers Button -->
 				<button
 					@click="$emit('show-offers')"
-					class="relative flex-1 flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-green-300 hover:border-green-500 hover:bg-green-50 transition-all group"
+					class="relative flex-1 flex items-center justify-between px-2 py-2 rounded-lg bg-white border-2 border-green-300 hover:border-green-500 hover:bg-green-50 transition-all group min-w-0"
 				>
-					<div class="flex items-center space-x-2">
-						<div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors">
+					<div class="flex items-center space-x-1.5 min-w-0 flex-1">
+						<div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors flex-shrink-0">
 							<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
 							</svg>
 						</div>
-						<span class="text-xs font-semibold text-gray-900">Offers</span>
+						<span class="text-xs font-semibold text-gray-900 truncate">Offers</span>
 					</div>
-					<span v-if="availableOffers.length > 0" class="bg-green-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+					<span v-if="availableOffers.length > 0" class="bg-green-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center flex-shrink-0 ml-1">
 						{{ availableOffers.length }}
+					</span>
+				</button>
+
+				<!-- Enter Coupon Code Button -->
+				<button
+					@click="$emit('apply-coupon')"
+					class="relative flex-1 flex items-center px-2 py-2 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 hover:bg-purple-50 transition-all group min-w-0"
+				>
+					<div class="flex items-center space-x-1 min-w-0 flex-1">
+						<div class="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors flex-shrink-0">
+							<svg class="w-3.5 h-3.5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+								<path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
+							</svg>
+						</div>
+						<span class="text-xs font-semibold text-gray-900 truncate">Coupon</span>
+					</div>
+					<span v-if="availableGiftCards.length > 0" class="bg-purple-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center flex-shrink-0 ml-1">
+						{{ availableGiftCards.length }}
 					</span>
 				</button>
 			</div>
@@ -295,20 +295,28 @@
 					<span class="font-medium text-gray-900">{{ totalQuantity }}</span>
 				</div>
 				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
-					<span>Net Total</span>
+					<span>Subtotal</span>
 					<span class="font-medium text-gray-900">{{ formatCurrency(subtotal) }}</span>
 				</div>
-				<div v-if="discountAmount > 0" class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
-					<span>Discount</span>
-					<span class="font-semibold text-green-600">-{{ formatCurrency(discountAmount) }}</span>
-				</div>
-				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
-					<button class="text-blue-600 hover:text-blue-700 flex items-center">
-						<span>Total Tax</span>
-						<svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+
+				<!-- Discount Display - Highlighted -->
+				<div v-if="discountAmount > 0" class="flex items-center justify-between mb-1 bg-red-50 rounded px-1.5 py-1 -mx-0.5">
+					<div class="flex items-center space-x-1">
+						<svg class="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
 						</svg>
-					</button>
+						<span class="text-[10px] font-semibold text-red-700">Discount</span>
+					</div>
+					<span class="text-xs font-bold text-red-600">{{ formatCurrency(discountAmount) }}</span>
+				</div>
+
+				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
+					<div class="flex items-center space-x-1">
+						<svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+						</svg>
+						<span>Tax</span>
+					</div>
 					<span class="font-medium text-gray-900">{{ formatCurrency(taxAmount) }}</span>
 				</div>
 			</div>
@@ -381,6 +389,10 @@ const props = defineProps({
 	currency: {
 		type: String,
 		default: 'USD'
+	},
+	appliedOffer: {
+		type: Object,
+		default: null
 	}
 })
 
@@ -395,6 +407,7 @@ const emit = defineEmits([
 	"apply-coupon",
 	"show-coupons",
 	"show-offers",
+	"remove-offer",
 ])
 
 const customerSearch = ref("")
@@ -403,6 +416,7 @@ const customersLoaded = ref(false)
 const selectedIndex = ref(-1)
 const availableOffers = ref([])
 const availableGiftCards = ref([])
+const appliedOfferPreview = computed(() => props.appliedOffer)
 
 // Load customers into memory on mount for instant filtering
 // Load customers resource
@@ -493,11 +507,19 @@ watch(() => props.grandTotal, () => {
 	}
 })
 
+// Computed top offer for preview
+const topOffer = computed(() => {
+	if (availableOffers.value.length === 0) return null
+	// Return the offer with highest discount
+	return availableOffers.value[0]
+})
+
 function checkOfferEligibility(offer) {
-	if (offer.min_amt && props.grandTotal < offer.min_amt) {
+	// Check eligibility based on SUBTOTAL (before tax)
+	if (offer.min_amt && props.subtotal < offer.min_amt) {
 		return false
 	}
-	if (offer.max_amt && props.grandTotal > offer.max_amt) {
+	if (offer.max_amt && props.subtotal > offer.max_amt) {
 		return false
 	}
 	return true
@@ -604,6 +626,18 @@ function updateQuantity(item, value) {
 	if (qty > 0) {
 		emit("update-quantity", item.item_code, qty)
 	}
+}
+
+function applyTopOffer() {
+	if (!topOffer.value) return
+
+	// Just open the offers dialog - don't set preview yet
+	// Preview will be set when user actually selects an offer in the dialog
+	emit('show-offers')
+}
+
+function removeAppliedOffer() {
+	emit('remove-offer')
 }
 
 // Close dropdown when clicking outside

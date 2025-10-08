@@ -279,6 +279,7 @@
 					:grand-total="grandTotal"
 					:pos-profile="currentProfile?.name"
 					:currency="currentProfile?.currency || 'USD'"
+					:applied-offer="autoAppliedOffer"
 					@update-quantity="updateItemQuantity"
 					@remove-item="removeItem"
 					@select-customer="handleCustomerSelected"
@@ -287,6 +288,8 @@
 					@clear-cart="handleClearCart"
 					@save-draft="handleSaveDraft"
 					@apply-coupon="showCouponDialog = true"
+					@show-offers="showOffersDialog = true"
+					@remove-offer="handleOfferRemoved"
 				/>
 			</div>
 		</div>
@@ -375,10 +378,29 @@
 		<!-- Coupon Dialog -->
 		<CouponDialog
 			v-model="showCouponDialog"
-			:cart-total="subtotal"
+			:subtotal="subtotal"
 			:items="invoiceItems"
+			:pos-profile="currentProfile?.name"
+			:customer="customer?.name || customer"
+			:company="currentProfile?.company"
+			:currency="currentProfile?.currency || 'USD'"
+			:applied-coupon="appliedCoupon"
 			@discount-applied="handleDiscountApplied"
 			@discount-removed="handleDiscountRemoved"
+		/>
+
+		<!-- Offers Dialog -->
+		<OffersDialog
+			v-model="showOffersDialog"
+			:subtotal="subtotal"
+			:items="invoiceItems"
+			:pos-profile="currentProfile?.name"
+			:customer="customer?.name || customer"
+			:company="currentProfile?.company"
+			:currency="currentProfile?.currency || 'USD'"
+			:applied-offer="autoAppliedOffer"
+			@offer-applied="handleOfferApplied"
+			@offer-removed="handleOfferRemoved"
 		/>
 
 		<!-- Batch/Serial Dialog -->
@@ -424,6 +446,30 @@
 					</Button>
 					<Button class="flex-1" variant="solid" theme="red" @click="confirmClearCart">
 						Clear All
+					</Button>
+				</div>
+			</template>
+		</Dialog>
+
+		<!-- Logout Confirmation Dialog -->
+		<Dialog
+			v-model="showLogoutDialog"
+			:options="{ title: 'Logout', size: 'xs' }"
+		>
+			<template #body-content>
+				<div class="py-3">
+					<p class="text-sm text-gray-600">
+						Are you sure you want to logout?
+					</p>
+				</div>
+			</template>
+			<template #actions>
+				<div class="flex space-x-2 w-full">
+					<Button class="flex-1" variant="subtle" @click="showLogoutDialog = false">
+						Cancel
+					</Button>
+					<Button class="flex-1" variant="solid" theme="red" @click="confirmLogout">
+						Logout
 					</Button>
 				</div>
 			</template>
@@ -482,6 +528,7 @@ import { useShift } from "@/composables/useShift"
 import { useOffline } from "@/composables/useOffline"
 import { useDialog, useDialogState } from "@/composables/useDialogState"
 import { Button, Dialog, toast } from "frappe-ui"
+import { session } from "@/data/session"
 import ItemsSelector from "@/components/sale/ItemsSelector.vue"
 import InvoiceCart from "@/components/sale/InvoiceCart.vue"
 import PaymentDialog from "@/components/sale/PaymentDialog.vue"
@@ -491,6 +538,7 @@ import ShiftClosingDialog from "@/components/ShiftClosingDialog.vue"
 import DraftInvoicesDialog from "@/components/sale/DraftInvoicesDialog.vue"
 import ReturnInvoiceDialog from "@/components/sale/ReturnInvoiceDialog.vue"
 import CouponDialog from "@/components/sale/CouponDialog.vue"
+import OffersDialog from "@/components/sale/OffersDialog.vue"
 import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
 import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
 import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
@@ -530,6 +578,11 @@ const {
 	updateItemQuantity,
 	submitInvoice,
 	clearCart,
+	loadTaxRules,
+	calculateDiscountAmount,
+	applyDiscount,
+	removeDiscount,
+	applyOffersResource,
 } = useInvoice()
 
 // Use dialog composable for automatic global tracking
@@ -541,10 +594,12 @@ const { isOpen: showCloseShiftDialog } = useDialog('closeShift')
 const { isOpen: showDraftDialog } = useDialog('draft')
 const { isOpen: showReturnDialog } = useDialog('return')
 const { isOpen: showCouponDialog } = useDialog('coupon')
+const { isOpen: showOffersDialog } = useDialog('offers')
 const { isOpen: showBatchSerialDialog } = useDialog('batchSerial')
 const { isOpen: showHistoryDialog } = useDialog('history')
 const { isOpen: showCreateCustomerDialog } = useDialog('createCustomer')
 const { isOpen: showClearCartDialog } = useDialog('clearCart')
+const { isOpen: showLogoutDialog } = useDialog('logout')
 
 // Other refs
 const itemsSelectorRef = ref(null)
@@ -562,6 +617,9 @@ const containerRef = ref(null)
 const dividerRef = ref(null)
 const leftPanelWidth = ref(800) // Start with 800px width
 const isResizing = ref(false)
+const autoAppliedOffer = ref(null)
+const appliedCoupon = ref(null)
+const pendingPaymentAfterCustomer = ref(false)
 
 // Get global dialog state for divider behavior
 const { isAnyDialogOpen } = useDialogState()
@@ -609,6 +667,9 @@ onMounted(async () => {
 			// Set POS profile from current shift
 			if (currentProfile.value) {
 				posProfile.value = currentProfile.value.name
+
+				// Load tax rules for this POS Profile
+				await loadTaxRules(currentProfile.value.name)
 
 				// Pre-load data for offline use if online and needed
 				if (!isOffline.value) {
@@ -690,17 +751,56 @@ watch(hasOpenShift, value => {
 	}
 })
 
+// Watch cart changes to auto-apply eligible offers with debouncing
+let autoApplyTimeout = null
+watch([invoiceItems, subtotal], async (newVal, oldVal) => {
+	// Clear any pending auto-apply
+	if (autoApplyTimeout) {
+		clearTimeout(autoApplyTimeout)
+	}
+
+	// Only auto-apply if:
+	// 1. Cart is not empty
+	// 2. POS profile is set
+	// 3. No offer is currently applied (to avoid overwriting manual selections)
+	if (invoiceItems.value.length > 0 && posProfile.value && !autoAppliedOffer.value) {
+		// Debounce for 500ms to avoid excessive API calls
+		autoApplyTimeout = setTimeout(async () => {
+			await autoApplyOffers()
+		}, 500)
+	} else if (invoiceItems.value.length === 0) {
+		// Clear auto-applied offers when cart is emptied
+		autoAppliedOffer.value = null
+	}
+}, { deep: true })
+
+// Watch for items changes and re-apply offer if one is already applied
+watch(invoiceItems, () => {
+	if (autoAppliedOffer.value && invoiceItems.value.length > 0) {
+		// Re-apply the current offer to new items
+		applyDiscount(autoAppliedOffer.value)
+	}
+}, { deep: true })
+
 onUnmounted(() => {
+	// Clean up timeout
+	if (autoApplyTimeout) {
+		clearTimeout(autoApplyTimeout)
+	}
+
+	// Clean up event listeners
 	document.removeEventListener('click', handleClickOutside)
 	window.removeEventListener('resize', updateLayoutBounds)
 	stopResize()
 })
 
-function handleShiftOpened() {
+async function handleShiftOpened() {
 	showOpenShiftDialog.value = false
 	// Set POS profile after shift is opened
 	if (currentProfile.value) {
 		posProfile.value = currentProfile.value.name
+		// Load tax rules for this POS Profile
+		await loadTaxRules(currentProfile.value.name)
 	}
 	// Update shift duration immediately
 	updateShiftDuration()
@@ -753,6 +853,12 @@ function handleCustomerSelected(selectedCustomer) {
 			icon: "check",
 			iconClasses: "text-green-600",
 		})
+
+		// If there was a pending payment, continue to payment dialog
+		if (pendingPaymentAfterCustomer.value) {
+			pendingPaymentAfterCustomer.value = false
+			showPaymentDialog.value = true
+		}
 	} else {
 		// Clear customer
 		customer.value = null
@@ -772,6 +878,21 @@ function handleProceedToPayment() {
 			icon: "alert-circle",
 			iconClasses: "text-orange-600",
 		})
+		return
+	}
+
+	// Check if customer is selected
+	const customerValue = customer.value?.name || customer.value
+	if (!customerValue && !currentProfile.value?.customer) {
+		toast.create({
+			title: "Customer Required",
+			text: "Please select a customer before proceeding",
+			icon: "alert-circle",
+			iconClasses: "text-orange-600",
+		})
+		showCustomerDialog.value = true
+		// Set flag to continue to payment after customer selection
+		pendingPaymentAfterCustomer.value = true
 		return
 	}
 
@@ -836,6 +957,7 @@ async function handlePaymentCompleted(paymentData) {
 				showPaymentDialog.value = false
 				clearCart()
 				customer.value = null
+				autoAppliedOffer.value = null
 
 				if (itemsSelectorRef.value) {
 					itemsSelectorRef.value.loadItems()
@@ -896,6 +1018,7 @@ function handleClearCart() {
 function confirmClearCart() {
 	clearCart()
 	customer.value = null
+	autoAppliedOffer.value = null
 	showClearCartDialog.value = false
 	toast.create({
 		title: "Cart Cleared",
@@ -946,9 +1069,12 @@ function getUserInitials() {
 
 function handleLogout() {
 	showActionsMenu.value = false
-	if (confirm("Are you sure you want to logout?")) {
-		window.location.href = "/app/logout"
-	}
+	showLogoutDialog.value = true
+}
+
+function confirmLogout() {
+	showLogoutDialog.value = false
+	session.logout.submit()
 }
 
 // Close dropdown when clicking outside
@@ -1054,24 +1180,127 @@ function handleReturnCreated(returnInvoice) {
 }
 
 function handleDiscountApplied(discount) {
-	// Update invoice with discount
-	// In a real implementation, this would update the invoice totals
+	// Use the composable's applyDiscount function
+	applyDiscount(discount)
+	appliedCoupon.value = discount
+	showCouponDialog.value = false
+
 	toast.create({
-		title: "Discount Applied",
-		text: `${discount.name} (${discount.percentage}% off) applied successfully`,
+		title: "Coupon Applied",
+		text: `${discount.name} applied successfully`,
 		icon: "check",
 		iconClasses: "text-green-600",
 	})
 }
 
 function handleDiscountRemoved() {
-	// Remove discount from invoice
+	// Use the composable's removeDiscount function
+	removeDiscount()
+	autoAppliedOffer.value = null
+	appliedCoupon.value = null
+
 	toast.create({
 		title: "Discount Removed",
 		text: "Discount has been removed from cart",
 		icon: "check",
 		iconClasses: "text-blue-600",
 	})
+}
+
+function handleOfferApplied(offer) {
+	// Use the composable's applyDiscount function
+	applyDiscount(offer)
+	autoAppliedOffer.value = offer
+	showOffersDialog.value = false
+
+	toast.create({
+		title: "Offer Applied",
+		text: `${offer.name} applied successfully`,
+		icon: "check",
+		iconClasses: "text-green-600",
+	})
+}
+
+function handleOfferRemoved() {
+	// Use the composable's removeDiscount function
+	removeDiscount()
+	autoAppliedOffer.value = null
+
+	toast.create({
+		title: "Offer Removed",
+		text: "Offer has been removed from cart",
+		icon: "check",
+		iconClasses: "text-blue-600",
+	})
+}
+
+async function autoApplyOffers() {
+	// Automatically apply eligible offers from the backend
+	try {
+		// Clear auto-applied flag if cart is empty
+		if (invoiceItems.value.length === 0) {
+			autoAppliedOffer.value = null
+			return
+		}
+
+		const invoiceData = {
+			doctype: "Sales Invoice",
+			pos_profile: posProfile.value,
+			customer: customer.value?.name || customer.value || currentProfile.value?.customer,
+			items: invoiceItems.value.map(item => ({
+				item_code: item.item_code,
+				item_name: item.item_name,
+				qty: item.quantity,
+				rate: item.rate,
+				uom: item.uom,
+				warehouse: item.warehouse,
+				conversion_factor: item.conversion_factor || 1,
+			})),
+		}
+
+		const result = await applyOffersResource.submit({ invoice_data: invoiceData })
+
+		if (result && result.items) {
+			let hasDiscounts = false
+			const discountedItems = []
+
+			// Collect items with discounts
+			result.items.forEach(serverItem => {
+				const cartItem = invoiceItems.value.find(i => i.item_code === serverItem.item_code)
+				if (cartItem && serverItem.discount_percentage > 0) {
+					discountedItems.push({
+						item: cartItem,
+						discount_percentage: serverItem.discount_percentage,
+						discount_amount: serverItem.discount_amount || 0
+					})
+					hasDiscounts = true
+				}
+			})
+
+			// Apply all discounts at once using the composable
+			if (hasDiscounts) {
+				discountedItems.forEach(({ item, discount_percentage, discount_amount }) => {
+					item.discount_percentage = discount_percentage
+					item.discount_amount = discount_amount
+					updateItemQuantity(item.item_code, item.quantity)
+				})
+
+				autoAppliedOffer.value = { name: "Auto Offer", applied: true }
+
+				toast.create({
+					title: "Offers Applied",
+					text: "Eligible offers have been applied to your cart",
+					icon: "check",
+					iconClasses: "text-green-600",
+				})
+			} else {
+				autoAppliedOffer.value = null
+			}
+		}
+	} catch (error) {
+		// Silently fail - don't interrupt the user experience
+		console.error("Error auto-applying offers:", error)
+	}
 }
 
 function handleBatchSerialSelected(batchSerial) {
