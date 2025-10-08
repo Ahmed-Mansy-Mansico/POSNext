@@ -884,14 +884,21 @@ def apply_offers(invoice_data):
                                                 "base_price_list_rate": price_list_rate,
                                                 "rate": flt(item.get("rate") or price_list_rate),
                                                 "base_rate": flt(item.get("rate") or price_list_rate),
-                                                "discount_percentage": flt(item.get("discount_percentage") or 0),
-                                                "discount_amount": flt(item.get("discount_amount") or 0),
+                                                "discount_percentage": 0,
+                                                "discount_amount": 0,
                                                 "warehouse": item.get("warehouse") or profile.warehouse,
                                                 "parenttype": invoice.get("doctype") or "Sales Invoice",
                                         }
                                 )
                         )
                         index_map.append(idx)
+
+                        # Clear previously applied promotional metadata if the
+                        # current quantity can no longer satisfy the rule.
+                        item.discount_percentage = 0
+                        item.discount_amount = 0
+                        item.pricing_rules = []
+                        item.applied_promotional_schemes = []
 
                 if not pricing_items:
                         return {"items": items}
