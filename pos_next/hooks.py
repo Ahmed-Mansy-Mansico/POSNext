@@ -79,6 +79,24 @@ app_license = "agpl-3.0"
 # 	"filters": "pos_next.utils.jinja_filters"
 # }
 
+# Fixtures
+# --------
+fixtures = [
+	{
+		"dt": "Custom Field",
+		"filters": [
+			[
+				"name",
+				"in",
+				[
+					"Sales Invoice-posa_pos_opening_shift",
+					"Sales Invoice-posa_is_printed"
+				]
+			]
+		]
+	}
+]
+
 # Installation
 # ------------
 

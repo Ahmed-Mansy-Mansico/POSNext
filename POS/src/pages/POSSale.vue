@@ -417,23 +417,99 @@
 		<!-- Logout Confirmation Dialog -->
 		<Dialog
 			v-model="uiStore.showLogoutDialog"
-			:options="{ title: 'Logout', size: 'xs' }"
+			:options="{ title: 'Sign Out Confirmation', size: 'md' }"
+			:dismissable="!session.logout.loading"
 		>
 			<template #body-content>
-				<div class="py-3">
-					<p class="text-sm text-gray-600">
-						Are you sure you want to logout?
-					</p>
+				<!-- WITH SHIFT OPEN -->
+				<div v-if="shiftStore.hasOpenShift" class="px-4 py-5">
+					<div class="text-center mb-6">
+						<div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-br from-red-100 to-red-200 shadow-md mb-4">
+							<svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+							</svg>
+						</div>
+						<h3 class="text-lg font-bold text-red-600 mb-2">
+							Your Shift is Still Open!
+						</h3>
+						<p class="text-sm text-gray-600 max-w-sm mx-auto">
+							Close your shift first to save all transactions properly
+						</p>
+					</div>
+
+					<!-- Action Buttons -->
+					<div class="space-y-3 max-w-md mx-auto">
+						<!-- Recommended Action - BLUE -->
+						<button
+							@click="logoutWithCloseShift"
+							:disabled="session.logout.loading"
+							class="w-full flex items-center justify-center px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
+						>
+							<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+							</svg>
+							Close Shift & Sign Out
+						</button>
+
+						<!-- Alternative Actions -->
+						<div class="grid grid-cols-2 gap-2">
+							<button
+								@click="confirmLogout"
+								:disabled="session.logout.loading"
+								class="px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold text-sm rounded-lg shadow-md hover:shadow-red-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								Skip & Sign Out
+							</button>
+							<button
+								@click="uiStore.showLogoutDialog = false"
+								:disabled="session.logout.loading"
+								class="px-4 py-3 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300 hover:border-gray-400"
+							>
+								Cancel
+							</button>
+						</div>
+					</div>
 				</div>
-			</template>
-			<template #actions>
-				<div class="flex space-x-2 w-full">
-					<Button class="flex-1" variant="subtle" @click="uiStore.showLogoutDialog = false">
-						Cancel
-					</Button>
-					<Button class="flex-1" variant="solid" theme="red" @click="confirmLogout">
-						Logout
-					</Button>
+
+				<!-- WITHOUT SHIFT (Simple confirmation) -->
+				<div v-else class="px-4 py-5">
+					<div class="text-center mb-6">
+						<div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-br from-red-100 to-red-200 shadow-md mb-4">
+							<svg class="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+							</svg>
+						</div>
+						<h3 class="text-lg font-bold text-red-600 mb-2">
+							Sign Out?
+						</h3>
+						<p class="text-sm text-gray-600">
+							You will be logged out of POS Next
+						</p>
+					</div>
+
+					<div class="grid grid-cols-2 gap-3 max-w-sm mx-auto">
+						<button
+							@click="uiStore.showLogoutDialog = false"
+							:disabled="session.logout.loading"
+							class="px-5 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-blue-500/30 transition-all disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98]"
+						>
+							Cancel
+						</button>
+						<button
+							@click="confirmLogout"
+							:disabled="session.logout.loading"
+							class="px-5 py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-red-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
+						>
+							<span v-if="!session.logout.loading">Sign Out</span>
+							<span v-else class="flex items-center justify-center">
+								<svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								Signing Out...
+							</span>
+						</button>
+					</div>
 				</div>
 			</template>
 		</Dialog>
@@ -561,6 +637,7 @@ const offersDialogRef = ref(null)
 const containerRef = ref(null)
 const dividerRef = ref(null)
 const pendingPaymentAfterCustomer = ref(false)
+const logoutAfterClose = ref(false)
 
 // Promotion dialog
 const showPromotionManagement = ref(false)
@@ -590,6 +667,7 @@ onMounted(async () => {
 			// Set POS profile and load tax rules
 			if (shiftStore.currentProfile) {
 				cartStore.posProfile = shiftStore.profileName
+				cartStore.posOpeningShift = shiftStore.currentShift?.name
 				await cartStore.loadTaxRules(shiftStore.profileName)
 
 				// Pre-load data for offline use
@@ -634,6 +712,7 @@ async function handleShiftOpened() {
 	uiStore.showOpenShiftDialog = false
 	if (shiftStore.currentProfile) {
 		cartStore.posProfile = shiftStore.profileName
+		cartStore.posOpeningShift = shiftStore.currentShift?.name
 		await cartStore.loadTaxRules(shiftStore.profileName)
 	}
 	toast.create({
@@ -652,9 +731,16 @@ function handleShiftClosed() {
 		icon: "check",
 		iconClasses: "text-green-600",
 	})
-	setTimeout(() => {
-		uiStore.showOpenShiftDialog = true
-	}, 500)
+
+	// Check if logout should happen after closing shift
+	if (logoutAfterClose.value) {
+		logoutAfterClose.value = false
+		session.logout.submit()
+	} else {
+		setTimeout(() => {
+			uiStore.showOpenShiftDialog = true
+		}, 500)
+	}
 }
 
 function handleItemSelected(item, autoAdd = false) {
@@ -811,6 +897,7 @@ async function handlePaymentCompleted(paymentData) {
 		if (offlineStore.isOffline) {
 			const invoiceData = {
 				pos_profile: cartStore.posProfile,
+				posa_pos_opening_shift: cartStore.posOpeningShift,
 				customer: customerValue || shiftStore.profileCustomer,
 				items: JSON.parse(JSON.stringify(cartStore.invoiceItems)),
 				payments: JSON.parse(JSON.stringify(cartStore.payments)),
@@ -1018,8 +1105,16 @@ function getCurrentUser() {
 }
 
 function confirmLogout() {
+	logoutAfterClose.value = false
 	uiStore.showLogoutDialog = false
 	session.logout.submit()
+}
+
+function logoutWithCloseShift() {
+	// Open close shift dialog and remember to logout after closing
+	logoutAfterClose.value = true
+	uiStore.showLogoutDialog = false
+	uiStore.showCloseShiftDialog = true
 }
 
 async function handleSaveDraft() {

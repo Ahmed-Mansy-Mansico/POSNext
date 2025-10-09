@@ -7,6 +7,7 @@ export function useInvoice() {
 	const customer = ref(null)
 	const payments = ref([])
 	const posProfile = ref(null)
+	const posOpeningShift = ref(null) // POS Opening Shift name
 	const additionalDiscount = ref(0)
 	const couponCode = ref(null)
 	const taxRules = ref([]) // Tax rules from POS Profile
@@ -356,6 +357,7 @@ export function useInvoice() {
 		const invoiceData = {
 			doctype: "Sales Invoice",
 			pos_profile: posProfile.value,
+			posa_pos_opening_shift: posOpeningShift.value,
 			customer: customer.value?.name || customer.value,
 			items: invoiceItems.value.map((item) => ({
 				item_code: item.item_code,
@@ -396,6 +398,7 @@ export function useInvoice() {
 			const invoiceData = {
 			doctype: "Sales Invoice",
 			pos_profile: posProfile.value,
+			posa_pos_opening_shift: posOpeningShift.value,
 			customer: customer.value?.name || customer.value,
 			items: invoiceItems.value.map((item) => ({
 				item_code: item.item_code,
@@ -554,6 +557,7 @@ export function useInvoice() {
 		customer,
 		payments,
 		posProfile,
+		posOpeningShift,
 		additionalDiscount,
 		couponCode,
 		taxRules,
