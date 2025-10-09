@@ -43,15 +43,34 @@
           </div>
 
           <div>
-            <Input
-              v-model="loginForm.password"
-              required
-              name="password"
-              type="password"
-              placeholder="Enter your password"
-              label="Password"
-              :disabled="session.login.loading"
-            />
+            <label class="block">
+              <span class="mb-2 block text-sm leading-4 text-gray-700">Password</span>
+              <div class="relative">
+                <input
+                  v-model="loginForm.password"
+                  required
+                  name="password"
+                  :type="showPassword ? 'text' : 'password'"
+                  placeholder="Enter your password"
+                  :disabled="session.login.loading"
+                  class="form-input block w-full border-gray-400 placeholder-gray-500 pr-10"
+                />
+                <button
+                  type="button"
+                  @click="showPassword = !showPassword"
+                  class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-600 hover:text-gray-800 transition-colors focus:outline-none"
+                  :disabled="session.login.loading"
+                  tabindex="-1"
+                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                >
+                  <FeatherIcon
+                    :name="showPassword ? 'eye-off' : 'eye'"
+                    class="h-5 w-5"
+                    :stroke-width="2"
+                  />
+                </button>
+              </div>
+            </label>
           </div>
 
           <div>
@@ -81,6 +100,7 @@ import { reactive, watch, ref } from "vue"
 import { useRouter } from "vue-router"
 import { session } from "../data/session"
 import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
+import { FeatherIcon } from "frappe-ui"
 
 const router = useRouter()
 
@@ -90,6 +110,7 @@ const loginForm = reactive({
 })
 
 const showShiftDialog = ref(false)
+const showPassword = ref(false)
 
 function submit() {
 	if (!loginForm.email || !loginForm.password) {
