@@ -1,6 +1,6 @@
 <template>
-	<!-- Icon-Only Sidebar - Always Visible -->
-	<div class="w-16 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col items-center py-4 space-y-2">
+	<!-- Icon-Only Sidebar - Hidden on Mobile, Visible on Desktop -->
+	<div class="hidden lg:flex w-16 flex-shrink-0 bg-white border-r border-gray-200 flex-col items-center py-4 space-y-2">
 		<!-- Dashboard -->
 		<button
 			@click="handleMenuClick('dashboard')"

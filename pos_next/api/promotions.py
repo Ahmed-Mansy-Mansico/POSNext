@@ -108,9 +108,9 @@ def get_promotion_details(scheme_name):
 
 
 @frappe.whitelist()
-def create_simple_promotion(data):
+def create_promotion(data):
 	"""
-	Create a promotional scheme with simplified input.
+	Create a promotional scheme.
 
 	Simplified input format:
 	{
@@ -277,14 +277,18 @@ def update_promotion(scheme_name, data):
 			scheme.disable = cint(data["disable"])
 
 		# Update discount values in slabs
-		if "discount_value" in data or "min_qty" in data or "min_amt" in data:
+		if "discount_value" in data or "min_qty" in data or "max_qty" in data or "min_amt" in data or "max_amt" in data:
 			# Update price discount slabs
 			if scheme.price_discount_slabs and len(scheme.price_discount_slabs) > 0:
 				slab = scheme.price_discount_slabs[0]
 				if "min_qty" in data:
 					slab.min_qty = flt(data["min_qty"])
+				if "max_qty" in data:
+					slab.max_qty = flt(data["max_qty"])
 				if "min_amt" in data:
 					slab.min_amount = flt(data["min_amt"])
+				if "max_amt" in data:
+					slab.max_amount = flt(data["max_amt"])
 				if "discount_value" in data:
 					if slab.rate_or_discount == "Discount Percentage":
 						slab.discount_percentage = flt(data["discount_value"])
@@ -292,7 +296,7 @@ def update_promotion(scheme_name, data):
 						slab.discount_amount = flt(data["discount_value"])
 
 		# Update free item slabs
-		if "free_item" in data or "free_qty" in data:
+		if "free_item" in data or "free_qty" in data or "min_qty" in data or "max_qty" in data or "min_amt" in data or "max_amt" in data:
 			if scheme.product_discount_slabs and len(scheme.product_discount_slabs) > 0:
 				slab = scheme.product_discount_slabs[0]
 				if "free_item" in data:
@@ -301,8 +305,12 @@ def update_promotion(scheme_name, data):
 					slab.free_qty = flt(data["free_qty"])
 				if "min_qty" in data:
 					slab.min_qty = flt(data["min_qty"])
+				if "max_qty" in data:
+					slab.max_qty = flt(data["max_qty"])
 				if "min_amt" in data:
 					slab.min_amount = flt(data["min_amt"])
+				if "max_amt" in data:
+					slab.max_amount = flt(data["max_amt"])
 
 		# Save
 		scheme.flags.ignore_permissions = True
@@ -388,15 +396,12 @@ def delete_promotion(scheme_name):
 
 @frappe.whitelist()
 def get_item_groups(company=None):
-	"""Get all item groups for the company."""
-	filters = {}
-	if company:
-		filters["company"] = company
-
+	"""Get all item groups."""
+	# Item Group is a global doctype, not company-specific
+	# Return all item groups (both parent groups and leaf nodes)
 	return frappe.get_all(
 		"Item Group",
-		filters=filters,
-		fields=["name", "parent_item_group"],
+		fields=["name", "parent_item_group", "is_group"],
 		order_by="name"
 	)
 
@@ -416,12 +421,13 @@ def search_items(search_term, pos_profile=None, limit=20):
 	"""Search for items."""
 	# Rate limiting: Track API calls per user
 	cache_key = f"search_items_rate_limit:{frappe.session.user}"
-	call_count = frappe.cache().get(cache_key) or 0
+	call_count_raw = frappe.cache().get(cache_key)
+	call_count = int(call_count_raw) if call_count_raw else 0
 
 	if call_count > 50:  # Max 50 searches per minute
 		frappe.throw(_("Too many search requests. Please wait a moment."))
 
-	frappe.cache().set(cache_key, call_count + 1, expires_in_sec=60)
+	frappe.cache().setex(cache_key, 60, call_count + 1)
 
 	# Sanitize search term to prevent SQL injection
 	if not search_term or not isinstance(search_term, str):

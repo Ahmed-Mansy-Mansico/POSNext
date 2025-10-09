@@ -69,7 +69,7 @@
 							</div>
 
 							<!-- Create New Button -->
-							<div class="p-4 bg-white border-b">
+							<div class="p-4 bg-white border-b space-y-2">
 								<Button
 									@click="handleCreateNew"
 									variant="solid"
@@ -79,6 +79,17 @@
 										<FeatherIcon name="plus-circle" class="w-4 h-4" />
 									</template>
 									Create New Promotion
+								</Button>
+								<Button
+									@click="loadPromotions"
+									variant="outline"
+									class="w-full"
+									:loading="loading"
+								>
+									<template #prefix>
+										<FeatherIcon name="refresh-cw" class="w-4 h-4" />
+									</template>
+									Refresh
 								</Button>
 							</div>
 
@@ -202,6 +213,23 @@
 												</template>
 												{{ selectedPromotion.disable ? 'Enable' : 'Disable' }}
 											</Button>
+											<div class="w-px h-6 bg-gray-200"></div>
+											<Button
+												@click="handleCancel"
+												variant="ghost"
+											>
+												Cancel
+											</Button>
+											<Button
+												@click="handleSubmit"
+												:loading="loading"
+												variant="solid"
+											>
+												<template #prefix>
+													<FeatherIcon :name="isCreating ? 'plus' : 'save'" class="w-4 h-4" />
+												</template>
+												{{ isCreating ? 'Create' : 'Update' }}
+											</Button>
 										</div>
 									</div>
 
@@ -266,26 +294,18 @@
 
 												<!-- Item Code Search -->
 												<div v-if="form.apply_on === 'Item Code'" class="space-y-3">
-													<div class="flex space-x-2">
+													<div>
 														<FormControl
 															type="text"
 															v-model="itemSearch"
 															:disabled="!isCreating"
-															placeholder="Search items..."
-															@input="searchItems"
-															class="flex-1"
+															placeholder="Search items... (min 2 characters)"
 														>
 															<template #prefix>
 																<FeatherIcon name="search" class="w-4 h-4 text-gray-500" />
 															</template>
 														</FormControl>
-														<Button
-															@click="searchItems"
-															:disabled="!isCreating"
-															variant="solid"
-														>
-															Search
-														</Button>
+														<p class="text-xs text-gray-500 mt-1">Searching from {{ itemSearchStore.allItems.length }} cached items</p>
 													</div>
 
 													<!-- Search Results -->
@@ -430,14 +450,52 @@
 															required
 														/>
 
-														<FormControl
-															v-if="form.discount_type === 'free_item'"
-															type="text"
-															label="Free Item Code"
-															v-model="form.free_item"
-															placeholder="ITEM-001"
-															required
-														/>
+														<!-- Free Item Search -->
+														<div v-if="form.discount_type === 'free_item'" class="space-y-2">
+															<label class="block text-sm font-medium text-gray-700">Free Item <span class="text-red-500">*</span></label>
+
+															<!-- Search Input -->
+															<FormControl
+																v-if="!form.free_item"
+																type="text"
+																v-model="freeItemSearch"
+																placeholder="Search item... (min 2 characters)"
+															>
+																<template #prefix>
+																	<FeatherIcon name="search" class="w-4 h-4 text-gray-500" />
+																</template>
+															</FormControl>
+
+															<!-- Search Results -->
+															<div v-if="freeItemSearchResults.length > 0 && !form.free_item" class="border rounded-lg overflow-hidden">
+																<div class="max-h-40 overflow-y-auto divide-y">
+																	<button
+																		v-for="item in freeItemSearchResults"
+																		:key="item.item_code"
+																		@click="selectFreeItem(item)"
+																		type="button"
+																		class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors"
+																	>
+																		<p class="text-sm font-medium text-gray-900">{{ item.item_name }}</p>
+																		<p class="text-xs text-gray-500">{{ item.item_code }}</p>
+																	</button>
+																</div>
+															</div>
+
+															<!-- Selected Free Item -->
+															<div v-if="form.free_item" class="flex items-center space-x-2">
+																<Badge variant="subtle" theme="green" size="md">
+																	{{ form.free_item }}
+																	<button
+																		@click="form.free_item = ''"
+																		type="button"
+																		class="ml-2 hover:text-green-900"
+																	>
+																		×
+																	</button>
+																</Badge>
+															</div>
+														</div>
 
 														<FormControl
 															v-if="form.discount_type === 'free_item'"
@@ -457,40 +515,80 @@
 
 														<FormControl
 															type="number"
+															label="Maximum Quantity"
+															v-model="form.max_qty"
+															placeholder="0"
+														/>
+
+														<FormControl
+															type="number"
 															:label="`Minimum Amount (${currency})`"
 															v-model="form.min_amt"
+															placeholder="0"
+														/>
+
+														<FormControl
+															type="number"
+															:label="`Maximum Amount (${currency})`"
+															v-model="form.max_amt"
 															placeholder="0"
 														/>
 													</div>
 												</div>
 											</div>
 										</Card>
-
-										<!-- Action Buttons -->
-										<div class="flex items-center justify-end space-x-3 pt-4 border-t">
-											<Button
-												@click="handleCancel"
-												variant="ghost"
-											>
-												Cancel
-											</Button>
-											<Button
-												@click="handleSubmit"
-												:loading="loading"
-												variant="solid"
-											>
-												<template #prefix>
-													<FeatherIcon :name="isCreating ? 'plus' : 'save'" class="w-4 h-4" />
-												</template>
-												{{ isCreating ? 'Create Promotion' : 'Update Promotion' }}
-											</Button>
-										</div>
 									</div>
 								</div>
 							</div>
 						</div>
 					</div>
 				</div>
+
+				<!-- Delete Confirmation Dialog -->
+				<Transition name="fade">
+					<div
+						v-if="showDeleteConfirm"
+						class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[400]"
+						@click.self="cancelDelete"
+					>
+						<div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 p-6">
+							<div class="flex items-start space-x-4">
+								<div class="flex-shrink-0">
+									<div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+										<FeatherIcon name="alert-triangle" class="w-6 h-6 text-red-600" />
+									</div>
+								</div>
+								<div class="flex-1">
+									<h3 class="text-lg font-semibold text-gray-900 mb-2">Delete Promotion</h3>
+									<p class="text-sm text-gray-600 mb-1">
+										Are you sure you want to delete <strong>"{{ promotionToDelete?.name }}"</strong>?
+									</p>
+									<p class="text-sm text-gray-500">
+										This will also delete all associated pricing rules. This action cannot be undone.
+									</p>
+								</div>
+							</div>
+							<div class="flex justify-end space-x-3 mt-6">
+								<Button
+									@click="cancelDelete"
+									variant="ghost"
+								>
+									Cancel
+								</Button>
+								<Button
+									@click="confirmDelete"
+									variant="solid"
+									theme="red"
+								>
+									<template #prefix>
+										<FeatherIcon name="trash-2" class="w-4 h-4" />
+									</template>
+									Delete Promotion
+								</Button>
+							</div>
+						</div>
+					</div>
+				</Transition>
 			</div>
 		</div>
 	</Transition>
@@ -498,8 +596,13 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { Button, FormControl, Badge, Card, LoadingIndicator, createResource, toast } from 'frappe-ui'
+import { Button, FormControl, Badge, Card, LoadingIndicator, createResource } from 'frappe-ui'
 import { FeatherIcon } from 'frappe-ui'
+import { useItemSearchStore } from '@/stores/itemSearch'
+import { useToast } from '@/composables/useToast'
+
+// Use shared toast
+const { showSuccess, showError, showWarning } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -513,10 +616,15 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'promotion-saved'])
 
+// Access cached items from the store
+const itemSearchStore = useItemSearchStore()
+
 const show = ref(props.modelValue)
 const loading = ref(false)
 const isCreating = ref(false)
 const selectedPromotion = ref(null)
+const showDeleteConfirm = ref(false)
+const promotionToDelete = ref(null)
 
 // List view state
 const promotions = ref([])
@@ -534,7 +642,9 @@ const form = ref({
 	free_qty: 1,
 	items: [],
 	min_qty: 0,
+	max_qty: 0,
 	min_amt: 0,
+	max_amt: 0,
 	valid_from: '',
 	valid_upto: ''
 })
@@ -542,8 +652,8 @@ const form = ref({
 // Dropdown data
 const itemGroups = ref([])
 const brands = ref([])
-const searchResults = ref([])
 const itemSearch = ref('')
+const freeItemSearch = ref('')
 const selectedItemGroup = ref('')
 const selectedBrand = ref('')
 
@@ -575,6 +685,46 @@ const filteredPromotions = computed(() => {
 	return filtered
 })
 
+// Computed: Filter cached items based on search term
+const searchResults = computed(() => {
+	if (!itemSearch.value || itemSearch.value.length < 2) {
+		return []
+	}
+
+	const term = itemSearch.value.toLowerCase()
+	const allItems = itemSearchStore.allItems || []
+
+	// Filter items by search term
+	const filtered = allItems.filter(item =>
+		item.item_code?.toLowerCase().includes(term) ||
+		item.item_name?.toLowerCase().includes(term) ||
+		item.barcode?.toLowerCase().includes(term)
+	)
+
+	// Limit to 20 results for performance
+	return filtered.slice(0, 20)
+})
+
+// Computed: Filter cached items for free item selection
+const freeItemSearchResults = computed(() => {
+	if (!freeItemSearch.value || freeItemSearch.value.length < 2) {
+		return []
+	}
+
+	const term = freeItemSearch.value.toLowerCase()
+	const allItems = itemSearchStore.allItems || []
+
+	// Filter items by search term
+	const filtered = allItems.filter(item =>
+		item.item_code?.toLowerCase().includes(term) ||
+		item.item_name?.toLowerCase().includes(term) ||
+		item.barcode?.toLowerCase().includes(term)
+	)
+
+	// Limit to 20 results for performance
+	return filtered.slice(0, 20)
+})
+
 // Resources
 const promotionsResource = createResource({
 	url: 'pos_next.api.promotions.get_promotions',
@@ -600,6 +750,10 @@ const itemGroupsResource = createResource({
 	auto: false,
 	onSuccess(data) {
 		itemGroups.value = data || []
+	},
+	onError(error) {
+		console.error('Error loading item groups:', error)
+		handleError(error, 'Failed to load item groups')
 	}
 })
 
@@ -608,52 +762,32 @@ const brandsResource = createResource({
 	auto: false,
 	onSuccess(data) {
 		brands.value = data || []
-	}
-})
-
-const searchItemsResource = createResource({
-	url: 'pos_next.api.promotions.search_items',
-	makeParams() {
-		return {
-			search_term: itemSearch.value,
-			pos_profile: props.posProfile,
-			limit: 20
-		}
 	},
-	auto: false,
-	onSuccess(data) {
-		searchResults.value = data || []
+	onError(error) {
+		console.error('Error loading brands:', error)
+		handleError(error, 'Failed to load brands')
 	}
 })
 
 const savePromotionResource = createResource({
-	url: 'pos_next.api.promotions.create_simple_promotion',
+	url: 'pos_next.api.promotions.create_promotion',
 	makeParams() {
 		return { data: JSON.stringify(form.value) }
 	},
 	auto: false,
 	onSuccess(data) {
 		loading.value = false
-		toast({
-			title: 'Success',
-			text: data.message || 'Promotion created successfully',
-			icon: 'check',
-			iconClasses: 'text-green-600'
-		})
-		emit('promotion-saved', data)
+		const responseData = data?.message || data
+		const successMessage = responseData?.message || 'Promotion created successfully'
+
+		showSuccess(successMessage)
+		emit('promotion-saved', responseData)
 		loadPromotions()
-		resetForm()
-		isCreating.value = false
-		selectedPromotion.value = null
+		returnToList()
 	},
 	onError(error) {
 		loading.value = false
-		toast({
-			title: 'Error',
-			text: error.message || 'Failed to save promotion',
-			icon: 'x',
-			iconClasses: 'text-red-600'
-		})
+		handleError(error, 'Failed to create promotion')
 	}
 })
 
@@ -666,7 +800,9 @@ const updatePromotionResource = createResource({
 				valid_from: form.value.valid_from,
 				valid_upto: form.value.valid_upto,
 				min_qty: form.value.min_qty,
+				max_qty: form.value.max_qty,
 				min_amt: form.value.min_amt,
+				max_amt: form.value.max_amt,
 				discount_value: form.value.discount_value,
 				free_item: form.value.free_item,
 				free_qty: form.value.free_qty
@@ -676,13 +812,16 @@ const updatePromotionResource = createResource({
 	auto: false,
 	onSuccess(data) {
 		loading.value = false
-		toast({
-			title: 'Success',
-			text: 'Promotion updated successfully',
-			icon: 'check',
-			iconClasses: 'text-green-600'
-		})
+		const responseData = data?.message || data
+		const successMessage = responseData?.message || 'Promotion updated successfully'
+
+		showSuccess(successMessage)
 		loadPromotions()
+		returnToList()
+	},
+	onError(error) {
+		loading.value = false
+		handleError(error, 'Failed to update promotion')
 	}
 })
 
@@ -690,30 +829,54 @@ const toggleResource = createResource({
 	url: 'pos_next.api.promotions.toggle_promotion',
 	auto: false,
 	onSuccess() {
-		toast({
-			title: 'Success',
-			text: 'Promotion status updated',
-			icon: 'check',
-			iconClasses: 'text-green-600'
-		})
+		showSuccess('Promotion status updated successfully')
 		loadPromotions()
+	},
+	onError(error) {
+		handleError(error, 'Failed to update promotion status')
 	}
 })
 
 const deleteResource = createResource({
 	url: 'pos_next.api.promotions.delete_promotion',
 	auto: false,
-	onSuccess() {
-		toast({
-			title: 'Success',
-			text: 'Promotion deleted',
-			icon: 'check',
-			iconClasses: 'text-green-600'
-		})
+	onSuccess(data) {
+		const responseData = data?.message || data
+		const successMessage = responseData?.message || 'Promotion deleted successfully'
+
+		showSuccess(successMessage)
+
+		// Close delete confirmation dialog
+		showDeleteConfirm.value = false
+		promotionToDelete.value = null
+
+		// Reload and return to list
 		loadPromotions()
-		selectedPromotion.value = null
-		isCreating.value = false
-		resetForm()
+		returnToList()
+	},
+	onError(error) {
+		loading.value = false
+		showDeleteConfirm.value = false
+		promotionToDelete.value = null
+		handleError(error, 'Failed to delete promotion')
+	}
+})
+
+const promotionDetailsResource = createResource({
+	url: 'pos_next.api.promotions.get_promotion_details',
+	makeParams() {
+		return {
+			scheme_name: selectedPromotion.value?.name
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		loading.value = false
+		populateFormFromPromotion(data)
+	},
+	onError(error) {
+		loading.value = false
+		handleError(error, 'Failed to load promotion details')
 	}
 })
 
@@ -733,6 +896,37 @@ watch(show, (val) => {
 		isCreating.value = false
 	}
 })
+
+// Utility: Parse error messages from server response
+function parseErrorMessage(error) {
+	try {
+		// Check if there's a _server_messages field
+		if (error._server_messages) {
+			const messages = JSON.parse(error._server_messages)
+			if (Array.isArray(messages) && messages.length > 0) {
+				const firstMessage = typeof messages[0] === 'string' ? JSON.parse(messages[0]) : messages[0]
+				return firstMessage.message || error.message || 'An error occurred'
+			}
+		}
+		// Fallback to error.message
+		return error.message || 'An error occurred'
+	} catch (e) {
+		return error.message || 'An error occurred'
+	}
+}
+
+// Utility: Show error with proper parsing
+function handleError(error, defaultMessage = 'An error occurred') {
+	const errorMessage = parseErrorMessage(error)
+	showError(errorMessage || defaultMessage)
+}
+
+// Utility: Reset form and return to list view (keep dialog open)
+function returnToList() {
+	resetForm()
+	selectedPromotion.value = null
+	isCreating.value = false
+}
 
 function loadPromotions() {
 	loading.value = true
@@ -757,8 +951,8 @@ function handleCreateNew() {
 function handleSelectPromotion(promotion) {
 	isCreating.value = false
 	selectedPromotion.value = promotion
-	form.value.name = promotion.name
-	// Could load full promotion details here if needed
+	loading.value = true
+	promotionDetailsResource.reload()
 }
 
 function handleCancel() {
@@ -772,30 +966,42 @@ function handleToggle(promotion) {
 }
 
 function handleDelete(promotion) {
-	if (confirm(`Delete "${promotion.name}"? This will also delete all associated pricing rules.`)) {
-		deleteResource.submit({ scheme_name: promotion.name })
+	promotionToDelete.value = promotion
+	showDeleteConfirm.value = true
+}
+
+function confirmDelete() {
+	if (promotionToDelete.value) {
+		loading.value = true
+		deleteResource.submit({ scheme_name: promotionToDelete.value.name })
 	}
+}
+
+function cancelDelete() {
+	showDeleteConfirm.value = false
+	promotionToDelete.value = null
 }
 
 function handleSubmit() {
 	// Validate
 	if (!form.value.name) {
-		toast({
-			title: 'Validation Error',
-			text: 'Please enter a promotion name',
-			icon: 'alert-circle',
-			iconClasses: 'text-orange-600'
-		})
+		showWarning('Please enter a promotion name')
 		return
 	}
 
+	// Check for duplicate name when creating
+	if (isCreating.value) {
+		const duplicate = promotions.value.find(p =>
+			p.name.toLowerCase() === form.value.name.toLowerCase()
+		)
+		if (duplicate) {
+			showWarning(`Promotion "${form.value.name}" already exists. Please use a different name.`)
+			return
+		}
+	}
+
 	if (form.value.apply_on !== 'Transaction' && form.value.items.length === 0) {
-		toast({
-			title: 'Validation Error',
-			text: `Please select at least one ${form.value.apply_on}`,
-			icon: 'alert-circle',
-			iconClasses: 'text-orange-600'
-		})
+		showWarning(`Please select at least one ${form.value.apply_on}`)
 		return
 	}
 
@@ -808,18 +1014,12 @@ function handleSubmit() {
 	}
 }
 
-function searchItems() {
-	if (itemSearch.value.length > 2) {
-		searchItemsResource.reload()
-	}
-}
-
 function addItem(item) {
 	if (!form.value.items.some(i => i.item_code === item.item_code)) {
 		form.value.items.push({ item_code: item.item_code })
 	}
+	// Clear search term (searchResults will automatically update via computed)
 	itemSearch.value = ''
-	searchResults.value = []
 }
 
 function addItemGroup() {
@@ -840,6 +1040,11 @@ function removeItem(index) {
 	form.value.items.splice(index, 1)
 }
 
+function selectFreeItem(item) {
+	form.value.free_item = item.item_code
+	freeItemSearch.value = ''
+}
+
 function resetForm() {
 	form.value = {
 		name: '',
@@ -851,14 +1056,72 @@ function resetForm() {
 		free_qty: 1,
 		items: [],
 		min_qty: 0,
+		max_qty: 0,
 		min_amt: 0,
+		max_amt: 0,
 		valid_from: '',
 		valid_upto: ''
 	}
 	itemSearch.value = ''
+	freeItemSearch.value = ''
 	selectedItemGroup.value = ''
 	selectedBrand.value = ''
-	searchResults.value = []
+}
+
+function populateFormFromPromotion(promotion) {
+	// Reset form first
+	resetForm()
+
+	// Basic fields
+	form.value.name = promotion.name
+	form.value.company = promotion.company
+	form.value.apply_on = promotion.apply_on
+	form.value.valid_from = promotion.valid_from || ''
+	form.value.valid_upto = promotion.valid_upto || ''
+
+	// Populate items/item_groups/brands based on apply_on
+	if (promotion.apply_on === 'Item Code' && promotion.items) {
+		form.value.items = promotion.items.map(item => ({
+			item_code: item.item_code,
+			uom: item.uom
+		}))
+	} else if (promotion.apply_on === 'Item Group' && promotion.item_groups) {
+		form.value.items = promotion.item_groups.map(group => ({
+			item_group: group.item_group,
+			uom: group.uom
+		}))
+	} else if (promotion.apply_on === 'Brand' && promotion.brands) {
+		form.value.items = promotion.brands.map(brand => ({
+			brand: brand.brand,
+			uom: brand.uom
+		}))
+	}
+
+	// Populate discount details from slabs
+	if (promotion.price_discount_slabs && promotion.price_discount_slabs.length > 0) {
+		const slab = promotion.price_discount_slabs[0]
+		form.value.min_qty = slab.min_qty || 0
+		form.value.max_qty = slab.max_qty || 0
+		form.value.min_amt = slab.min_amount || 0
+		form.value.max_amt = slab.max_amount || 0
+
+		if (slab.rate_or_discount === 'Discount Percentage') {
+			form.value.discount_type = 'percentage'
+			form.value.discount_value = slab.discount_percentage || 0
+		} else if (slab.rate_or_discount === 'Discount Amount') {
+			form.value.discount_type = 'amount'
+			form.value.discount_value = slab.discount_amount || 0
+		}
+	} else if (promotion.product_discount_slabs && promotion.product_discount_slabs.length > 0) {
+		const slab = promotion.product_discount_slabs[0]
+		form.value.discount_type = 'free_item'
+		form.value.free_item = slab.free_item || ''
+		form.value.free_qty = slab.free_qty || 1
+		form.value.min_qty = slab.min_qty || 0
+		form.value.max_qty = slab.max_qty || 0
+		form.value.min_amt = slab.min_amount || 0
+		form.value.max_amt = slab.max_amount || 0
+	}
 }
 
 function formatDate(dateStr) {
