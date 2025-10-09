@@ -89,14 +89,18 @@
 				</template>
 			</POSHeader>
 
-		<!-- Main Content: Responsive Layout -->
+	<!-- Main Content: Responsive Layout -->
+	<div
+		v-if="shiftStore.hasOpenShift"
+		class="flex-1 flex overflow-hidden relative"
+	>
+		<!-- Icon-Only Management Slider - Always Visible -->
+		<ManagementSlider @menu-clicked="handleManagementMenuClick" />
+
+		<!-- Main Content Container -->
+		<div ref="containerRef" class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+		<!-- Mobile Tab Navigation -->
 		<div
-			v-if="shiftStore.hasOpenShift"
-			ref="containerRef"
-			class="flex-1 flex flex-col lg:flex-row overflow-hidden relative"
-		>
-			<!-- Mobile Tab Navigation -->
-			<div
 				class="lg:hidden bg-white border-b border-gray-200 flex shadow-sm sticky top-0 transition-all z-[100]"
 			>
 				<button
@@ -232,6 +236,7 @@
 					</span>
 				</div>
 			</button>
+		</div>
 		</div>
 
 		<!-- No Shift Placeholder -->
@@ -376,6 +381,15 @@
 			@customer-created="handleCustomerCreated"
 		/>
 
+		<!-- Promotion Management -->
+		<PromotionManagement
+			v-model="showPromotionManagement"
+			:pos-profile="shiftStore.profileName"
+			:company="shiftStore.profileCompany"
+			:currency="shiftStore.profileCurrency"
+			@promotion-saved="handlePromotionSaved"
+		/>
+
 		<!-- Clear Cart Confirmation Dialog -->
 		<Dialog
 			v-model="uiStore.showClearCartDialog"
@@ -508,6 +522,7 @@ import { session } from "@/data/session"
 import { parseError } from "@/utils/errorHandler"
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue"
 import POSHeader from "@/components/pos/POSHeader.vue"
+import ManagementSlider from "@/components/pos/ManagementSlider.vue"
 import ItemsSelector from "@/components/sale/ItemsSelector.vue"
 import InvoiceCart from "@/components/sale/InvoiceCart.vue"
 import PaymentDialog from "@/components/sale/PaymentDialog.vue"
@@ -523,6 +538,7 @@ import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
 import OfflineInvoicesDialog from "@/components/sale/OfflineInvoicesDialog.vue"
 import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
 import ItemSelectionDialog from "@/components/sale/ItemSelectionDialog.vue"
+import PromotionManagement from "@/components/sale/PromotionManagement.vue"
 import { printInvoiceByName } from "@/utils/printInvoice"
 
 // Pinia Stores
@@ -545,6 +561,9 @@ const offersDialogRef = ref(null)
 const containerRef = ref(null)
 const dividerRef = ref(null)
 const pendingPaymentAfterCustomer = ref(false)
+
+// Promotion dialog
+const showPromotionManagement = ref(false)
 
 // Resize state
 let resizeState = null
@@ -1285,5 +1304,21 @@ function restoreBodyStyles() {
 	document.body.style.cursor = bodyStyleSnapshot.cursor || ''
 	document.body.style.userSelect = bodyStyleSnapshot.userSelect || ''
 	bodyStyleSnapshot = null
+}
+
+// Management and Promotion handlers
+function handleManagementMenuClick(menuItem) {
+	if (menuItem === 'promotions') {
+		showPromotionManagement.value = true
+	}
+}
+
+function handlePromotionSaved(data) {
+	toast.create({
+		title: "Success",
+		text: data.message || "Promotion saved successfully",
+		icon: "check",
+		iconClasses: "text-green-600",
+	})
 }
 </script>

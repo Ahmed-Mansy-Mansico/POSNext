@@ -3,20 +3,27 @@
 		class="bg-white shadow-sm sticky top-0 transition-all"
 		:class="isAnyDialogOpen ? 'z-[100]' : 'z-[200]'"
 	>
-		<div class="px-2 sm:px-4 md:px-6 py-2 sm:py-3">
-			<div class="flex justify-between items-center gap-1 sm:gap-2">
-				<!-- Left Side: Logo/Brand -->
+		<div class="flex py-2 sm:py-3">
+			<!-- POS Icon - Aligned with Management Sidebar (64px) -->
+			<div class="w-16 flex-shrink-0 flex items-center justify-center">
+				<button
+					class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0 hover:from-blue-600 hover:to-blue-700 active:scale-95 transition-all"
+					:aria-label="'POS Next'"
+					title="POS Next"
+				>
+					<svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+						<path d="M20 7h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM10 4h4v3h-4V4zm10 16H4V9h16v11z"/>
+					</svg>
+				</button>
+			</div>
+
+			<!-- Main Header Content -->
+			<div class="flex-1 flex justify-between items-center gap-1 sm:gap-2 px-2 sm:px-4 md:px-6">
+				<!-- Left Side: Brand Info -->
 				<div class="flex items-center space-x-1 sm:space-x-4 min-w-0 flex-1">
-					<div class="flex items-center space-x-1.5 sm:space-x-3 min-w-0">
-						<div class="w-7 h-7 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
-							<svg class="w-4 h-4 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-								<path d="M20 7h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM10 4h4v3h-4V4zm10 16H4V9h16v11z"/>
-							</svg>
-						</div>
-						<div class="min-w-0 flex-1">
-							<h1 class="text-xs sm:text-base font-bold text-gray-900 truncate">POS Next</h1>
-							<p v-if="profileName" class="text-[9px] sm:text-xs text-gray-500 truncate hidden sm:block">{{ profileName }}</p>
-						</div>
+					<div class="min-w-0">
+						<h1 class="text-xs sm:text-base font-bold text-gray-900 truncate">POS Next</h1>
+						<p v-if="profileName" class="text-[9px] sm:text-xs text-gray-500 truncate hidden sm:block">{{ profileName }}</p>
 					</div>
 
 					<!-- Time and Shift Duration - Compact on mobile -->
@@ -171,7 +178,7 @@ defineProps({
 	}
 })
 
-defineEmits(['sync-click', 'printer-click', 'refresh-click', 'logout', 'menu-opened', 'menu-closed'])
+defineEmits(['sync-click', 'printer-click', 'refresh-click', 'menu-click', 'logout', 'menu-opened', 'menu-closed'])
 
 // SVG Path Icons
 const timeIcon = "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
