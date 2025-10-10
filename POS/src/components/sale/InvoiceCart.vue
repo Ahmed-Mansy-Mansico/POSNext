@@ -154,11 +154,12 @@
 				<div
 					v-for="(item, index) in items"
 					:key="index"
-					class="bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2 hover:shadow-md transition-all active:scale-[0.99]"
+					@click="openEditDialog(item)"
+					class="bg-white border-2 border-gray-200 rounded-lg p-1.5 sm:p-2 hover:border-blue-300 hover:shadow-lg transition-all duration-200 active:scale-[0.99] cursor-pointer group"
 				>
-					<div class="flex items-start space-x-1.5 sm:space-x-2 mb-1 sm:mb-2">
+					<div class="flex gap-1.5 sm:gap-2">
 						<!-- Item Image Thumbnail -->
-						<div class="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden">
+						<div class="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden border border-gray-200">
 							<img
 								v-if="item.image"
 								:src="item.image"
@@ -182,112 +183,187 @@
 							</svg>
 						</div>
 
-						<!-- Item Info -->
-						<div class="flex-1 min-w-0">
-							<div class="flex items-start justify-between gap-1">
-								<div class="flex-1 min-w-0">
-									<h4 class="text-[11px] sm:text-xs font-semibold text-gray-900 truncate leading-tight">
-										{{ item.item_name }}
-									</h4>
-									<!-- Merged: show rate + UOM selector (fallback to static text) -->
-									<div class="flex items-center space-x-1 sm:space-x-2 mt-0.5">
-										<p class="text-[10px] text-gray-500 leading-tight">
-											{{ formatCurrency(item.rate) }} /
-										</p>
-										<!-- UOM Selector (if multiple UOMs available) -->
-										<select
-											v-if="item.item_uoms && item.item_uoms.length > 0"
-											:value="item.uom || item.stock_uom"
-											@change="handleUomChange(item, $event.target.value)"
-											class="text-[10px] text-gray-700 font-medium bg-transparent border-0 border-b border-dashed border-gray-300 hover:border-blue-500 focus:outline-none focus:border-blue-500 px-0 py-0 cursor-pointer touch-manipulation"
-											@click.stop
-										>
-											<option :value="item.stock_uom">{{ item.stock_uom }}</option>
-											<option
-												v-for="uomData in item.item_uoms"
-												:key="uomData.uom"
-												:value="uomData.uom"
-											>
-												{{ uomData.uom }}
-											</option>
-										</select>
-										<!-- Static UOM (if only one UOM) -->
-										<span v-else class="text-[10px] text-gray-500">
-											{{ item.uom || item.stock_uom || 'Nos' }}
-										</span>
-									</div>
-								</div>
+						<!-- Item Content -->
+						<div class="flex-1 min-w-0 flex flex-col">
+							<!-- Header: Item Name & Delete -->
+							<div class="flex items-start justify-between gap-1 mb-1">
+								<h4 class="text-[11px] sm:text-xs font-bold text-gray-900 truncate leading-tight">
+									{{ item.item_name }}
+								</h4>
 								<button
 									type="button"
-									@click="$emit('remove-item', item.item_code)"
-									class="text-gray-400 hover:text-red-600 active:text-red-700 ml-0.5 transition-colors flex-shrink-0 p-1 touch-manipulation active:scale-90"
+									@click.stop="$emit('remove-item', item.item_code)"
+									class="text-gray-400 hover:text-red-600 active:text-red-700 transition-colors flex-shrink-0 p-0.5 -m-0.5 touch-manipulation active:scale-90"
 									:aria-label="'Remove ' + item.item_name"
+									title="Remove item"
 								>
 									<svg class="h-4 w-4 sm:h-4.5 sm:w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
 									</svg>
 								</button>
 							</div>
-						</div>
-					</div>
 
-					<!-- Quantity Controls, Edit Button, and Total -->
-					<div class="flex items-center justify-between gap-2">
-						<div class="flex items-center space-x-1">
-							<button
-								type="button"
-								@click="decrementQuantity(item)"
-								class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 flex items-center justify-center font-bold text-gray-700 text-base transition-all touch-manipulation active:scale-95"
-								:aria-label="'Decrease quantity'"
-							>
-								−
-							</button>
-							<input
-								:value="item.quantity"
-								@input="updateQuantity(item, $event.target.value)"
-								type="number"
-								min="1"
-								step="1"
-								class="w-12 sm:w-14 text-center border border-gray-300 rounded-lg px-1 py-1.5 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-								:aria-label="'Quantity'"
-							/>
-							<button
-								type="button"
-								@click="incrementQuantity(item)"
-								class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 flex items-center justify-center font-bold text-gray-700 text-base transition-all touch-manipulation active:scale-95"
-								:aria-label="'Increase quantity'"
-							>
-								+
-							</button>
-							<!-- Edit Button -->
-							<button
-								type="button"
-								@click="openEditDialog(item)"
-								class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-50 hover:bg-blue-100 active:bg-blue-200 flex items-center justify-center transition-all touch-manipulation active:scale-95"
-								:aria-label="'Edit item details'"
-								title="Edit item details"
-							>
-								<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-								</svg>
-							</button>
-						</div>
-						<div class="text-right">
-							<p class="text-xs sm:text-sm font-bold text-blue-600">
-								{{ formatCurrency(item.amount || item.rate * item.quantity) }}
-							</p>
-						</div>
-					</div>
+							<!-- Price & UOM Row -->
+							<div class="flex items-center flex-wrap gap-1.5 mb-1.5">
+								<div class="flex items-center gap-1">
+									<span class="text-[11px] sm:text-xs font-bold text-gray-900">
+										{{ formatCurrency(item.rate) }}
+									</span>
+									<span class="text-[10px] text-gray-500">/</span>
+									<span class="inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] sm:text-xs font-semibold">
+										{{ item.uom || item.stock_uom || 'Nos' }}
+									</span>
+								</div>
 
-					<!-- Discount Badge if any -->
-					<div
-						v-if="item.discount_amount && item.discount_amount > 0"
-						class="mt-1.5 inline-flex items-center px-1.5 py-0.5 bg-red-50 text-red-700 rounded text-[10px] font-medium"
-					>
-						<svg class="w-2.5 h-2.5 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
-						</svg>
-						{{ item.discount_percentage }}% off
+								<!-- Discount Badge if any -->
+								<div
+									v-if="item.discount_amount && item.discount_amount > 0"
+									class="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-red-50 to-orange-50 text-red-700 rounded-full text-[9px] font-bold border border-red-200"
+								>
+									<svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+										<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+									</svg>
+									{{ item.discount_percentage }}% OFF
+								</div>
+							</div>
+
+							<!-- Bottom Row: Quantity Controls, UOM Selector & Total -->
+							<div class="flex items-center justify-between gap-1.5">
+								<div class="flex items-center gap-1.5" @click.stop>
+									<!-- Quantity Counter -->
+									<div class="flex items-center bg-gray-50 border-2 border-gray-200 rounded-lg overflow-hidden">
+										<button
+											type="button"
+											@click="decrementQuantity(item)"
+											class="w-7 h-7 sm:w-8 sm:h-8 bg-white hover:bg-gray-100 active:bg-gray-200 flex items-center justify-center font-bold text-gray-700 transition-colors touch-manipulation border-r-2 border-gray-200"
+											:aria-label="'Decrease quantity'"
+											title="Decrease quantity"
+										>
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M20 12H4"/>
+											</svg>
+										</button>
+										<input
+											:value="item.quantity"
+											@input="updateQuantity(item, $event.target.value)"
+											type="number"
+											min="1"
+											step="1"
+											class="w-10 sm:w-11 text-center bg-white border-0 text-xs sm:text-sm font-bold text-gray-900 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+											:aria-label="'Quantity'"
+										/>
+										<button
+											type="button"
+											@click="incrementQuantity(item)"
+											class="w-7 h-7 sm:w-8 sm:h-8 bg-white hover:bg-gray-100 active:bg-gray-200 flex items-center justify-center font-bold text-gray-700 transition-colors touch-manipulation border-l-2 border-gray-200"
+											:aria-label="'Increase quantity'"
+											title="Increase quantity"
+										>
+											<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/>
+											</svg>
+										</button>
+									</div>
+
+									<!-- UOM Selector Dropdown (Custom) -->
+									<div class="relative group/uom">
+										<!-- Dropdown Button -->
+										<button
+											type="button"
+											@click="toggleUomDropdown(item.item_code)"
+											:disabled="!item.item_uoms || item.item_uoms.length === 0"
+											:class="[
+												'h-7 sm:h-8 text-[10px] sm:text-xs font-bold rounded-lg pl-2.5 pr-7 transition-all touch-manipulation shadow-sm flex items-center justify-center min-w-[60px]',
+												item.item_uoms && item.item_uoms.length > 0
+													? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white border-2 border-blue-400 hover:from-blue-600 hover:to-blue-700 hover:border-blue-500 hover:shadow-md active:scale-95 cursor-pointer'
+													: 'bg-gray-100 text-gray-500 border-2 border-gray-200 cursor-not-allowed opacity-60'
+											]"
+											:title="item.item_uoms && item.item_uoms.length > 0 ? 'Click to change unit' : 'Only one unit available'"
+										>
+											{{ item.uom || item.stock_uom || 'Nos' }}
+										</button>
+
+										<!-- Dropdown Arrow Icon -->
+										<svg
+											:class="[
+												'absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none transition-transform',
+												openUomDropdown === item.item_code ? 'rotate-180' : '',
+												item.item_uoms && item.item_uoms.length > 0 ? 'text-white' : 'text-gray-400'
+											]"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+										</svg>
+
+										<!-- Dropdown Menu -->
+										<div
+											v-if="openUomDropdown === item.item_code && item.item_uoms && item.item_uoms.length > 0"
+											class="absolute top-full left-0 mt-1 bg-white border-2 border-blue-300 rounded-lg shadow-xl z-50 min-w-full overflow-hidden"
+										>
+											<!-- Stock UOM Option -->
+											<button
+												type="button"
+												@click="selectUom(item, item.stock_uom)"
+												:class="[
+													'w-full text-left px-3 py-2 text-[10px] sm:text-xs font-semibold transition-colors border-b border-gray-100',
+													(item.uom || item.stock_uom) === item.stock_uom
+														? 'bg-blue-50 text-blue-700'
+														: 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+												]"
+											>
+												<div class="flex items-center justify-between">
+													<span>{{ item.stock_uom || 'Nos' }}</span>
+													<svg
+														v-if="(item.uom || item.stock_uom) === item.stock_uom"
+														class="w-4 h-4 text-blue-600"
+														fill="currentColor"
+														viewBox="0 0 20 20"
+													>
+														<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+													</svg>
+												</div>
+											</button>
+
+											<!-- Other UOM Options -->
+											<button
+												v-for="uomData in item.item_uoms"
+												:key="uomData.uom"
+												type="button"
+												@click="selectUom(item, uomData.uom)"
+												:class="[
+													'w-full text-left px-3 py-2 text-[10px] sm:text-xs font-semibold transition-colors border-b border-gray-100 last:border-0',
+													(item.uom || item.stock_uom) === uomData.uom
+														? 'bg-blue-50 text-blue-700'
+														: 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+												]"
+											>
+												<div class="flex items-center justify-between">
+													<span>{{ uomData.uom }}</span>
+													<svg
+														v-if="(item.uom || item.stock_uom) === uomData.uom"
+														class="w-4 h-4 text-blue-600"
+														fill="currentColor"
+														viewBox="0 0 20 20"
+													>
+														<path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+													</svg>
+												</div>
+											</button>
+										</div>
+									</div>
+								</div>
+
+								<!-- Item Total Price -->
+								<div class="text-right">
+									<div class="text-[9px] text-gray-500 leading-none mb-0.5">Total</div>
+									<div class="text-xs sm:text-sm font-bold text-blue-600 leading-none">
+										{{ formatCurrency(item.amount || item.rate * item.quantity) }}
+									</div>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -311,9 +387,20 @@
 						</div>
 						<span class="text-xs font-semibold text-gray-900 truncate">Offers</span>
 					</div>
-					<span v-if="availableOffers.length > 0" class="bg-green-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center flex-shrink-0 ml-1">
-						{{ availableOffers.length }}
-					</span>
+					<div class="flex items-center space-x-1 flex-shrink-0 ml-1">
+						<span
+							v-if="appliedOfferCount > 0"
+							class="bg-green-700 text-white text-[9px] font-bold rounded-full px-2 py-0.5 flex items-center"
+						>
+							{{ appliedOfferCount }} Applied
+						</span>
+						<span
+							v-if="offersStore.autoEligibleCount > 0"
+							class="bg-green-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center"
+						>
+							{{ offersStore.autoEligibleCount }}
+						</span>
+					</div>
 				</button>
 
 				<!-- Enter Coupon Code Button -->
@@ -433,7 +520,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { createResource } from "frappe-ui"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { usePOSCartStore } from "@/stores/posCart"
+import { usePOSOffersStore } from "@/stores/posOffers"
 import EditItemDialog from "./EditItemDialog.vue"
+
+// Use Pinia store
+const cartStore = usePOSCartStore()
+const offersStore = usePOSOffersStore()
 
 const props = defineProps({
 	items: {
@@ -462,9 +555,9 @@ const props = defineProps({
 		type: String,
 		default: "USD",
 	},
-	appliedOffer: {
-		type: Object,
-		default: null,
+	appliedOffers: {
+		type: Array,
+		default: () => [],
 	},
 	warehouses: {
 		type: Array,
@@ -493,12 +586,14 @@ const customerSearchContainer = ref(null)
 const allCustomers = ref([])
 const customersLoaded = ref(false)
 const selectedIndex = ref(-1)
-const rawOffers = ref([])
 const availableGiftCards = ref([])
 
 // Edit item dialog state
 const showEditDialog = ref(false)
 const selectedItem = ref(null)
+
+// UOM dropdown state - tracks which item's UOM dropdown is open
+const openUomDropdown = ref(null)
 
 // Load customers into memory on mount for instant filtering
 // Load customers resource
@@ -526,7 +621,7 @@ const customersResource = createResource({
 	},
 })
 
-// Load offers resource
+// Load offers resource and set them in store
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const offersResource = createResource({
 	url: "pos_next.api.offers.get_offers",
@@ -537,7 +632,8 @@ const offersResource = createResource({
 	},
 	auto: true,
 	onSuccess(data) {
-		rawOffers.value = data?.message || data || []
+		const offers = data?.message || data || []
+		offersStore.setAvailableOffers(offers)
 	},
 	onError(error) {
 		console.error("Error loading offers:", error)
@@ -571,25 +667,12 @@ watch(
 	},
 )
 
-function checkOfferEligibility(offer) {
-	// Check eligibility based on SUBTOTAL (before tax)
-	if (offer.min_amt && props.subtotal < offer.min_amt) {
-		return false
-	}
-	if (offer.max_amt && props.subtotal > offer.max_amt) {
-		return false
-	}
-	return true
-}
-
+// Use eligible offers from store (limited to 3 for display)
 const availableOffers = computed(() =>
-	rawOffers.value
-		.filter(
-			(offer) =>
-				offer.auto && !offer.coupon_based && checkOfferEligibility(offer),
-		)
-		.slice(0, 3),
+	offersStore.autoEligibleOffers.slice(0, 3)
 )
+
+const appliedOfferCount = computed(() => (props.appliedOffers || []).length)
 
 // Direct computed results - zero latency filtering!
 const customerResults = computed(() => {
@@ -694,6 +777,9 @@ function incrementQuantity(item) {
 function decrementQuantity(item) {
 	if (item.quantity > 1) {
 		emit("update-quantity", item.item_code, item.quantity - 1)
+	} else {
+		// If quantity is 1, remove the item
+		emit("remove-item", item.item_code)
 	}
 }
 
@@ -704,8 +790,19 @@ function updateQuantity(item, value) {
 	}
 }
 
-function handleUomChange(item, newUom) {
+async function handleUomChange(item, newUom) {
+	await cartStore.changeItemUOM(item.item_code, newUom)
+	openUomDropdown.value = null // Close dropdown after selection
+	// Also emit for parent component compatibility
 	emit("update-uom", item.item_code, newUom)
+}
+
+function toggleUomDropdown(itemCode) {
+	openUomDropdown.value = openUomDropdown.value === itemCode ? null : itemCode
+}
+
+function selectUom(item, uom) {
+	handleUomChange(item, uom)
 }
 
 function openEditDialog(item) {
@@ -713,20 +810,34 @@ function openEditDialog(item) {
 	showEditDialog.value = true
 }
 
-function handleUpdateItem(updatedItem) {
+async function handleUpdateItem(updatedItem) {
+	// Use store method to update item
+	await cartStore.updateItemDetails(updatedItem.item_code, updatedItem)
+	// Also emit for parent component compatibility
 	emit("edit-item", updatedItem)
 }
 
 function handleOutsideClick(event) {
 	const target = event.target
+
+	// Close customer search if clicking outside
 	if (
-		!customerSearchContainer.value ||
-		!(target instanceof Node) ||
-		customerSearchContainer.value.contains(target)
+		customerSearchContainer.value &&
+		target instanceof Node &&
+		!customerSearchContainer.value.contains(target)
 	) {
-		return
+		customerSearch.value = ""
 	}
-	customerSearch.value = ""
+
+	// Close UOM dropdown if clicking outside
+	if (openUomDropdown.value !== null) {
+		// Check if click is outside all UOM dropdowns
+		const clickedInsideUomDropdown = target instanceof Element &&
+			target.closest('.group\\/uom')
+		if (!clickedInsideUomDropdown) {
+			openUomDropdown.value = null
+		}
+	}
 }
 
 onMounted(() => {

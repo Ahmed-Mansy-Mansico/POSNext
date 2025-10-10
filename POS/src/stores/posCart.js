@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useInvoice } from '@/composables/useInvoice'
 import { toast } from 'frappe-ui'
 import { parseError } from '@/utils/errorHandler'
 import { checkStockAvailability, formatStockError } from '@/utils/stockValidator'
+import { usePOSOffersStore } from '@/stores/posOffers'
 
 export const usePOSCartStore = defineStore('posCart', () => {
 	// Use the existing invoice composable for core functionality
@@ -30,10 +31,12 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		recalculateItem,
 	} = useInvoice()
 
+	const offersStore = usePOSOffersStore()
+
 	// Additional cart state
 	const pendingItem = ref(null)
 	const pendingItemQty = ref(1)
-	const autoAppliedOffer = ref(null)
+	const appliedOffers = ref([])
 	const appliedCoupon = ref(null)
 	const selectionMode = ref('uom') // 'uom' or 'variant'
 	const suppressOfferReapply = ref(false)
@@ -93,7 +96,7 @@ export const usePOSCartStore = defineStore('posCart', () => {
 	function clearCart() {
 		clearInvoiceCart()
 		customer.value = null
-		autoAppliedOffer.value = null
+		appliedOffers.value = []
 		appliedCoupon.value = null
 	}
 
@@ -127,7 +130,7 @@ export const usePOSCartStore = defineStore('posCart', () => {
 
 	function removeDiscountFromCart() {
 		suppressOfferReapply.value = true
-		autoAppliedOffer.value = null
+		appliedOffers.value = []
 		removeDiscount()
 		appliedCoupon.value = null
 		toast.create({
@@ -191,11 +194,34 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		return hasDiscounts
 	}
 
+	function getAppliedOfferCodes() {
+		return appliedOffers.value.map(entry => entry.code)
+	}
+
+	function filterActiveOffers(appliedRuleNames = []) {
+		if (!Array.isArray(appliedRuleNames) || appliedRuleNames.length === 0) {
+			appliedOffers.value = []
+			return
+		}
+
+		appliedOffers.value = appliedOffers.value.filter(entry =>
+			appliedRuleNames.includes(entry.code)
+		)
+	}
+
 	async function applyOffer(offer, currentProfile, offersDialogRef = null) {
 		if (!offer) {
 			console.error('No offer provided')
 			offersDialogRef?.resetApplyingState()
-			return
+			return false
+		}
+
+		const offerCode = offer.name
+		const existingCodes = getAppliedOfferCodes()
+		const alreadyApplied = existingCodes.includes(offerCode)
+
+		if (alreadyApplied) {
+			return await removeOffer(offerCode, currentProfile, offersDialogRef)
 		}
 
 		if (!posProfile.value || invoiceItems.value.length === 0) {
@@ -206,12 +232,12 @@ export const usePOSCartStore = defineStore('posCart', () => {
 				iconClasses: "text-orange-600",
 			})
 			offersDialogRef?.resetApplyingState()
-			return
+			return false
 		}
 
 		try {
 			const invoiceData = buildInvoiceDataForOffers(currentProfile)
-			const offerNames = [offer.name]
+			const offerNames = [...new Set([...existingCodes, offerCode])]
 
 			const response = await applyOffersResource.submit({
 				invoice_data: invoiceData,
@@ -220,30 +246,48 @@ export const usePOSCartStore = defineStore('posCart', () => {
 
 			const payload = response?.message || response || {}
 			const responseItems = payload.items || []
-			const appliedRules = payload.applied_pricing_rules || offerNames
+			const rawAppliedRules = payload.applied_pricing_rules
+			const appliedRules = Array.isArray(rawAppliedRules) && rawAppliedRules.length
+				? rawAppliedRules
+				: existingCodes
+			const freeItems = Array.isArray(payload.free_items) ? payload.free_items : []
 
 			suppressOfferReapply.value = true
-			const hasDiscounts = applyServerDiscounts(responseItems)
+			applyServerDiscounts(responseItems)
 
-			if (hasDiscounts) {
-				autoAppliedOffer.value = {
-					name: offer.title || offer.name,
-					code: offer.name,
-					offer: offer,
-					source: "manual",
-					applied: true,
-					rules: appliedRules,
-				}
+			filterActiveOffers(appliedRules)
 
-				toast.create({
-					title: "Offer Applied",
-					text: `${offer.title || offer.name} applied successfully`,
-					icon: "check",
-					iconClasses: "text-green-600",
+			const offerApplied =
+				appliedRules.includes(offerCode) ||
+				freeItems.some(item => {
+					const ruleName = item?.pricing_rules
+					if (Array.isArray(ruleName)) {
+						return ruleName.includes(offerCode)
+					}
+					return ruleName === offerCode
 				})
 
-				return true
-			} else {
+			if (!offerApplied) {
+				// No new offer applied - restore previous state without new offer
+				if (existingCodes.length) {
+					try {
+						const rollbackResponse = await applyOffersResource.submit({
+							invoice_data: invoiceData,
+							selected_offers: existingCodes,
+						})
+						const rollbackPayload = rollbackResponse?.message || rollbackResponse || {}
+						const rollbackItems = rollbackPayload.items || []
+						const rollbackRawRules = rollbackPayload.applied_pricing_rules
+						const rollbackRules = Array.isArray(rollbackRawRules) && rollbackRawRules.length
+							? rollbackRawRules
+							: existingCodes
+						applyServerDiscounts(rollbackItems)
+						filterActiveOffers(rollbackRules)
+					} catch (rollbackError) {
+						console.error("Error rolling back offers:", rollbackError)
+					}
+				}
+
 				toast.create({
 					title: "Offer Not Eligible",
 					text: "Your cart doesn't meet the requirements for this offer.",
@@ -253,6 +297,30 @@ export const usePOSCartStore = defineStore('posCart', () => {
 				offersDialogRef?.resetApplyingState()
 				return false
 			}
+
+			const offerRuleCodes = appliedRules.includes(offerCode)
+				? appliedRules.filter(ruleName => ruleName === offerCode)
+				: [offerCode]
+
+			const updatedEntries = appliedOffers.value.filter(entry => entry.code !== offerCode)
+			updatedEntries.push({
+				name: offer.title || offer.name,
+				code: offerCode,
+				offer,
+				source: "manual",
+				applied: true,
+				rules: offerRuleCodes,
+			})
+			appliedOffers.value = updatedEntries
+
+			toast.create({
+				title: "Offer Applied",
+				text: `${offer.title || offer.name} applied successfully`,
+				icon: "check",
+				iconClasses: "text-green-600",
+			})
+
+			return true
 		} catch (error) {
 			console.error("Error applying offer:", error)
 			toast.create({
@@ -266,41 +334,117 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		}
 	}
 
-	function removeOffer() {
-		suppressOfferReapply.value = true
-		autoAppliedOffer.value = null
-		removeDiscount()
-		toast.create({
-			title: "Offer Removed",
-			text: "Offer has been removed from cart",
-			icon: "check",
-			iconClasses: "text-blue-600",
-		})
+	async function removeOffer(offer, currentProfile = null, offersDialogRef = null) {
+		const offerCode = typeof offer === "string" ? offer : offer?.name || offer?.code
+
+		if (!offerCode) {
+			// Remove all offers
+			suppressOfferReapply.value = true
+			appliedOffers.value = []
+			removeDiscount()
+			toast.create({
+				title: "Offer Removed",
+				text: "Offer has been removed from cart",
+				icon: "check",
+				iconClasses: "text-blue-600",
+			})
+			offersDialogRef?.resetApplyingState()
+			return true
+		}
+
+		const remainingOffers = appliedOffers.value.filter(entry => entry.code !== offerCode)
+		const remainingCodes = remainingOffers.map(entry => entry.code)
+
+		if (remainingCodes.length === 0) {
+			suppressOfferReapply.value = true
+			appliedOffers.value = []
+			removeDiscount()
+			toast.create({
+				title: "Offer Removed",
+				text: "Offer has been removed from cart",
+				icon: "check",
+				iconClasses: "text-blue-600",
+			})
+			offersDialogRef?.resetApplyingState()
+			return true
+		}
+
+		try {
+			const invoiceData = buildInvoiceDataForOffers(currentProfile)
+
+			const response = await applyOffersResource.submit({
+				invoice_data: invoiceData,
+				selected_offers: remainingCodes,
+			})
+
+			const payload = response?.message || response || {}
+			const responseItems = payload.items || []
+			const rawAppliedRules = payload.applied_pricing_rules
+			const appliedRules = Array.isArray(rawAppliedRules) && rawAppliedRules.length
+				? rawAppliedRules
+				: remainingCodes
+
+			suppressOfferReapply.value = true
+			applyServerDiscounts(responseItems)
+			filterActiveOffers(appliedRules)
+
+			appliedOffers.value = appliedOffers.value.filter(entry =>
+				remainingCodes.includes(entry.code)
+			)
+
+			toast.create({
+				title: "Offer Removed",
+				text: "Offer has been removed from cart",
+				icon: "check",
+				iconClasses: "text-blue-600",
+			})
+			offersDialogRef?.resetApplyingState()
+			return true
+		} catch (error) {
+			console.error("Error removing offer:", error)
+			toast.create({
+				title: "Error",
+				text: "Failed to update cart after removing offer.",
+				icon: "x",
+				iconClasses: "text-red-600",
+			})
+			offersDialogRef?.resetApplyingState()
+			return false
+		}
 	}
 
 	async function reapplyOffer(currentProfile) {
-		if (invoiceItems.value.length === 0 && autoAppliedOffer.value) {
-			autoAppliedOffer.value = null
+		if (invoiceItems.value.length === 0 && appliedOffers.value.length) {
+			appliedOffers.value = []
 			return
 		}
 
-		if (invoiceItems.value.length > 0 && autoAppliedOffer.value && !suppressOfferReapply.value) {
+		if (
+			invoiceItems.value.length > 0 &&
+			appliedOffers.value.length > 0 &&
+			!suppressOfferReapply.value
+		) {
 			try {
 				const invoiceData = buildInvoiceDataForOffers(currentProfile)
-				const offerNames = [autoAppliedOffer.value.code]
+				const offerNames = getAppliedOfferCodes()
 
 				const response = await applyOffersResource.submit({
 					invoice_data: invoiceData,
 					selected_offers: offerNames,
 				})
 
-				const payload = response?.message || response || {}
-				const responseItems = payload.items || []
+			const payload = response?.message || response || {}
+			const responseItems = payload.items || []
+			const rawAppliedRules = payload.applied_pricing_rules
+			const appliedRules = Array.isArray(rawAppliedRules) && rawAppliedRules.length
+				? rawAppliedRules
+				: offerNames
 
-				suppressOfferReapply.value = true
-				applyServerDiscounts(responseItems)
+			suppressOfferReapply.value = true
+			applyServerDiscounts(responseItems)
+			filterActiveOffers(appliedRules)
 			} catch (error) {
-				console.error("Error re-applying offer:", error)
+				console.error("Error re-applying offers:", error)
 			}
 		}
 
@@ -420,6 +564,29 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		}
 	}
 
+	function syncOfferSnapshot() {
+		// Only sync if values are initialized
+		if (subtotal.value !== undefined && invoiceItems.value) {
+			// Extract item codes, groups, and brands from cart
+			const itemCodes = invoiceItems.value.map(item => item.item_code)
+			const itemGroups = [...new Set(invoiceItems.value.map(item => item.item_group).filter(Boolean))]
+			const brands = [...new Set(invoiceItems.value.map(item => item.brand).filter(Boolean))]
+
+			offersStore.updateCartSnapshot({
+				subtotal: subtotal.value,
+				itemCount: invoiceItems.value.length,
+				itemCodes,
+				itemGroups,
+				brands,
+			})
+		}
+	}
+
+	// Watch for cart changes to update offer snapshot (min/max thresholds etc.)
+	watch([subtotal, () => invoiceItems.value.length, () => invoiceItems.value.map(i => i.item_code).join(',')], () => {
+		syncOfferSnapshot()
+	}, { immediate: true })
+
 	return {
 		// State
 		invoiceItems,
@@ -433,11 +600,10 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		payments,
 		pendingItem,
 		pendingItemQty,
-		autoAppliedOffer,
+		appliedOffers,
 		appliedCoupon,
 		selectionMode,
 		suppressOfferReapply,
-
 		// Computed
 		itemCount,
 		isEmpty,

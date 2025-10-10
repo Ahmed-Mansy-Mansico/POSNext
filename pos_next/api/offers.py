@@ -18,20 +18,19 @@ def get_offers(pos_profile):
 
 
 def _get_pricing_rules(pos_profile, date):
-    """Return Pricing Rules generated via Promotional Schemes."""
+    """Return Pricing Rules generated via Promotional Schemes with slab details."""
     filters = {
         "company": pos_profile.company,
         "date": date,
     }
 
+    # Fetch pricing rules
     pricing_rules = frappe.db.sql(
         """
         SELECT
                 name, title, apply_on, selling, promotional_scheme,
                 promotional_scheme_id, coupon_code_based,
-                min_qty, max_qty, min_amt, max_amt,
-                price_or_product_discount, rate_or_discount,
-                rate, discount_amount, discount_percentage,
+                price_or_product_discount,
                 priority, valid_from, valid_upto
         FROM `tabPricing Rule`
         WHERE
@@ -49,27 +48,108 @@ def _get_pricing_rules(pos_profile, date):
 
     offers = []
     for rule in pricing_rules:
+        # Get slab details based on discount type
+        if rule.price_or_product_discount == "Price":
+            # Fetch from Promotional Scheme Price Discount slabs
+            slabs = frappe.db.sql(
+                """
+                SELECT
+                    min_qty, max_qty, min_amount, max_amount,
+                    rate_or_discount, rate, discount_amount, discount_percentage,
+                    apply_multiple_pricing_rules
+                FROM `tabPromotional Scheme Price Discount`
+                WHERE parent = %(scheme)s AND disable = 0
+                ORDER BY min_amount ASC, min_qty ASC
+                LIMIT 1
+                """,
+                {"scheme": rule.promotional_scheme},
+                as_dict=1,
+            )
+        else:
+            # Fetch from Promotional Scheme Product Discount slabs
+            slabs = frappe.db.sql(
+                """
+                SELECT
+                    min_qty, max_qty, min_amount, max_amount,
+                    apply_multiple_pricing_rules
+                FROM `tabPromotional Scheme Product Discount`
+                WHERE parent = %(scheme)s AND disable = 0
+                ORDER BY min_amount ASC, min_qty ASC
+                LIMIT 1
+                """,
+                {"scheme": rule.promotional_scheme},
+                as_dict=1,
+            )
+
+        # Skip if no slabs found
+        if not slabs:
+            continue
+
+        slab = slabs[0]
+
+        # Determine if offer should auto-apply:
+        # - Coupon-based offers are NEVER auto (must enter coupon code)
+        # - Offers with apply_multiple_pricing_rules enabled are manual selection
+        # - Otherwise, can auto-apply
+        is_auto = 0
+        if not rule.coupon_code_based:
+            # Only non-coupon offers can be auto-apply
+            # If apply_multiple_pricing_rules is not enabled, it's auto
+            if not slab.apply_multiple_pricing_rules:
+                is_auto = 1
+
+        # Get eligible items/groups for this promotional scheme
+        eligible_items = []
+        eligible_item_groups = []
+        eligible_brands = []
+
+        if rule.apply_on == "Item Code":
+            eligible_items = frappe.db.sql_list(
+                """SELECT item_code FROM `tabPricing Rule Item Code`
+                WHERE parent = %s""",
+                rule.promotional_scheme
+            )
+        elif rule.apply_on == "Item Group":
+            eligible_item_groups = frappe.db.sql_list(
+                """SELECT item_group FROM `tabPricing Rule Item Group`
+                WHERE parent = %s""",
+                rule.promotional_scheme
+            )
+        elif rule.apply_on == "Brand":
+            eligible_brands = frappe.db.sql_list(
+                """SELECT brand FROM `tabPricing Rule Brand`
+                WHERE parent = %s""",
+                rule.promotional_scheme
+            )
+
         offer = {
             "name": rule.name,
             "title": rule.title or rule.promotional_scheme or rule.name,
             "description": rule.title or rule.promotional_scheme,
             "apply_on": rule.apply_on,
             "offer": "Item Price" if rule.price_or_product_discount == "Price" else "Give Product",
-            "auto": 1,
+            "auto": is_auto,
             "coupon_based": 1 if rule.coupon_code_based else 0,
-            "min_qty": flt(rule.min_qty),
-            "max_qty": flt(rule.max_qty),
-            "min_amt": flt(rule.min_amt),
-            "max_amt": flt(rule.max_amt),
-            "discount_type": rule.rate_or_discount,
-            "rate": flt(rule.rate),
-            "discount_amount": flt(rule.discount_amount),
-            "discount_percentage": flt(rule.discount_percentage),
+            # Use min/max from slab
+            "min_qty": flt(slab.min_qty),
+            "max_qty": flt(slab.max_qty),
+            "min_amt": flt(slab.min_amount),
+            "max_amt": flt(slab.max_amount),
+            # Discount info from slab (for price discounts)
+            "discount_type": slab.rate_or_discount if rule.price_or_product_discount == "Price" else None,
+            "rate": flt(slab.rate) if rule.price_or_product_discount == "Price" else 0,
+            "discount_amount": flt(slab.discount_amount) if rule.price_or_product_discount == "Price" else 0,
+            "discount_percentage": flt(slab.discount_percentage) if rule.price_or_product_discount == "Price" else 0,
+            # Validity from pricing rule
             "valid_from": rule.valid_from,
             "valid_upto": rule.valid_upto,
             "source": "Promotional Scheme",
             "promotional_scheme": rule.promotional_scheme,
             "promotional_scheme_id": rule.promotional_scheme_id,
+            # Eligibility criteria
+            "eligible_items": eligible_items,
+            "eligible_item_groups": eligible_item_groups,
+            "eligible_brands": eligible_brands,
         }
         offers.append(offer)
 

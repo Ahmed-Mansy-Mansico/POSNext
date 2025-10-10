@@ -205,7 +205,7 @@
 					:grand-total="cartStore.grandTotal"
 					:pos-profile="shiftStore.profileName"
 					:currency="shiftStore.profileCurrency"
-					:applied-offer="cartStore.autoAppliedOffer"
+					:applied-offers="cartStore.appliedOffers"
 					:warehouses="profileWarehouses"
 					@update-quantity="cartStore.updateItemQuantity"
 					@remove-item="cartStore.removeItem"
@@ -216,7 +216,7 @@
 					@save-draft="handleSaveDraft"
 					@apply-coupon="uiStore.showCouponDialog = true"
 					@show-offers="uiStore.showOffersDialog = true"
-					@remove-offer="cartStore.removeOffer"
+					@remove-offer="offer => cartStore.removeOffer(offer, shiftStore.currentProfile, offersDialogRef.value)"
 					@update-uom="cartStore.changeItemUOM"
 					@edit-item="handleEditItem"
 				/>
@@ -331,9 +331,9 @@
 			:customer="cartStore.customer?.name || cartStore.customer"
 			:company="shiftStore.profileCompany"
 			:currency="shiftStore.profileCurrency"
-			:applied-offer="cartStore.autoAppliedOffer"
+			:applied-offers="cartStore.appliedOffers"
 			@apply-offer="handleApplyOffer"
-			@remove-offer="cartStore.removeOffer"
+			@remove-offer="offer => cartStore.removeOffer(offer, shiftStore.currentProfile, offersDialogRef.value)"
 		/>
 
 		<!-- Batch/Serial Dialog -->

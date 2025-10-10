@@ -131,6 +131,11 @@ def get_item_detail(item, doc=None, warehouse=None, price_list=None, company=Non
 	res["batch_no_data"] = batch_no_data
 	res["serial_no_data"] = serial_no_data
 
+	# Add item_group and brand for offer eligibility checking
+	item_group, brand = frappe.db.get_value("Item", item_code, ["item_group", "brand"])
+	res["item_group"] = item_group
+	res["brand"] = brand
+
 	# Add UOMs data
 	uoms = frappe.get_all(
 		"UOM Conversion Detail",
@@ -342,7 +347,9 @@ def get_item_variants(template_item, pos_profile):
 				"stock_uom",
 				"image",
 				"has_batch_no",
-				"has_serial_no"
+				"has_serial_no",
+				"item_group",
+				"brand"
 			]
 		)
 
@@ -495,6 +502,7 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 				"has_batch_no",
 				"has_serial_no",
 				"item_group",
+				"brand",
 				"has_variants"
 			],
 			start=start,

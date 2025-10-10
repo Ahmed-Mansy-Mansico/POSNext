@@ -154,6 +154,9 @@ export function useInvoice() {
 				batch_no: item.batch_no,
 				serial_no: item.serial_no,
 				item_uoms: item.item_uoms || [],  // Available UOMs for this item
+				// Add item_group and brand for offer eligibility checking
+				item_group: item.item_group,
+				brand: item.brand,
 			}
 			invoiceItems.value.push(newItem)
 			// Recalculate the newly added item to apply taxes

@@ -31,20 +31,21 @@
 				</div>
 
 				<!-- Offers List -->
-				<div v-else class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-					<div
-						v-for="offer in eligibleOffers"
-						:key="offer.name"
-						:class="[
-							'relative rounded-xl p-4 transition-all duration-200 border-2',
-							appliedOffer?.code === offer.name
-								? 'bg-green-50 border-green-500 shadow-md'
-								: 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:border-green-400 hover:shadow-lg cursor-pointer'
-						]"
-					>
+				<div v-else>
+					<div class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+						<div
+							v-for="offer in eligibleOffers"
+							:key="offer.name"
+							:class="[
+								'relative rounded-xl p-4 transition-all duration-200 border-2',
+								isOfferApplied(offer)
+									? 'bg-green-50 border-green-500 shadow-md'
+									: 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:border-green-400 hover:shadow-lg cursor-pointer'
+							]"
+						>
 						<!-- Applied Badge -->
 						<div
-							v-if="appliedOffer?.code === offer.name"
+							v-if="isOfferApplied(offer)"
 							class="absolute top-2 right-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center space-x-1"
 						>
 							<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -131,22 +132,22 @@
 							</div>
 						</div>
 
-						<!-- Progress Bar for Min Amount -->
-						<div v-if="offer.min_amt && subtotal < offer.min_amt" class="mt-3">
+						<!-- Progress Bar for Min Amount (only shown if not eligible) -->
+						<div v-if="offer.min_amt && offersStore.cartSnapshot.subtotal < offer.min_amt" class="mt-3">
 							<div class="flex items-center justify-between text-xs mb-1">
 								<span class="text-gray-600">Subtotal (before tax)</span>
 								<span class="text-gray-900 font-semibold">
-									{{ formatCurrency(subtotal) }} / {{ formatCurrency(offer.min_amt) }}
+									{{ formatCurrency(offersStore.cartSnapshot.subtotal) }} / {{ formatCurrency(offer.min_amt) }}
 								</span>
 							</div>
 							<div class="w-full bg-gray-200 rounded-full h-2">
 								<div
 									class="bg-green-600 h-2 rounded-full transition-all"
-									:style="{ width: `${Math.min((subtotal / offer.min_amt) * 100, 100)}%` }"
+									:style="{ width: `${Math.min((offersStore.cartSnapshot.subtotal / offer.min_amt) * 100, 100)}%` }"
 								></div>
 							</div>
 							<p class="text-xs text-orange-600 mt-1 font-medium">
-								Add {{ formatCurrency(offer.min_amt - subtotal) }} more to unlock
+								Add {{ formatCurrency(offersStore.getUnlockAmount(offer)) }} more to unlock
 							</p>
 						</div>
 
@@ -157,16 +158,17 @@
 							:disabled="applyingOffer"
 							:class="[
 								'mt-3 w-full py-2 px-4 rounded-lg font-semibold text-sm transition-all',
-								appliedOffer?.code === offer.name
+								isOfferApplied(offer)
 									? 'bg-red-600 hover:bg-red-700 text-white'
 									: 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg',
 								applyingOffer ? 'opacity-70 cursor-not-allowed' : ''
 							]"
 						>
-							{{ appliedOffer?.code === offer.name ? 'Remove Offer' : 'Apply Offer' }}
+							{{ isOfferApplied(offer) ? 'Remove Offer' : 'Apply Offer' }}
 						</button>
 					</div>
 				</div>
+			</div>
 			</div>
 		</template>
 		<template #actions>
@@ -181,8 +183,12 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { Dialog, Button, createResource, toast } from 'frappe-ui'
+import { Dialog, Button } from 'frappe-ui'
 import { formatCurrency as formatCurrencyUtil } from '@/utils/currency'
+import { usePOSOffersStore } from '@/stores/posOffers'
+
+// Use Pinia stores
+const offersStore = usePOSOffersStore()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -199,64 +205,31 @@ const props = defineProps({
 		type: String,
 		default: 'USD'
 	},
-	appliedOffer: {
-		type: Object,
-		default: null
+	appliedOffers: {
+		type: Array,
+		default: () => []
 	}
 })
 
 const emit = defineEmits(['update:modelValue', 'apply-offer', 'remove-offer'])
 
 const show = ref(props.modelValue)
-const allOffers = ref([])
-const loading = ref(false)
 const applyingOffer = ref(false)
-
-// Resource to load offers
-const offersResource = createResource({
-	url: 'pos_next.api.offers.get_offers',
-	makeParams() {
-		return {
-			pos_profile: props.posProfile
-		}
-	},
-	auto: false,
-	onSuccess(data) {
-		allOffers.value = data?.message || data || []
-		loading.value = false
-	},
-	onError(error) {
-		console.error('Error loading offers:', error)
-		loading.value = false
-		toast({
-			title: 'Error',
-			text: 'Failed to load offers',
-			icon: 'x',
-			iconClasses: 'text-red-600'
-		})
-	}
+const appliedOfferCodes = computed(() => {
+	return new Set((props.appliedOffers || []).map(entry => entry?.code).filter(Boolean))
 })
 
-// Computed eligible offers - only show offers the user is eligible for
-const eligibleOffers = computed(() => {
-	if (!allOffers.value) return []
+// Use ALL eligible offers from store (includes both auto and manual offers)
+const eligibleOffers = computed(() => offersStore.allEligibleOffersSorted)
 
-	// Filter to only show eligible, non-coupon offers
-	return allOffers.value
-		.filter(offer => !offer.coupon_based && checkOfferEligibility(offer))
-		.sort((a, b) => {
-			// Sort by discount value (higher discounts first)
-			const aValue = a.discount_percentage || a.discount_amount || 0
-			const bValue = b.discount_percentage || b.discount_amount || 0
-			return bValue - aValue
-		})
+// Loading state - check if offers are being loaded
+const loading = computed(() => {
+	return !offersStore.hasFetched && eligibleOffers.value.length === 0
 })
 
 watch(() => props.modelValue, (val) => {
 	show.value = val
-	if (val) {
-		loadOffers()
-	}
+	// No need to load offers - they're already in the store
 })
 
 watch(show, (val) => {
@@ -267,46 +240,16 @@ watch(show, (val) => {
 	}
 })
 
-function checkOfferEligibility(offer) {
-	// Check minimum amount (on subtotal before tax)
-	if (offer.min_amt && props.subtotal < offer.min_amt) {
-		return false
-	}
-	// Check maximum amount (on subtotal before tax)
-	if (offer.max_amt && props.subtotal > offer.max_amt) {
-		return false
-	}
-	// Check minimum quantity
-	if (offer.min_qty) {
-		const totalQty = props.items.reduce((sum, item) => sum + item.quantity, 0)
-		if (totalQty < offer.min_qty) {
-			return false
-		}
-	}
-	return true
-}
-
-async function loadOffers() {
-	if (!props.posProfile) return
-	loading.value = true
-	try {
-		await offersResource.reload()
-	} catch (error) {
-		console.error('Error loading offers:', error)
-		loading.value = false
-	}
-}
-
 async function handleApplyOffer(offer) {
 	if (applyingOffer.value) {
 		return
 	}
 
 	// Toggle offer - if already applied, remove it
-	if (props.appliedOffer?.code === offer.name) {
+	if (isOfferApplied(offer)) {
 		applyingOffer.value = true
 		try {
-			emit('remove-offer')
+			emit('remove-offer', offer)
 			// Close dialog after successful removal
 			await new Promise(resolve => setTimeout(resolve, 500))
 			show.value = false
@@ -334,6 +277,10 @@ function resetApplyingState() {
 
 // Expose for parent component
 defineExpose({ resetApplyingState })
+
+function isOfferApplied(offer) {
+	return appliedOfferCodes.value.has(offer?.name)
+}
 
 function formatCurrency(amount) {
 	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
