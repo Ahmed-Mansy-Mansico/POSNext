@@ -467,13 +467,14 @@ const searchMode = computed(() => {
 
 const searchPlaceholder = computed(() => SEARCH_PLACEHOLDERS[searchMode.value])
 
-// Watch for cart items and pos profile changes
+// Watch for cart items and pos profile changes (optimized - uses length + hash instead of deep watch)
+// Tracks: length, item_code, quantity, and amount to detect all cart changes including array replacements
 watch(
-	() => props.cartItems,
-	(newCartItems) => {
-		itemStore.setCartItems(newCartItems)
+	() => `${props.cartItems.length}-${props.cartItems.map(i => `${i.item_code}:${i.quantity || 0}:${i.amount || 0}`).join('|')}`,
+	() => {
+		itemStore.setCartItems(props.cartItems)
 	},
-	{ immediate: true, deep: true },
+	{ immediate: true }
 )
 
 watch(

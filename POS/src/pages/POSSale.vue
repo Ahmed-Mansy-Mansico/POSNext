@@ -641,6 +641,9 @@ const dividerRef = ref(null)
 const pendingPaymentAfterCustomer = ref(false)
 const logoutAfterClose = ref(false)
 
+// Debounce timer for offer reapplication
+const offerReapplyTimer = ref(null)
+
 // Promotion dialog
 const showPromotionManagement = ref(false)
 
@@ -692,12 +695,12 @@ let resizeState = null
 let bodyStyleSnapshot = null
 
 onMounted(async () => {
-	// Window resize listeners
+	// Window resize listeners (passive for better performance)
 	const handleResize = () => {
 		uiStore.setWindowWidth(window.innerWidth)
 		updateLayoutBounds()
 	}
-	window.addEventListener('resize', handleResize)
+	window.addEventListener('resize', handleResize, { passive: true })
 
 	try {
 		// Start timers for current time and shift duration
@@ -739,10 +742,24 @@ watch(() => shiftStore.hasOpenShift, value => {
 	}
 })
 
-// Watch for cart changes to re-apply offers
-watch(() => cartStore.invoiceItems, async () => {
-	await cartStore.reapplyOffer(shiftStore.currentProfile)
-}, { deep: true })
+// Watch for cart changes to re-apply offers (optimized - uses computed key instead of deep watch + debounced)
+// Tracks: item_code, quantity, rate, discount_percentage, discount_amount to catch all pricing changes
+watch(
+	() => cartStore.invoiceItems.map(i =>
+		`${i.item_code}-${i.quantity}-${i.rate}-${i.discount_percentage || 0}-${i.discount_amount || 0}`
+	).join(','),
+	() => {
+		// Clear existing timer to prevent multiple API calls
+		if (offerReapplyTimer.value) {
+			clearTimeout(offerReapplyTimer.value)
+		}
+
+		// Set new timer - reapply offers after 500ms of no changes
+		offerReapplyTimer.value = setTimeout(async () => {
+			await cartStore.reapplyOffer(shiftStore.currentProfile)
+		}, 500)
+	}
+)
 
 onUnmounted(() => {
 	window.removeEventListener('resize', () => {

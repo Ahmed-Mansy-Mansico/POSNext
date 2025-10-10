@@ -275,10 +275,10 @@ if (typeof window !== 'undefined') {
 				})
 			}
 		}
-	})
+	}, { passive: true })
 
 	window.addEventListener('offline', () => {
 		console.log('Gone offline')
 		window.posNextServerOnline = false
-	})
+	}, { passive: true })
 }

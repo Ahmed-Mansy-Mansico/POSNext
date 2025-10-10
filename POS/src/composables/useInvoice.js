@@ -304,8 +304,7 @@ export function useInvoice() {
 		// Step 5: Calculate final item amount (net amount + tax)
 		item.amount = netAmount + taxAmount
 
-		// Force reactivity update
-		invoiceItems.value = [...invoiceItems.value]
+		// Vue 3 reactivity tracks mutations automatically - no need to replace array
 	}
 
 	function addPayment(payment) {

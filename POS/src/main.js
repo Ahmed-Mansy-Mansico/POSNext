@@ -43,7 +43,7 @@ if ('serviceWorker' in navigator) {
 				}
 			})
 		})
-	})
+	}, { passive: true })
 }
 
 const globalComponents = {

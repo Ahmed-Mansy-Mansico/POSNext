@@ -122,12 +122,12 @@ export function useOffline() {
 		updateOfflineStatus()
 		updatePendingCount()
 
-		// Listen to online/offline events
-		window.addEventListener('online', handleOnline)
-		window.addEventListener('offline', handleOffline)
+		// Listen to online/offline events (passive for better performance)
+		window.addEventListener('online', handleOnline, { passive: true })
+		window.addEventListener('offline', handleOffline, { passive: true })
 
-		// Listen to worker status changes
-		window.addEventListener('offlineStatusChange', handleWorkerStatusChange)
+		// Listen to worker status changes (passive for better performance)
+		window.addEventListener('offlineStatusChange', handleWorkerStatusChange, { passive: true })
 	})
 
 	onUnmounted(() => {
