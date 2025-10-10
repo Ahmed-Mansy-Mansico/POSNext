@@ -206,6 +206,7 @@
 					:pos-profile="shiftStore.profileName"
 					:currency="shiftStore.profileCurrency"
 					:applied-offer="cartStore.autoAppliedOffer"
+					:warehouses="profileWarehouses"
 					@update-quantity="cartStore.updateItemQuantity"
 					@remove-item="cartStore.removeItem"
 					@select-customer="handleCustomerSelected"
@@ -217,6 +218,7 @@
 					@show-offers="uiStore.showOffersDialog = true"
 					@remove-offer="cartStore.removeOffer"
 					@update-uom="cartStore.changeItemUOM"
+					@edit-item="handleEditItem"
 				/>
 			</div>
 
@@ -592,8 +594,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from "vue"
-import { Button, Dialog, toast } from "frappe-ui"
+import { ref, onMounted, onUnmounted, watch, computed } from "vue"
+import { Button, Dialog, toast, createResource } from "frappe-ui"
 import { session } from "@/data/session"
 import { parseError } from "@/utils/errorHandler"
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue"
@@ -641,6 +643,49 @@ const logoutAfterClose = ref(false)
 
 // Promotion dialog
 const showPromotionManagement = ref(false)
+
+// Warehouses state and resource
+const warehousesList = ref([])
+
+const warehousesResource = createResource({
+	url: "pos_next.api.pos_profile.get_warehouses",
+	makeParams() {
+		return {
+			pos_profile: shiftStore.profileName
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		const warehouses = data?.message || data || []
+		warehousesList.value = warehouses
+	},
+	onError(error) {
+		console.error("Error loading warehouses:", error)
+		warehousesList.value = []
+	}
+})
+
+// Watch for profile changes to load warehouses
+watch(() => shiftStore.profileName, (newProfile) => {
+	if (newProfile) {
+		warehousesResource.reload()
+	}
+}, { immediate: true })
+
+// Computed for warehouses - returns all warehouses for the company
+const profileWarehouses = computed(() => {
+	if (warehousesList.value.length > 0) {
+		return warehousesList.value.map(w => ({
+			name: w.name,
+			warehouse: w.warehouse_name || w.name
+		}))
+	}
+	// Fallback to profile warehouse if API hasn't loaded yet
+	if (shiftStore.profileWarehouse) {
+		return [{ name: shiftStore.profileWarehouse, warehouse: shiftStore.profileWarehouse }]
+	}
+	return []
+})
 
 // Resize state
 let resizeState = null
@@ -787,6 +832,10 @@ function handleItemSelected(item, autoAdd = false) {
 	} catch (error) {
 		uiStore.showError("Insufficient Stock", error.message, `Item: ${item.item_code}`)
 	}
+}
+
+async function handleEditItem(updatedItem) {
+	await cartStore.updateItemDetails(updatedItem.item_code, updatedItem)
 }
 
 function handleCustomerSelected(selectedCustomer) {

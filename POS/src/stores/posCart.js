@@ -348,6 +348,78 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		}
 	}
 
+	async function updateItemDetails(itemCode, updatedDetails) {
+		try {
+			const cartItem = invoiceItems.value.find(i => i.item_code === itemCode)
+			if (!cartItem) {
+				throw new Error('Item not found in cart')
+			}
+
+			// If UOM changed, fetch new rate from server
+			if (updatedDetails.uom && updatedDetails.uom !== cartItem.uom) {
+				try {
+					const itemDetails = await getItemDetailsResource.submit({
+						item_code: itemCode,
+						pos_profile: posProfile.value,
+						customer: customer.value?.name || customer.value,
+						qty: updatedDetails.quantity || cartItem.quantity,
+						uom: updatedDetails.uom
+					})
+
+					const uomData = cartItem.item_uoms?.find(u => u.uom === updatedDetails.uom)
+
+					// Update with server response
+					cartItem.uom = updatedDetails.uom
+					cartItem.conversion_factor = uomData?.conversion_factor || itemDetails.conversion_factor || 1
+					cartItem.rate = itemDetails.price_list_rate || itemDetails.rate
+					cartItem.price_list_rate = itemDetails.price_list_rate
+				} catch (error) {
+					console.warn('Failed to fetch UOM details, using provided rate:', error)
+					// Fall back to using the provided rate
+					cartItem.uom = updatedDetails.uom
+				}
+			}
+
+			// Update all provided details
+			if (updatedDetails.quantity !== undefined) {
+				cartItem.quantity = updatedDetails.quantity
+			}
+			if (updatedDetails.rate !== undefined) {
+				cartItem.rate = updatedDetails.rate
+			}
+			if (updatedDetails.warehouse !== undefined) {
+				cartItem.warehouse = updatedDetails.warehouse
+			}
+			if (updatedDetails.discount_percentage !== undefined) {
+				cartItem.discount_percentage = updatedDetails.discount_percentage
+			}
+			if (updatedDetails.discount_amount !== undefined) {
+				cartItem.discount_amount = updatedDetails.discount_amount
+			}
+
+			// Recalculate item totals
+			recalculateItem(cartItem)
+
+			toast.create({
+				title: "Item Updated",
+				text: `${cartItem.item_name} updated successfully`,
+				icon: "check",
+				iconClasses: "text-green-600",
+			})
+
+			return true
+		} catch (error) {
+			console.error("Error updating item details:", error)
+			toast.create({
+				title: "Error",
+				text: parseError(error) || "Failed to update item. Please try again.",
+				icon: "alert-circle",
+				iconClasses: "text-red-600",
+			})
+			return false
+		}
+	}
+
 	return {
 		// State
 		invoiceItems,
@@ -387,6 +459,7 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		removeOffer,
 		reapplyOffer,
 		changeItemUOM,
+		updateItemDetails,
 		getItemDetailsResource,
 		recalculateItem,
 		applyOffersResource,

@@ -231,7 +231,7 @@
 						</div>
 					</div>
 
-					<!-- Quantity Controls and Total -->
+					<!-- Quantity Controls, Edit Button, and Total -->
 					<div class="flex items-center justify-between gap-2">
 						<div class="flex items-center space-x-1">
 							<button
@@ -258,6 +258,18 @@
 								:aria-label="'Increase quantity'"
 							>
 								+
+							</button>
+							<!-- Edit Button -->
+							<button
+								type="button"
+								@click="openEditDialog(item)"
+								class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-50 hover:bg-blue-100 active:bg-blue-200 flex items-center justify-center transition-all touch-manipulation active:scale-95"
+								:aria-label="'Edit item details'"
+								title="Edit item details"
+							>
+								<svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+								</svg>
 							</button>
 						</div>
 						<div class="text-right">
@@ -404,6 +416,15 @@
 				</button>
 			</div>
 		</div>
+
+		<!-- Edit Item Dialog -->
+		<EditItemDialog
+			v-model="showEditDialog"
+			:item="selectedItem"
+			:warehouses="warehouses"
+			:currency="currency"
+			@update-item="handleUpdateItem"
+		/>
 	</div>
 </template>
 
@@ -412,6 +433,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { createResource } from "frappe-ui"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import EditItemDialog from "./EditItemDialog.vue"
 
 const props = defineProps({
 	items: {
@@ -444,6 +466,10 @@ const props = defineProps({
 		type: Object,
 		default: null,
 	},
+	warehouses: {
+		type: Array,
+		default: () => []
+	},
 })
 
 const emit = defineEmits([
@@ -459,6 +485,7 @@ const emit = defineEmits([
 	"show-offers",
 	"remove-offer",
 	"update-uom",
+	"edit-item",
 ])
 
 const customerSearch = ref("")
@@ -468,6 +495,10 @@ const customersLoaded = ref(false)
 const selectedIndex = ref(-1)
 const rawOffers = ref([])
 const availableGiftCards = ref([])
+
+// Edit item dialog state
+const showEditDialog = ref(false)
+const selectedItem = ref(null)
 
 // Load customers into memory on mount for instant filtering
 // Load customers resource
@@ -675,6 +706,15 @@ function updateQuantity(item, value) {
 
 function handleUomChange(item, newUom) {
 	emit("update-uom", item.item_code, newUom)
+}
+
+function openEditDialog(item) {
+	selectedItem.value = { ...item }
+	showEditDialog.value = true
+}
+
+function handleUpdateItem(updatedItem) {
+	emit("edit-item", updatedItem)
 }
 
 function handleOutsideClick(event) {

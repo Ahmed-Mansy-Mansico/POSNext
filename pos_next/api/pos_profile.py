@@ -116,3 +116,35 @@ def get_taxes(pos_profile):
 		frappe.log_error(frappe.get_traceback(), "Get Taxes Error")
 		# Return empty array instead of throwing - taxes are optional
 		return []
+
+
+@frappe.whitelist()
+def get_warehouses(pos_profile):
+	"""Get all warehouses for the company in POS Profile"""
+	try:
+		if not pos_profile:
+			return []
+
+		# Get the company from POS Profile
+		company = frappe.db.get_value("POS Profile", pos_profile, "company")
+
+		if not company:
+			return []
+
+		# Get all active warehouses for the company
+		warehouses = frappe.get_list(
+			"Warehouse",
+			filters={
+				"company": company,
+				"disabled": 0,
+				"is_group": 0
+			},
+			fields=["name", "warehouse_name"],
+			order_by="warehouse_name",
+			limit_page_length=0
+		)
+
+		return warehouses
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Warehouses Error")
+		return []
