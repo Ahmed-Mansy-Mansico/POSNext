@@ -1,7 +1,55 @@
 import { call } from "@/utils/apiWrapper"
 
-// Print utility for POS invoices
-export function printInvoice(invoiceData) {
+/**
+ * Print invoice using Frappe's print format system
+ * @param {Object} invoiceData - The invoice document data
+ * @param {string} printFormat - The print format name (optional)
+ * @param {string} letterhead - The letterhead name (optional)
+ */
+export async function printInvoice(invoiceData, printFormat = null, letterhead = null) {
+	try {
+		if (!invoiceData || !invoiceData.name) {
+			throw new Error('Invalid invoice data')
+		}
+
+		const doctype = invoiceData.doctype || 'Sales Invoice'
+		const format = printFormat || 'POS Next Receipt'
+
+		// Build PDF print URL
+		const params = new URLSearchParams({
+			doctype: doctype,
+			name: invoiceData.name,
+			format: format,
+			no_letterhead: letterhead ? 0 : 1,
+			_lang: 'en',
+			trigger_print: 1
+		})
+
+		if (letterhead) {
+			params.append('letterhead', letterhead)
+		}
+
+		// Open PDF in new window - browser will handle print dialog
+		const printUrl = `/api/method/frappe.utils.print_format.download_pdf?${params.toString()}`
+		const printWindow = window.open(printUrl, '_blank', 'width=800,height=600')
+
+		if (!printWindow) {
+			throw new Error('Failed to open print window. Please check your popup blocker settings.')
+		}
+
+		return true
+	} catch (error) {
+		console.error('Error printing with Frappe print format:', error)
+		// Fallback to custom print format
+		return printInvoiceCustom(invoiceData)
+	}
+}
+
+/**
+ * Custom print format as fallback
+ * @param {Object} invoiceData - The invoice document data
+ */
+function printInvoiceCustom(invoiceData) {
 	const printWindow = window.open('', '_blank', 'width=800,height=600')
 
 	const printContent = `
@@ -161,39 +209,99 @@ export function printInvoice(invoiceData) {
 
 				<!-- Items -->
 				<div class="items-table">
-					${invoiceData.items.map(item => `
+					${invoiceData.items.map(item => {
+						const hasItemDiscount = item.discount_percentage || item.discount_amount;
+						const hasDistributedDiscount = item.distributed_discount_amount;
+						const isFree = item.is_free_item;
+						const qty = item.qty || item.quantity;
+						const amount = item.amount || (item.rate * qty);
+
+						// Calculate original amount if there's a discount
+						let originalAmount = amount;
+						if (hasItemDiscount && item.price_list_rate && item.price_list_rate > item.rate) {
+							originalAmount = qty * item.price_list_rate;
+						}
+
+						return `
 						<div class="item-row">
 							<div style="flex: 1;">
-								<div class="item-name">${item.item_name || item.item_code}</div>
-								<div class="item-details">
-									<span>${item.qty || item.quantity} × ${formatCurrency(item.rate)}</span>
-									<span>${formatCurrency(item.amount || (item.rate * (item.qty || item.quantity)))}</span>
+								<div class="item-name">
+									${item.item_name || item.item_code}${isFree ? ' (FREE)' : ''}
 								</div>
+								<div class="item-details">
+									<span>${qty} × ${formatCurrency(item.rate)}</span>
+									<span>${formatCurrency(amount)}</span>
+								</div>
+								${hasItemDiscount ? `
+								<div class="item-details" style="margin-top: 2px;">
+									<span style="font-size: 10px; color: #666;">
+										${item.discount_percentage ? `  Disc ${item.discount_percentage}%` : ''}
+										${item.price_list_rate && item.price_list_rate > item.rate ? ` (was ${formatCurrency(originalAmount)})` : ''}
+									</span>
+									<span style="font-size: 10px; color: #28a745;">-${formatCurrency(item.discount_amount || 0)}</span>
+								</div>
+								` : ''}
+								${hasDistributedDiscount ? `
+								<div class="item-details" style="margin-top: 2px;">
+									<span style="font-size: 10px; color: #666;">  Additional Disc</span>
+									<span style="font-size: 10px; color: #28a745;">-${formatCurrency(item.distributed_discount_amount)}</span>
+								</div>
+								` : ''}
 							</div>
 						</div>
-					`).join('')}
+						`;
+					}).join('')}
 				</div>
 
 				<!-- Totals -->
 				<div class="totals">
+					${(() => {
+						// Calculate total discount from items
+						let totalItemDiscount = 0;
+						let subtotalBeforeDiscount = 0;
+
+						invoiceData.items.forEach(item => {
+							const qty = item.qty || item.quantity;
+							// Use price_list_rate if available, otherwise use rate
+							const originalRate = item.price_list_rate || item.rate;
+							subtotalBeforeDiscount += originalRate * qty;
+
+							// Sum up item-level discounts
+							if (item.discount_amount) {
+								totalItemDiscount += parseFloat(item.discount_amount);
+							}
+							if (item.distributed_discount_amount) {
+								totalItemDiscount += parseFloat(item.distributed_discount_amount);
+							}
+						});
+
+						// Add invoice-level additional discount
+						const additionalDiscount = parseFloat(invoiceData.discount_amount || 0);
+						const totalDiscount = totalItemDiscount + additionalDiscount;
+
+						return `
 					<div class="total-row">
 						<span>Subtotal:</span>
-						<span>${formatCurrency(invoiceData.subtotal || invoiceData.net_total)}</span>
+						<span>${formatCurrency(subtotalBeforeDiscount)}</span>
 					</div>
-					${invoiceData.discount_amount && invoiceData.discount_amount > 0 ? `
-					<div class="total-row" style="color: #28a745;">
-						<span>Discount:</span>
-						<span>-${formatCurrency(invoiceData.discount_amount)}</span>
+					${totalDiscount > 0 ? `
+					<div class="total-row">
+						<span>Discount${invoiceData.additional_discount_percentage ? ` (${invoiceData.additional_discount_percentage}%)` : ''}:</span>
+						<span style="color: #28a745;">-${formatCurrency(totalDiscount)}</span>
 					</div>
 					` : ''}
+					${invoiceData.total_taxes_and_charges && invoiceData.total_taxes_and_charges > 0 ? `
 					<div class="total-row">
 						<span>Tax:</span>
-						<span>${formatCurrency(invoiceData.total_taxes_and_charges || 0)}</span>
+						<span>${formatCurrency(invoiceData.total_taxes_and_charges)}</span>
 					</div>
+					` : ''}
 					<div class="total-row grand-total">
-						<span>GRAND TOTAL:</span>
+						<span>TOTAL:</span>
 						<span>${formatCurrency(invoiceData.grand_total)}</span>
 					</div>
+						`;
+					})()}
 				</div>
 
 				<!-- Payments -->
@@ -249,16 +357,44 @@ function formatCurrency(amount) {
 	return parseFloat(amount || 0).toFixed(2)
 }
 
-export async function printInvoiceByName(invoiceName) {
+/**
+ * Print invoice by name, fetching print format from POS Profile
+ * @param {string} invoiceName - The name of the invoice to print
+ * @param {string} printFormat - Optional print format override
+ * @param {string} letterhead - Optional letterhead override
+ */
+export async function printInvoiceByName(invoiceName, printFormat = null, letterhead = null) {
 	try {
-		const response = await call('frappe.client.get', {
+		// Fetch the invoice document
+		const invoiceDoc = await call('frappe.client.get', {
 			doctype: 'Sales Invoice',
 			name: invoiceName
 		})
 
-		if (response) {
-			printInvoice(response)
+		if (!invoiceDoc) {
+			throw new Error('Invoice not found')
 		}
+
+		// If no print format specified and invoice has a POS Profile, fetch its print settings
+		if (!printFormat && invoiceDoc.pos_profile) {
+			try {
+				const posProfileDoc = await call('frappe.client.get', {
+					doctype: 'POS Profile',
+					name: invoiceDoc.pos_profile
+				})
+
+				if (posProfileDoc) {
+					printFormat = posProfileDoc.print_format
+					letterhead = letterhead || posProfileDoc.letter_head
+				}
+			} catch (error) {
+				console.warn('Could not fetch POS Profile print settings:', error)
+				// Continue with default print format
+			}
+		}
+
+		// Print the invoice
+		return await printInvoice(invoiceDoc, printFormat, letterhead)
 	} catch (error) {
 		console.error('Error fetching invoice for print:', error)
 		throw error

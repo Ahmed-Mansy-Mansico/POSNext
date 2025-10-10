@@ -94,6 +94,18 @@ fixtures = [
 				]
 			]
 		]
+	},
+	{
+		"dt": "Print Format",
+		"filters": [
+			[
+				"name",
+				"in",
+				[
+					"POS Next Receipt"
+				]
+			]
+		]
 	}
 ]
 
@@ -101,7 +113,8 @@ fixtures = [
 # ------------
 
 # before_install = "pos_next.install.before_install"
-# after_install = "pos_next.install.after_install"
+after_install = "pos_next.install.after_install"
+after_migrate = "pos_next.install.after_migrate"
 
 # Uninstallation
 # ------------
