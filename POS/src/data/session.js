@@ -2,6 +2,7 @@ import router from "@/router"
 import { createResource } from "frappe-ui"
 import { computed, reactive } from "vue"
 
+import { ensureCSRFToken } from "@/utils/csrf"
 import { userResource } from "./user"
 
 export function sessionUser() {
@@ -22,8 +23,11 @@ export const session = reactive({
 				pwd: password,
 			}
 		},
-		onSuccess(data) {
-			userResource.reload()
+		async onSuccess(data) {
+			// Initialize CSRF token immediately after successful login
+			await ensureCSRFToken()
+
+			await userResource.reload()
 			session.user = sessionUser()
 			session.login.reset()
 			router.replace(data.default_route || "/")
