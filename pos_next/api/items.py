@@ -334,13 +334,20 @@ def get_item_variants(template_item, pos_profile):
 		pos_profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
 
 		# Get all variants of this template
+		# Apply company filter: show variants for specific company + global variants (empty company)
+		variant_filters = {
+			"variant_of": template_item,
+			"disabled": 0,
+			"is_sales_item": 1
+		}
+
+		# Add company filter to show items for specific company + global items
+		if pos_profile_doc.company:
+			variant_filters["ifnull(custom_company, '')"] = ["in", [pos_profile_doc.company, ""]]
+
 		variants = frappe.get_all(
 			"Item",
-			filters={
-				"variant_of": template_item,
-				"disabled": 0,
-				"is_sales_item": 1
-			},
+			filters=variant_filters,
 			fields=[
 				"name as item_code",
 				"item_name",
@@ -349,7 +356,8 @@ def get_item_variants(template_item, pos_profile):
 				"has_batch_no",
 				"has_serial_no",
 				"item_group",
-				"brand"
+				"brand",
+				"custom_company"
 			]
 		)
 
@@ -474,6 +482,11 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 		# - Regular items (has_variants=0, variant_of is null) are shown → direct add to cart
 		# - Variant items (has_variants=0, variant_of is not null) are HIDDEN from main list
 
+		# Add company filter - show items for specific company + global items (empty company)
+		# Global items (custom_company is empty) are available to all companies
+		if pos_profile_doc.company:
+			filters["ifnull(custom_company, '')"] = ["in", [pos_profile_doc.company, ""]]
+
 		# Add item group filter if provided
 		if item_group:
 			filters["item_group"] = item_group
@@ -503,7 +516,8 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 				"has_serial_no",
 				"item_group",
 				"brand",
-				"has_variants"
+				"has_variants",
+				"custom_company"
 			],
 			start=start,
 			page_length=limit,

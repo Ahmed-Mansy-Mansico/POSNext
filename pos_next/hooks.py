@@ -90,7 +90,8 @@ fixtures = [
 				"in",
 				[
 					"Sales Invoice-posa_pos_opening_shift",
-					"Sales Invoice-posa_is_printed"
+					"Sales Invoice-posa_is_printed",
+					"Item-custom_company"
 				]
 			]
 		]
@@ -119,7 +120,7 @@ after_migrate = "pos_next.install.after_migrate"
 # Uninstallation
 # ------------
 
-# before_uninstall = "pos_next.uninstall.before_uninstall"
+before_uninstall = "pos_next.uninstall.before_uninstall"
 # after_uninstall = "pos_next.uninstall.after_uninstall"
 
 # Integration Setup
@@ -156,6 +157,13 @@ after_migrate = "pos_next.install.after_migrate"
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
+# Standard Queries
+# ----------------
+# Custom query for company-aware item filtering
+standard_queries = {
+	"Item": "pos_next.validations.item_query"
+}
+
 # DocType Class
 # ---------------
 # Override standard doctype classes
@@ -168,13 +176,11 @@ after_migrate = "pos_next.install.after_migrate"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Item": {
+		"validate": "pos_next.validations.validate_item"
+	}
+}
 
 # Scheduled Tasks
 # ---------------
