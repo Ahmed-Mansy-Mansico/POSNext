@@ -165,6 +165,9 @@
 								:src="item.image"
 								:alt="item.item_name"
 								loading="lazy"
+								width="48"
+								height="48"
+								decoding="async"
 								class="w-full h-full object-cover"
 							/>
 							<svg

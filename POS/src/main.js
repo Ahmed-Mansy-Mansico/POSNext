@@ -154,6 +154,13 @@ async function initializeApp() {
 		app.component(key, globalComponents[key])
 	}
 
+	// Add touch-action directive for mobile optimization
+	app.directive('touch-action', {
+		mounted(el) {
+			el.style.touchAction = 'manipulation'
+		}
+	})
+
 	// Mount app with CSRF token initialized
 	app.mount("#app")
 

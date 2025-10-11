@@ -16,3 +16,37 @@ body {
 .dialog-content {
 	z-index: 500 !important;
 }
+
+/* Mobile touch optimizations - removes 300ms tap delay and improves scrolling */
+.touch-manipulation {
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/* Apply touch-action to all interactive elements */
+button,
+a,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+.cursor-pointer {
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/* Optimized button touch animations - prevents layout thrashing */
+.btn-touch {
+	transition: transform 0.1s ease;
+	will-change: transform;
+}
+
+.btn-touch:active {
+	transform: scale(0.95);
+}
+
+/* Override Tailwind's active:scale-95 with optimized version */
+button.active\:scale-95:active,
+.active\:scale-95:active {
+	transform: scale(0.95);
+	will-change: transform;
+}
