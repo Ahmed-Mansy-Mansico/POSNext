@@ -57,12 +57,12 @@
 				</div>
 
 				<!-- Right Side: Controls -->
-				<div class="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0">
+				<div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
 					<!-- WiFi/Offline Status -->
 					<button
 						@click="$emit('sync-click')"
 						:class="[
-							'p-1 sm:p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors relative group touch-manipulation',
+							'p-2 sm:p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors relative group touch-manipulation',
 							isSyncing ? 'animate-pulse' : ''
 						]"
 						:title="isOffline ? `Offline (${pendingInvoicesCount} pending)` : 'Online - Click to sync'"
@@ -70,7 +70,7 @@
 					>
 						<svg
 							v-if="!isOffline"
-							class="w-4 h-4 sm:w-5 sm:h-5 text-green-600"
+							class="w-5 h-5 text-green-600"
 							fill="currentColor"
 							viewBox="0 0 24 24"
 						>
@@ -78,7 +78,7 @@
 						</svg>
 						<svg
 							v-else
-							class="w-4 h-4 sm:w-5 sm:h-5 text-orange-600"
+							class="w-5 h-5 text-orange-600"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -87,11 +87,139 @@
 						</svg>
 						<span
 							v-if="pendingInvoicesCount > 0"
-							class="absolute -top-0.5 -right-0.5 bg-orange-600 text-white text-[8px] sm:text-[10px] font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center shadow-md"
+							class="absolute -top-1 -right-1 bg-orange-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md"
 						>
 							{{ pendingInvoicesCount }}
 						</span>
 					</button>
+
+					<!-- Cache Status Indicator -->
+					<div class="relative group">
+						<button
+							@click="toggleCacheTooltip"
+							class="p-2 sm:p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors relative touch-manipulation"
+							:aria-label="getCacheAriaLabel()"
+						>
+							<!-- Database/Cache Icon with color-coded status -->
+							<svg
+								class="w-5 h-5 transition-colors"
+								:class="getCacheIconColor()"
+								fill="currentColor"
+								viewBox="0 0 24 24"
+							>
+								<path d="M12 2C8.13 2 5 3.12 5 4.5V7c0 1.38 3.13 2.5 7 2.5S19 8.38 19 7V4.5C19 3.12 15.87 2 12 2zM5 9v3c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5V9c0 1.38-3.13 2.5-7 2.5S5 10.38 5 9zm0 5v3c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5v-3c0 1.38-3.13 2.5-7 2.5S5 15.38 5 14z"/>
+							</svg>
+							<!-- Spinning overlay when syncing -->
+							<svg
+								v-if="cacheSyncing"
+								class="w-5 h-5 absolute top-2 left-2 animate-spin opacity-70"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+								:class="getCacheIconColor()"
+							>
+								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+							</svg>
+						</button>
+
+						<!-- Custom Tooltip - Works on hover (desktop) and click (mobile) -->
+						<div
+							v-if="showCacheTooltip"
+							@click="toggleCacheTooltip"
+							class="fixed inset-0 z-[999] sm:hidden"
+						>
+							<!-- Mobile backdrop -->
+							<div class="absolute inset-0 bg-black/20"></div>
+							<!-- Mobile tooltip -->
+							<div class="absolute top-20 left-1/2 -translate-x-1/2 w-[90%] max-w-[280px]">
+								<div class="bg-gray-900 text-white text-sm rounded-lg shadow-2xl py-3 px-4">
+									<!-- Tooltip Arrow (pointing up) -->
+									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-px">
+										<div class="border-[6px] border-transparent border-b-gray-900"></div>
+									</div>
+
+									<!-- Status Header -->
+									<div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-700">
+										<span class="font-semibold text-base">Catalog Cache</span>
+										<span
+											class="px-2.5 py-1 rounded text-xs font-bold uppercase"
+											:class="getCacheStatusBadgeClass()"
+										>
+											{{ getCacheStatus() }}
+										</span>
+									</div>
+
+									<!-- Cache Stats -->
+									<div class="space-y-2">
+										<div class="flex items-center justify-between">
+											<span class="text-gray-400">Items Cached:</span>
+											<span class="font-semibold text-base">{{ cacheStats?.items || 0 }}</span>
+										</div>
+										<div v-if="cacheStats?.lastSync" class="flex items-center justify-between">
+											<span class="text-gray-400">Last Sync:</span>
+											<span class="font-semibold text-xs">{{ formatLastSync() }}</span>
+										</div>
+										<div v-if="cacheSyncing" class="flex items-center justify-between">
+											<span class="text-gray-400">Status:</span>
+											<span class="text-orange-400 font-semibold flex items-center gap-1.5">
+												<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+												</svg>
+												Syncing...
+											</span>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Desktop Tooltip - Hover only -->
+						<div
+							class="hidden sm:block absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-50"
+						>
+							<div class="bg-gray-900 text-white text-xs rounded-lg shadow-xl py-2 px-3 min-w-[220px]">
+								<!-- Tooltip Arrow (pointing up) -->
+								<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-px">
+									<div class="border-4 border-transparent border-b-gray-900"></div>
+								</div>
+
+								<!-- Status Header -->
+								<div class="flex items-center justify-between mb-2 pb-2 border-b border-gray-700">
+									<span class="font-semibold">Catalog Cache</span>
+									<span
+										class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+										:class="getCacheStatusBadgeClass()"
+									>
+										{{ getCacheStatus() }}
+									</span>
+								</div>
+
+								<!-- Cache Stats -->
+								<div class="space-y-1.5">
+									<div class="flex items-center justify-between">
+										<span class="text-gray-400">Items Cached:</span>
+										<span class="font-semibold">{{ cacheStats?.items || 0 }}</span>
+									</div>
+									<div v-if="cacheStats?.lastSync" class="flex items-center justify-between">
+										<span class="text-gray-400">Last Sync:</span>
+										<span class="font-semibold text-[10px]">{{ formatLastSync() }}</span>
+									</div>
+									<div v-if="cacheSyncing" class="flex items-center justify-between">
+										<span class="text-gray-400">Status:</span>
+										<span class="text-orange-400 font-semibold flex items-center gap-1">
+											<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+												<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+											</svg>
+											Syncing...
+										</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
 
 					<!-- Printer - Hidden on small screens -->
 					<div class="hidden md:block">
@@ -135,11 +263,19 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import ActionButton from '@/components/common/ActionButton.vue'
 import UserMenu from '@/components/common/UserMenu.vue'
 
-defineProps({
+// Mobile tooltip state
+const showCacheTooltip = ref(false)
+
+function toggleCacheTooltip() {
+	showCacheTooltip.value = !showCacheTooltip.value
+}
+
+const props = defineProps({
 	currentTime: {
 		type: String,
 		required: true
@@ -175,10 +311,71 @@ defineProps({
 	isAnyDialogOpen: {
 		type: Boolean,
 		default: false
+	},
+	cacheSyncing: {
+		type: Boolean,
+		default: false
+	},
+	cacheStats: {
+		type: Object,
+		default: () => ({ items: 0, lastSync: null })
 	}
 })
 
 defineEmits(['sync-click', 'printer-click', 'refresh-click', 'menu-click', 'logout', 'menu-opened', 'menu-closed'])
+
+// Cache status helpers
+function getCacheIconColor() {
+	if (!props.cacheStats || props.cacheStats.items === 0) {
+		return 'text-red-600' // Red: No cache
+	}
+	if (props.cacheSyncing) {
+		return 'text-orange-600' // Orange: Syncing in progress
+	}
+	return 'text-green-600' // Green: Cache ready
+}
+
+function getCacheStatus() {
+	if (!props.cacheStats || props.cacheStats.items === 0) {
+		return 'Empty'
+	}
+	if (props.cacheSyncing) {
+		return 'Syncing'
+	}
+	return 'Ready'
+}
+
+function getCacheStatusBadgeClass() {
+	if (!props.cacheStats || props.cacheStats.items === 0) {
+		return 'bg-red-500/20 text-red-300'
+	}
+	if (props.cacheSyncing) {
+		return 'bg-orange-500/20 text-orange-300'
+	}
+	return 'bg-green-500/20 text-green-300'
+}
+
+function formatLastSync() {
+	if (!props.cacheStats?.lastSync) {
+		return 'Never'
+	}
+	const date = new Date(props.cacheStats.lastSync)
+	return date.toLocaleTimeString('en-US', {
+		hour: '2-digit',
+		minute: '2-digit',
+		second: '2-digit'
+	})
+}
+
+function getCacheAriaLabel() {
+	if (!props.cacheStats || props.cacheStats.items === 0) {
+		return 'Cache empty'
+	}
+	if (props.cacheSyncing) {
+		return 'Cache syncing'
+	}
+	return 'Cache ready'
+}
 
 // SVG Path Icons
 const timeIcon = "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"

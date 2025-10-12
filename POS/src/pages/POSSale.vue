@@ -16,6 +16,8 @@
 				:is-syncing="offlineStore.isSyncing"
 				:pending-invoices-count="offlineStore.pendingInvoicesCount"
 				:is-any-dialog-open="uiStore.isAnyDialogOpen"
+				:cache-syncing="itemStore.cacheSyncing"
+				:cache-stats="itemStore.cacheStats"
 				@sync-click="handleSyncClick"
 				@printer-click="uiStore.showHistoryDialog = true"
 				@refresh-click="handleRefresh"
@@ -625,6 +627,7 @@ import { usePOSShiftStore } from "@/stores/posShift"
 import { usePOSUIStore } from "@/stores/posUI"
 import { usePOSSyncStore } from "@/stores/posSync"
 import { usePOSDraftsStore } from "@/stores/posDrafts"
+import { useItemSearchStore } from "@/stores/itemSearch"
 
 // Initialize stores
 const cartStore = usePOSCartStore()
@@ -632,6 +635,7 @@ const shiftStore = usePOSShiftStore()
 const uiStore = usePOSUIStore()
 const offlineStore = usePOSSyncStore()
 const draftsStore = usePOSDraftsStore()
+const itemStore = useItemSearchStore()
 
 // Component refs
 const itemsSelectorRef = ref(null)
