@@ -271,6 +271,36 @@ export function useInvoice() {
 		})
 	}
 
+	// Performance: Cache tax calculation to avoid repeated loops
+	let cachedTaxRate = 0
+	let taxRulesCacheKey = ''
+
+	function calculateTotalTaxRate() {
+		// Create cache key from tax rules
+		const currentKey = JSON.stringify(taxRules.value)
+
+		// Return cached value if tax rules haven't changed
+		if (currentKey === taxRulesCacheKey && cachedTaxRate !== 0) {
+			return cachedTaxRate
+		}
+
+		// Calculate total tax rate
+		let totalRate = 0
+		if (taxRules.value && taxRules.value.length > 0) {
+			for (const taxRule of taxRules.value) {
+				if (taxRule.charge_type === "On Net Total" || taxRule.charge_type === "On Previous Row Total") {
+					totalRate += (taxRule.rate || 0)
+				}
+			}
+		}
+
+		// Cache the result
+		cachedTaxRate = totalRate
+		taxRulesCacheKey = currentKey
+
+		return totalRate
+	}
+
 	function recalculateItem(item) {
 		// Step 1: Calculate base amount (rate * quantity)
 		const baseAmount = item.quantity * item.rate
@@ -290,15 +320,9 @@ export function useInvoice() {
 		// Step 3: Calculate net amount (after discount, before tax)
 		const netAmount = baseAmount - discountAmount
 
-		// Step 4: Calculate tax on net amount
-		let taxAmount = 0
-		if (taxRules.value && taxRules.value.length > 0) {
-			for (const taxRule of taxRules.value) {
-				if (taxRule.charge_type === "On Net Total" || taxRule.charge_type === "On Previous Row Total") {
-					taxAmount += (netAmount * (taxRule.rate || 0)) / 100
-				}
-			}
-		}
+		// Step 4: Calculate tax on net amount (optimized with cached tax rate)
+		const totalTaxRate = calculateTotalTaxRate()
+		const taxAmount = (netAmount * totalTaxRate) / 100
 		item.tax_amount = taxAmount
 
 		// Step 5: Calculate final item amount (net amount + tax)

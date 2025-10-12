@@ -644,6 +644,9 @@ const logoutAfterClose = ref(false)
 // Debounce timer for offer reapplication
 const offerReapplyTimer = ref(null)
 
+// Performance: Cache previous cart state to avoid unnecessary reapplications
+let previousCartHash = ''
+
 // Promotion dialog
 const showPromotionManagement = ref(false)
 
@@ -742,22 +745,37 @@ watch(() => shiftStore.hasOpenShift, value => {
 	}
 })
 
-// Watch for cart changes to re-apply offers (optimized - uses computed key instead of deep watch + debounced)
-// Tracks: item_code, quantity, rate, discount_percentage, discount_amount to catch all pricing changes
+// Watch for cart changes to re-apply offers (optimized - only watch length and defer expensive calculations)
+// Performance: Only recalculate hash if cart length changed, then check if content actually changed
 watch(
-	() => cartStore.invoiceItems.map(i =>
-		`${i.item_code}-${i.quantity}-${i.rate}-${i.discount_percentage || 0}-${i.discount_amount || 0}`
-	).join(','),
+	() => cartStore.invoiceItems.length,
 	() => {
+		// Only proceed if there are applied offers
+		if (cartStore.appliedOffers.length === 0) {
+			return
+		}
+
+		// Calculate hash only when length changes
+		const currentHash = cartStore.invoiceItems.map(i =>
+			`${i.item_code}-${i.quantity}-${i.rate}-${i.discount_percentage || 0}-${i.discount_amount || 0}`
+		).join(',')
+
+		// Skip if cart content hasn't actually changed
+		if (currentHash === previousCartHash) {
+			return
+		}
+
+		previousCartHash = currentHash
+
 		// Clear existing timer to prevent multiple API calls
 		if (offerReapplyTimer.value) {
 			clearTimeout(offerReapplyTimer.value)
 		}
 
-		// Set new timer - reapply offers after 500ms of no changes
+		// Set new timer - reapply offers after 800ms of no changes (increased for better performance)
 		offerReapplyTimer.value = setTimeout(async () => {
 			await cartStore.reapplyOffer(shiftStore.currentProfile)
-		}, 500)
+		}, 800)
 	}
 )
 

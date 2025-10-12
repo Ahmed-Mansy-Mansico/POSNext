@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useInvoice } from '@/composables/useInvoice'
 import { toast } from 'frappe-ui'
 import { parseError } from '@/utils/errorHandler'
@@ -74,23 +74,8 @@ export const usePOSCartStore = defineStore('posCart', () => {
 			}
 		}
 
+		// Add item to cart - no toast notification for performance
 		addItemToInvoice(item, qty)
-
-		if (autoAdd) {
-			toast.create({
-				title: "✓ Auto-Added to Cart",
-				text: `${item.item_name} added to cart`,
-				icon: "check",
-				iconClasses: "text-blue-600",
-			})
-		} else {
-			toast.create({
-				title: "Item Added",
-				text: `${item.item_name} added to cart`,
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
-		}
 	}
 
 	function clearCart() {
@@ -564,28 +549,44 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		}
 	}
 
+	// Performance: Cache previous item codes hash to avoid unnecessary recalculations
+	let previousItemCodesHash = ''
+	let cachedItemCodes = []
+	let cachedItemGroups = []
+	let cachedBrands = []
+
 	function syncOfferSnapshot() {
 		// Only sync if values are initialized
 		if (subtotal.value !== undefined && invoiceItems.value) {
-			// Extract item codes, groups, and brands from cart
-			const itemCodes = invoiceItems.value.map(item => item.item_code)
-			const itemGroups = [...new Set(invoiceItems.value.map(item => item.item_group).filter(Boolean))]
-			const brands = [...new Set(invoiceItems.value.map(item => item.brand).filter(Boolean))]
+			// Create hash for item codes to detect actual changes
+			const currentHash = invoiceItems.value.map(item => item.item_code).join(',')
+
+			// Only recalculate expensive operations if items actually changed
+			if (currentHash !== previousItemCodesHash) {
+				cachedItemCodes = invoiceItems.value.map(item => item.item_code)
+				cachedItemGroups = [...new Set(invoiceItems.value.map(item => item.item_group).filter(Boolean))]
+				cachedBrands = [...new Set(invoiceItems.value.map(item => item.brand).filter(Boolean))]
+				previousItemCodesHash = currentHash
+			}
 
 			offersStore.updateCartSnapshot({
 				subtotal: subtotal.value,
 				itemCount: invoiceItems.value.length,
-				itemCodes,
-				itemGroups,
-				brands,
+				itemCodes: cachedItemCodes,
+				itemGroups: cachedItemGroups,
+				brands: cachedBrands,
 			})
 		}
 	}
 
 	// Watch for cart changes to update offer snapshot (min/max thresholds etc.)
-	watch([subtotal, () => invoiceItems.value.length, () => invoiceItems.value.map(i => i.item_code).join(',')], () => {
-		syncOfferSnapshot()
-	}, { immediate: true })
+	// Optimized: Only watch length and subtotal, calculate hash inside the watcher
+	watch([subtotal, () => invoiceItems.value.length], () => {
+		// Defer to next tick to prevent blocking UI
+		nextTick(() => {
+			syncOfferSnapshot()
+		})
+	}, { immediate: true, flush: 'post' })
 
 	return {
 		// State

@@ -180,6 +180,7 @@
 					<div
 						v-for="item in paginatedItems"
 						:key="item.item_code"
+						v-memo="[item.item_code, item.actual_qty, item.stock_qty, item.rate, item.price_list_rate]"
 						@click="handleItemClick(item)"
 						class="relative bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-lg transition-all touch-manipulation active:scale-95 active:shadow-xl"
 					>
@@ -310,6 +311,7 @@
 						<tr
 							v-for="item in paginatedItems"
 							:key="item.item_code"
+							v-memo="[item.item_code, item.actual_qty, item.stock_qty, item.rate, item.price_list_rate]"
 							@click="handleItemClick(item)"
 							class="cursor-pointer hover:bg-blue-50 transition-colors touch-manipulation active:bg-blue-100"
 						>
