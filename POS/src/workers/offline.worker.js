@@ -342,6 +342,49 @@ async function deleteOfflineInvoice(id) {
 	}
 }
 
+// Update stock quantities in cached items
+async function updateStockQuantities(stockUpdates) {
+	try {
+		const db = await initDB()
+
+		if (!stockUpdates || stockUpdates.length === 0) {
+			return { success: true, updated: 0 }
+		}
+
+		let updatedCount = 0
+
+		// Process each stock update
+		for (const update of stockUpdates) {
+			const { item_code, warehouse, actual_qty, stock_qty } = update
+
+			if (!item_code) {
+				continue
+			}
+
+			// Get the cached item
+			const item = await db.items.get(item_code)
+
+			if (!item) {
+				continue
+			}
+
+			// Update stock quantities for this warehouse
+			item.actual_qty = actual_qty !== undefined ? actual_qty : stock_qty
+			item.stock_qty = stock_qty !== undefined ? stock_qty : actual_qty
+			item.warehouse = warehouse || item.warehouse
+
+			// Save updated item back to cache
+			await db.items.put(item)
+			updatedCount++
+		}
+
+		return { success: true, updated: updatedCount }
+	} catch (error) {
+		console.error('Worker: Error updating stock quantities:', error)
+		throw error
+	}
+}
+
 // Message handler
 self.onmessage = async (event) => {
 	const { type, payload, id } = event.data
@@ -401,6 +444,10 @@ self.onmessage = async (event) => {
 			case 'SET_MANUAL_OFFLINE':
 				manualOffline = payload.value
 				result = { success: true, manualOffline }
+				break
+
+			case 'UPDATE_STOCK_QUANTITIES':
+				result = await updateStockQuantities(payload.stockUpdates)
 				break
 
 			default:

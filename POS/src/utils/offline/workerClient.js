@@ -139,6 +139,10 @@ class OfflineWorkerClient {
 		return this.sendMessage('SET_MANUAL_OFFLINE', { value })
 	}
 
+	async updateStockQuantities(stockUpdates) {
+		return this.sendMessage('UPDATE_STOCK_QUANTITIES', { stockUpdates })
+	}
+
 	terminate() {
 		if (this.worker) {
 			this.worker.terminate()

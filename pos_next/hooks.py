@@ -179,6 +179,11 @@ standard_queries = {
 doc_events = {
 	"Item": {
 		"validate": "pos_next.validations.validate_item"
+	},
+	"Sales Invoice": {
+		"on_submit": "pos_next.realtime_events.emit_stock_update_event",
+		"on_cancel": "pos_next.realtime_events.emit_stock_update_event",
+		"after_insert": "pos_next.realtime_events.emit_invoice_created_event"
 	}
 }
 

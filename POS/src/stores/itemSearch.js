@@ -539,6 +539,47 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 		posProfile.value = profile
 	}
 
+	function invalidateCache() {
+		// Clear result cache to force UI refresh with updated stock
+		resultCache.value.clear()
+	}
+
+	function applyStockUpdates(stockUpdates) {
+		// Apply stock updates directly to reactive arrays for immediate UI refresh
+		if (!stockUpdates || stockUpdates.length === 0) {
+			return
+		}
+
+		// Build lookup map for O(1) access
+		const updateMap = new Map()
+		stockUpdates.forEach(update => {
+			updateMap.set(update.item_code, update)
+		})
+
+		// Update allItems array in-place
+		allItems.value.forEach(item => {
+			const update = updateMap.get(item.item_code)
+			if (update) {
+				item.actual_qty = update.actual_qty
+				item.stock_qty = update.stock_qty
+				item.warehouse = update.warehouse
+			}
+		})
+
+		// Update searchResults array in-place
+		searchResults.value.forEach(item => {
+			const update = updateMap.get(item.item_code)
+			if (update) {
+				item.actual_qty = update.actual_qty
+				item.stock_qty = update.stock_qty
+				item.warehouse = update.warehouse
+			}
+		})
+
+		// Clear result cache to force recomputation
+		resultCache.value.clear()
+	}
+
 	return {
 		// State
 		allItems,
@@ -576,6 +617,8 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 		startBackgroundCacheSync,
 		stopBackgroundCacheSync,
 		cleanup,
+		invalidateCache,
+		applyStockUpdates,
 
 		// Resources
 		itemGroupsResource,

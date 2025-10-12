@@ -620,6 +620,8 @@ import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
 import ItemSelectionDialog from "@/components/sale/ItemSelectionDialog.vue"
 import PromotionManagement from "@/components/sale/PromotionManagement.vue"
 import { printInvoiceByName } from "@/utils/printInvoice"
+import { useRealtimeStock } from "@/composables/useRealtimeStock"
+import { offlineWorker } from "@/utils/offline/workerClient"
 
 // Pinia Stores
 import { usePOSCartStore } from "@/stores/posCart"
@@ -636,6 +638,9 @@ const uiStore = usePOSUIStore()
 const offlineStore = usePOSSyncStore()
 const draftsStore = usePOSDraftsStore()
 const itemStore = useItemSearchStore()
+
+// Real-time stock updates
+const { onStockUpdate } = useRealtimeStock()
 
 // Component refs
 const itemsSelectorRef = ref(null)
@@ -715,6 +720,29 @@ onMounted(async () => {
 		updateLayoutBounds()
 	}
 	window.addEventListener('resize', handleResize, { passive: true })
+
+	// Set up real-time stock update listener
+	const cleanup = onStockUpdate(async (stockUpdates) => {
+		// Filter updates to only include items from our warehouse(s)
+		const profileWarehouses = shiftStore.profileWarehouse
+			? [shiftStore.profileWarehouse]
+			: warehousesList.value.map(w => w.warehouse_name || w.name)
+
+		const relevantUpdates = stockUpdates.filter(update =>
+			profileWarehouses.includes(update.warehouse)
+		)
+
+		if (relevantUpdates.length > 0) {
+			// Update IndexedDB cache with filtered updates (warehouse-specific)
+			await offlineWorker.updateStockQuantities(relevantUpdates)
+
+			// Apply stock updates directly to reactive arrays for immediate UI refresh
+			itemStore.applyStockUpdates(relevantUpdates)
+		}
+	})
+
+	// Store cleanup function for unmount
+	onUnmounted(cleanup)
 
 	try {
 		// Start timers for current time and shift duration
