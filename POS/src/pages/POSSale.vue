@@ -1209,7 +1209,8 @@ async function handleSaveDraft() {
 	const success = await draftsStore.saveDraftInvoice(
 		cartStore.invoiceItems,
 		cartStore.customer,
-		cartStore.posProfile
+		cartStore.posProfile,
+		cartStore.appliedOffers
 	)
 	if (success) {
 		cartStore.clearCart()
@@ -1221,6 +1222,14 @@ async function handleLoadDraft(draft) {
 		const draftData = await draftsStore.loadDraft(draft)
 		cartStore.invoiceItems = draftData.items
 		cartStore.setCustomer(draftData.customer)
+
+		// Restore applied offers if they were saved
+		if (draftData.applied_offers && draftData.applied_offers.length > 0) {
+			cartStore.appliedOffers = draftData.applied_offers
+			// Trigger offer reapplication to ensure they apply to all items
+			await cartStore.reapplyOffer(shiftStore.currentProfile)
+		}
+
 		uiStore.showDraftDialog = false
 	} catch (error) {
 		// Error handled in store

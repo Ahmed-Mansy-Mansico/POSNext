@@ -16,7 +16,7 @@ export const usePOSDraftsStore = defineStore('posDrafts', () => {
 		}
 	}
 
-	async function saveDraftInvoice(invoiceItems, customer, posProfile) {
+	async function saveDraftInvoice(invoiceItems, customer, posProfile, appliedOffers = []) {
 		if (invoiceItems.length === 0) {
 			toast.create({
 				title: "Empty Cart",
@@ -32,6 +32,7 @@ export const usePOSDraftsStore = defineStore('posDrafts', () => {
 				pos_profile: posProfile,
 				customer: customer,
 				items: invoiceItems,
+				applied_offers: appliedOffers, // Save applied offers
 			}
 
 			await saveDraft(draftData)
@@ -72,7 +73,8 @@ export const usePOSDraftsStore = defineStore('posDrafts', () => {
 
 			return {
 				items: draft.items || [],
-				customer: draft.customer
+				customer: draft.customer,
+				applied_offers: draft.applied_offers || [] // Restore applied offers
 			}
 		} catch (error) {
 			console.error("Error loading draft:", error)
