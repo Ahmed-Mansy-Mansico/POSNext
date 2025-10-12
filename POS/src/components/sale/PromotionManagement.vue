@@ -63,6 +63,8 @@
 									:options="[
 										{ label: 'All Status', value: 'all' },
 										{ label: 'Active Only', value: 'active' },
+										{ label: 'Expired Only', value: 'expired' },
+										{ label: 'Not Started', value: 'not_started' },
 										{ label: 'Disabled Only', value: 'disabled' }
 									]"
 								/>
@@ -135,11 +137,11 @@
 												<p class="text-xs text-gray-500 mt-0.5">{{ promotion.items_count || 0 }} items</p>
 											</div>
 											<Badge
-												:variant="promotion.disable ? 'subtle' : 'subtle'"
-												:theme="promotion.disable ? 'red' : 'green'"
+												variant="subtle"
+												:theme="getStatusTheme(promotion.status)"
 												size="sm"
 											>
-												{{ promotion.disable ? 'Disabled' : 'Active' }}
+												{{ promotion.status || 'Active' }}
 											</Badge>
 										</div>
 										<div class="flex items-center justify-between text-xs">
@@ -677,9 +679,13 @@ const filteredPromotions = computed(() => {
 
 	// Filter by status
 	if (filterStatus.value === 'active') {
-		filtered = filtered.filter(p => !p.disable)
+		filtered = filtered.filter(p => p.status === 'Active')
+	} else if (filterStatus.value === 'expired') {
+		filtered = filtered.filter(p => p.status === 'Expired')
+	} else if (filterStatus.value === 'not_started') {
+		filtered = filtered.filter(p => p.status === 'Not Started')
 	} else if (filterStatus.value === 'disabled') {
-		filtered = filtered.filter(p => p.disable)
+		filtered = filtered.filter(p => p.status === 'Disabled')
 	}
 
 	return filtered
@@ -1128,6 +1134,21 @@ function formatDate(dateStr) {
 	if (!dateStr) return ''
 	const date = new Date(dateStr)
 	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function getStatusTheme(status) {
+	switch (status) {
+		case 'Active':
+			return 'green'
+		case 'Expired':
+			return 'red'
+		case 'Not Started':
+			return 'orange'
+		case 'Disabled':
+			return 'gray'
+		default:
+			return 'gray'
+	}
 }
 </script>
 

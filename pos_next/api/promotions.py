@@ -59,6 +59,8 @@ def get_promotions(pos_profile=None, company=None, include_disabled=False):
 	)
 
 	# Enrich with pricing rules count and details
+	today = getdate(nowdate())
+
 	for scheme in schemes:
 		# Get pricing rules count
 		scheme["pricing_rules_count"] = frappe.db.count(
@@ -80,6 +82,16 @@ def get_promotions(pos_profile=None, company=None, include_disabled=False):
 			scheme["items_count"] = len(scheme_doc.brands or [])
 		else:
 			scheme["items_count"] = 0
+
+		# Calculate status based on dates and disable flag
+		if scheme.disable:
+			scheme["status"] = "Disabled"
+		elif scheme.valid_from and getdate(scheme.valid_from) > today:
+			scheme["status"] = "Not Started"
+		elif scheme.valid_upto and getdate(scheme.valid_upto) < today:
+			scheme["status"] = "Expired"
+		else:
+			scheme["status"] = "Active"
 
 	return schemes
 
