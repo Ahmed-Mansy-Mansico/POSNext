@@ -33,6 +33,14 @@
 			</div>
 		</div>
 
+		<!-- Cache Sync Indicator -->
+		<div v-if="cacheSyncing" class="px-1.5 sm:px-3 py-1 bg-blue-50 border-b border-blue-200">
+			<div class="flex items-center justify-center space-x-2 text-[10px] sm:text-xs text-blue-700">
+				<div class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+				<span>Syncing catalog in background... {{ cacheStats.items }} items cached</span>
+			</div>
+		</div>
+
 		<!-- Search Bar with Barcode Scanner and View Controls -->
 		<div class="px-1.5 sm:px-3 py-1.5 sm:py-2 bg-white border-b border-gray-200">
 			<div class="flex items-center space-x-1 sm:space-x-2">
@@ -140,10 +148,10 @@
 		</div>
 
 		<!-- Loading State -->
-		<div v-if="loading" class="flex-1 flex items-center justify-center p-3">
+		<div v-if="loading || searching" class="flex-1 flex items-center justify-center p-3">
 			<div class="text-center py-8">
 				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-				<p class="mt-3 text-xs text-gray-500">Loading items...</p>
+				<p class="mt-3 text-xs text-gray-500">{{ searching ? 'Searching all items...' : 'Loading items...' }}</p>
 			</div>
 		</div>
 
@@ -175,7 +183,11 @@
 
 		<!-- Grid View -->
 		<div v-else-if="viewMode === 'grid'" class="flex-1 flex flex-col overflow-hidden">
-			<div class="flex-1 overflow-y-auto p-1.5 sm:p-3">
+			<div
+				ref="gridScrollContainer"
+				class="flex-1 overflow-y-auto p-1.5 sm:p-3"
+				@scroll="handleScroll"
+			>
 				<div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 sm:gap-2.5">
 					<div
 						v-for="item in paginatedItems"
@@ -234,6 +246,22 @@
                                                         </p>
 						</div>
 					</div>
+				</div>
+
+				<!-- Loading More Indicator for Grid View -->
+				<div v-if="loadingMore" class="flex justify-center items-center py-4">
+					<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+					<p class="ml-2 text-xs text-gray-500">Loading more items...</p>
+				</div>
+
+				<!-- End of Results Indicator - Only show when browsing (not searching) -->
+				<div v-else-if="!hasMore && filteredItems.length > 0 && !searchTerm" class="flex justify-center items-center py-3">
+					<p class="text-xs text-gray-400">All items loaded</p>
+				</div>
+
+				<!-- Search Results Count -->
+				<div v-else-if="searchTerm && filteredItems.length > 0" class="flex justify-center items-center py-3">
+					<p class="text-xs text-gray-500">{{ filteredItems.length }} items found</p>
 				</div>
 			</div>
 
@@ -295,7 +323,11 @@
 
 		<!-- Table View -->
 		<div v-else class="flex-1 flex flex-col overflow-hidden">
-			<div class="flex-1 overflow-x-auto overflow-y-auto">
+			<div
+				ref="listScrollContainer"
+				class="flex-1 overflow-x-auto overflow-y-auto"
+				@scroll="handleScroll"
+			>
 				<table class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50 sticky top-0 z-0">
 						<tr>
@@ -336,6 +368,22 @@
 					</tbody>
 				</table>
 				<div v-if="paginatedItems.length === 0" class="text-center py-8 text-gray-500">No items found</div>
+
+				<!-- Loading More Indicator for Table View -->
+				<div v-if="loadingMore" class="flex justify-center items-center py-4 bg-white">
+					<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+					<p class="ml-2 text-xs text-gray-500">Loading more items...</p>
+				</div>
+
+				<!-- End of Results Indicator - Only show when browsing (not searching) -->
+				<div v-else-if="!hasMore && filteredItems.length > 0 && !searchTerm" class="flex justify-center items-center py-3 bg-white">
+					<p class="text-xs text-gray-400">All items loaded</p>
+				</div>
+
+				<!-- Search Results Count -->
+				<div v-else-if="searchTerm && filteredItems.length > 0" class="flex justify-center items-center py-3 bg-white">
+					<p class="text-xs text-gray-500">{{ filteredItems.length }} items found</p>
+				</div>
 			</div>
 
 			<!-- Pagination Controls for List View -->
@@ -397,7 +445,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue"
+import { ref, computed, onMounted, onUnmounted, watch } from "vue"
 import { toast } from "frappe-ui"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { useItemSearchStore } from "@/stores/itemSearch"
@@ -419,7 +467,7 @@ const emit = defineEmits(["item-selected"])
 
 // Use Pinia store
 const itemStore = useItemSearchStore()
-const { filteredItems, searchTerm, selectedItemGroup, itemGroups, loading } =
+const { filteredItems, searchTerm, selectedItemGroup, itemGroups, loading, loadingMore, searching, hasMore, cacheReady, cacheSyncing, cacheStats } =
 	storeToRefs(itemStore)
 
 // Local state
@@ -434,7 +482,11 @@ const userManuallySetView = ref(false) // Track if user manually changed view mo
 const scannerInputDetected = ref(false) // Track if current input is from scanner
 const autoSearchTimer = ref(null) // Timer for auto-search when typing stops
 
-// Pagination state
+// Infinite scroll refs
+const gridScrollContainer = ref(null)
+const listScrollContainer = ref(null)
+
+// Pagination state (for client-side display)
 const currentPage = ref(1)
 const itemsPerPage = ref(20)
 
@@ -523,11 +575,37 @@ watch(
 	{ immediate: false },
 )
 
+// Infinite scroll handler
+function handleScroll(event) {
+	const container = event.target
+	const scrollPosition = container.scrollTop + container.clientHeight
+	const scrollHeight = container.scrollHeight
+
+	// Load more when user is within 200px of the bottom
+	const threshold = 200
+
+	// Only trigger infinite scroll when browsing (not searching)
+	// Search shows all results immediately from server
+	const isSearching = searchTerm.value && searchTerm.value.trim().length > 0
+
+	if (!isSearching && scrollHeight - scrollPosition < threshold && hasMore.value && !loadingMore.value && !loading.value) {
+		itemStore.loadMoreItems()
+	}
+}
+
 onMounted(() => {
 	if (props.posProfile) {
 		itemStore.loadAllItems(props.posProfile)
 		itemStore.loadItemGroups()
 	}
+
+	// Attach scroll listeners for infinite scroll
+	// Note: We'll use onScroll event on the containers directly in template
+})
+
+onUnmounted(() => {
+	// Cleanup background sync when component unmounts
+	itemStore.cleanup()
 })
 
 // Handle keydown for barcode scanner detection
@@ -769,6 +847,7 @@ function formatCurrency(amount) {
 defineExpose({
 	loadItems: () => itemStore.loadAllItems(props.posProfile),
 	loadItemGroups: () => itemStore.loadItemGroups(),
+	loadMoreItems: () => itemStore.loadMoreItems(),
 })
 
 function handleImageError(event) {

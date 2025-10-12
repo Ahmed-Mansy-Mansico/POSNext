@@ -12,6 +12,13 @@ export function useInvoice() {
 	const couponCode = ref(null)
 	const taxRules = ref([]) // Tax rules from POS Profile
 
+	// Performance: Incrementally maintained aggregates (updated on add/remove/change)
+	// This avoids O(n) array reductions on every reactive change
+	const _cachedSubtotal = ref(0)
+	const _cachedTotalTax = ref(0)
+	const _cachedTotalDiscount = ref(0)
+	const _cachedTotalPaid = ref(0)
+
 	// Resources
 	const updateInvoiceResource = createResource({
 		url: "pos_next.api.invoices.update_invoice",
@@ -83,33 +90,12 @@ export function useInvoice() {
 		auto: false,
 	})
 
-	// Computed
-	const subtotal = computed(() => {
-		return invoiceItems.value.reduce((sum, item) => {
-			return sum + item.quantity * item.rate
-		}, 0)
-	})
-
-	const totalTax = computed(() => {
-		return invoiceItems.value.reduce((sum, item) => {
-			return sum + (item.tax_amount || 0)
-		}, 0)
-	})
-
-	const totalDiscount = computed(() => {
-		const itemDiscount = invoiceItems.value.reduce((sum, item) => {
-			return sum + (item.discount_amount || 0)
-		}, 0)
-		return itemDiscount + (additionalDiscount.value || 0)
-	})
-
-	const grandTotal = computed(() => {
-		return subtotal.value + totalTax.value - totalDiscount.value
-	})
-
-	const totalPaid = computed(() => {
-		return payments.value.reduce((sum, p) => sum + (p.amount || 0), 0)
-	})
+	// Computed - using incrementally maintained aggregates for O(1) performance
+	const subtotal = computed(() => _cachedSubtotal.value)
+	const totalTax = computed(() => _cachedTotalTax.value)
+	const totalDiscount = computed(() => _cachedTotalDiscount.value + (additionalDiscount.value || 0))
+	const grandTotal = computed(() => _cachedSubtotal.value + _cachedTotalTax.value - (_cachedTotalDiscount.value + (additionalDiscount.value || 0)))
+	const totalPaid = computed(() => _cachedTotalPaid.value)
 
 	const remainingAmount = computed(() => {
 		return grandTotal.value - totalPaid.value
@@ -129,8 +115,18 @@ export function useInvoice() {
 		)
 
 		if (existingItem) {
+			// Store old values before update for incremental cache adjustment
+			const oldAmount = existingItem.quantity * existingItem.rate
+			const oldTax = existingItem.tax_amount || 0
+			const oldDiscount = existingItem.discount_amount || 0
+
 			existingItem.quantity += quantity
 			recalculateItem(existingItem)
+
+			// Update cache incrementally (new values - old values)
+			_cachedSubtotal.value += (existingItem.quantity * existingItem.rate) - oldAmount
+			_cachedTotalTax.value += (existingItem.tax_amount || 0) - oldTax
+			_cachedTotalDiscount.value += (existingItem.discount_amount || 0) - oldDiscount
 		} else {
 			const newItem = {
 				item_code: item.item_code,
@@ -161,10 +157,24 @@ export function useInvoice() {
 			invoiceItems.value.push(newItem)
 			// Recalculate the newly added item to apply taxes
 			recalculateItem(newItem)
+
+			// Update cache incrementally (add new item values)
+			_cachedSubtotal.value += newItem.quantity * newItem.rate
+			_cachedTotalTax.value += newItem.tax_amount || 0
+			_cachedTotalDiscount.value += newItem.discount_amount || 0
 		}
 	}
 
 	function removeItem(itemCode) {
+		const itemToRemove = invoiceItems.value.find((i) => i.item_code === itemCode)
+
+		if (itemToRemove) {
+			// Update cache incrementally (subtract removed item values)
+			_cachedSubtotal.value -= itemToRemove.quantity * itemToRemove.rate
+			_cachedTotalTax.value -= itemToRemove.tax_amount || 0
+			_cachedTotalDiscount.value -= itemToRemove.discount_amount || 0
+		}
+
 		invoiceItems.value = invoiceItems.value.filter(
 			(i) => i.item_code !== itemCode
 		)
@@ -173,25 +183,55 @@ export function useInvoice() {
 	function updateItemQuantity(itemCode, quantity) {
 		const item = invoiceItems.value.find((i) => i.item_code === itemCode)
 		if (item) {
+			// Store old values before update for incremental cache adjustment
+			const oldAmount = item.quantity * item.rate
+			const oldTax = item.tax_amount || 0
+			const oldDiscount = item.discount_amount || 0
+
 			item.quantity = parseFloat(quantity) || 1
 			recalculateItem(item)
+
+			// Update cache incrementally (new values - old values)
+			_cachedSubtotal.value += (item.quantity * item.rate) - oldAmount
+			_cachedTotalTax.value += (item.tax_amount || 0) - oldTax
+			_cachedTotalDiscount.value += (item.discount_amount || 0) - oldDiscount
 		}
 	}
 
 	function updateItemRate(itemCode, rate) {
 		const item = invoiceItems.value.find((i) => i.item_code === itemCode)
 		if (item) {
+			// Store old values before update for incremental cache adjustment
+			const oldAmount = item.quantity * item.rate
+			const oldTax = item.tax_amount || 0
+			const oldDiscount = item.discount_amount || 0
+
 			item.rate = parseFloat(rate) || 0
 			recalculateItem(item)
+
+			// Update cache incrementally (new values - old values)
+			_cachedSubtotal.value += (item.quantity * item.rate) - oldAmount
+			_cachedTotalTax.value += (item.tax_amount || 0) - oldTax
+			_cachedTotalDiscount.value += (item.discount_amount || 0) - oldDiscount
 		}
 	}
 
 	function updateItemDiscount(itemCode, discountPercentage) {
 		const item = invoiceItems.value.find((i) => i.item_code === itemCode)
 		if (item) {
+			// Store old values before update for incremental cache adjustment
+			const oldAmount = item.quantity * item.rate
+			const oldTax = item.tax_amount || 0
+			const oldDiscount = item.discount_amount || 0
+
 			item.discount_percentage = parseFloat(discountPercentage) || 0
 			item.discount_amount = 0 // Let recalculateItem compute it
 			recalculateItem(item)
+
+			// Update cache incrementally (new values - old values)
+			_cachedSubtotal.value += (item.quantity * item.rate) - oldAmount
+			_cachedTotalTax.value += (item.tax_amount || 0) - oldTax
+			_cachedTotalDiscount.value += (item.discount_amount || 0) - oldDiscount
 		}
 	}
 
@@ -258,6 +298,9 @@ export function useInvoice() {
 				})
 			}
 		}
+
+		// Rebuild cache after bulk operation
+		rebuildIncrementalCache()
 	}
 
 	function removeDiscount() {
@@ -269,6 +312,9 @@ export function useInvoice() {
 			item.discount_amount = 0
 			recalculateItem(item)
 		})
+
+		// Rebuild cache after bulk operation
+		rebuildIncrementalCache()
 	}
 
 	// Performance: Cache tax calculation to avoid repeated loops
@@ -299,6 +345,27 @@ export function useInvoice() {
 		taxRulesCacheKey = currentKey
 
 		return totalRate
+	}
+
+	function rebuildIncrementalCache() {
+		/**
+		 * Rebuild cache from scratch - used when bulk operations modify all items
+		 * (e.g., loading tax rules, applying discounts to all items)
+		 */
+		_cachedSubtotal.value = 0
+		_cachedTotalTax.value = 0
+		_cachedTotalDiscount.value = 0
+
+		for (const item of invoiceItems.value) {
+			_cachedSubtotal.value += item.quantity * item.rate
+			_cachedTotalTax.value += item.tax_amount || 0
+			_cachedTotalDiscount.value += item.discount_amount || 0
+		}
+
+		_cachedTotalPaid.value = 0
+		for (const payment of payments.value) {
+			_cachedTotalPaid.value += payment.amount || 0
+		}
 	}
 
 	function recalculateItem(item) {
@@ -332,20 +399,34 @@ export function useInvoice() {
 	}
 
 	function addPayment(payment) {
+		const amount = parseFloat(payment.amount) || 0
 		payments.value.push({
 			mode_of_payment: payment.mode_of_payment,
-			amount: parseFloat(payment.amount) || 0,
+			amount: amount,
 			type: payment.type,
 		})
+		// Update cache incrementally
+		_cachedTotalPaid.value += amount
 	}
 
 	function removePayment(index) {
+		if (payments.value[index]) {
+			// Update cache incrementally (subtract removed payment)
+			_cachedTotalPaid.value -= payments.value[index].amount || 0
+		}
 		payments.value.splice(index, 1)
 	}
 
 	function updatePayment(index, amount) {
 		if (payments.value[index]) {
-			payments.value[index].amount = parseFloat(amount) || 0
+			// Store old value before update for incremental cache adjustment
+			const oldAmount = payments.value[index].amount || 0
+			const newAmount = parseFloat(amount) || 0
+
+			payments.value[index].amount = newAmount
+
+			// Update cache incrementally (new value - old value)
+			_cachedTotalPaid.value += newAmount - oldAmount
 		}
 	}
 
@@ -538,6 +619,12 @@ export function useInvoice() {
 		payments.value = []
 		additionalDiscount.value = 0
 		couponCode.value = null
+
+		// Reset incremental cache
+		_cachedSubtotal.value = 0
+		_cachedTotalTax.value = 0
+		_cachedTotalDiscount.value = 0
+		_cachedTotalPaid.value = 0
 	}
 
 	async function clearCart() {
@@ -545,6 +632,12 @@ export function useInvoice() {
 		payments.value = []
 		additionalDiscount.value = 0
 		couponCode.value = null
+
+		// Reset incremental cache
+		_cachedSubtotal.value = 0
+		_cachedTotalTax.value = 0
+		_cachedTotalDiscount.value = 0
+		_cachedTotalPaid.value = 0
 
 		// Cleanup old draft invoices (older than 1 hour) in background
 		try {
@@ -568,6 +661,9 @@ export function useInvoice() {
 
 			// Recalculate all items with new tax rules
 			invoiceItems.value.forEach(item => recalculateItem(item))
+
+			// Rebuild cache after bulk operation
+			rebuildIncrementalCache()
 
 			return taxRules.value
 		} catch (error) {
@@ -616,6 +712,7 @@ export function useInvoice() {
 		clearCart,
 		loadTaxRules,
 		recalculateItem,
+		rebuildIncrementalCache,
 
 		// Resources
 		updateInvoiceResource,

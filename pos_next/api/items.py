@@ -419,6 +419,20 @@ def get_item_variants(template_item, pos_profile):
 					attributes_map[attr["parent"]] = {}
 				attributes_map[attr["parent"]][attr["attribute"]] = attr["attribute_value"]
 
+		# Batch query stock for all variants at once (performance optimization)
+		stock_map = {}
+		if variant_codes and pos_profile_doc.warehouse:
+			stocks = frappe.db.sql(
+				"""
+				SELECT item_code, actual_qty
+				FROM `tabBin`
+				WHERE item_code IN %s AND warehouse = %s
+				""",
+				[variant_codes, pos_profile_doc.warehouse],
+				as_dict=1
+			)
+			stock_map = {s["item_code"]: s["actual_qty"] for s in stocks}
+
 		# Enrich each variant with attributes, price, stock, and UOMs
 		for variant in variants:
 			# Get variant attributes from preloaded map
@@ -432,19 +446,8 @@ def get_item_variants(template_item, pos_profile):
 				price = next(iter(variant_prices.values()), None)
 			variant["rate"] = price or 0
 
-			# Get stock
-			if pos_profile_doc.warehouse:
-				stock = frappe.db.get_value(
-					"Bin",
-					{
-						"item_code": variant["item_code"],
-						"warehouse": pos_profile_doc.warehouse
-					},
-					"actual_qty"
-				)
-				variant["actual_qty"] = stock or 0
-			else:
-				variant["actual_qty"] = 0
+			# Get stock from pre-loaded stock map (performance optimization)
+			variant["actual_qty"] = stock_map.get(variant["item_code"], 0)
 
 			# Add warehouse
 			variant["warehouse"] = pos_profile_doc.warehouse
@@ -561,7 +564,7 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 				if row.uom:
 					conversion_map[row.parent][row.uom] = row.conversion_factor
 
-		# UOM-specific prices
+		# UOM-specific prices - batch query ALL prices for all items
 		if item_codes:
 			prices = frappe.db.sql(
 				"""
@@ -576,33 +579,39 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			for price in prices:
 				uom_prices_map.setdefault(price["item_code"], {})[price["uom"]] = price["price_list_rate"]
 
+		# Batch query stock for all items at once (performance optimization)
+		stock_map = {}
+		if item_codes and pos_profile_doc.warehouse:
+			stock_items = [item["item_code"] for item in items if item.get("is_stock_item")]
+			if stock_items:
+				stocks = frappe.db.sql(
+					"""
+					SELECT item_code, actual_qty
+					FROM `tabBin`
+					WHERE item_code IN %s AND warehouse = %s
+					""",
+					[stock_items, pos_profile_doc.warehouse],
+					as_dict=1
+				)
+				stock_map = {s["item_code"]: s["actual_qty"] for s in stocks}
+
 		# Enrich items with price, stock, barcode, and UOM data
 		for item in items:
 			stock_uom = item.get("stock_uom")
 
+			# Use pre-loaded price map instead of per-item queries
+			price_row = None
+			item_prices = uom_prices_map.get(item["item_code"], {})
+
 			# 1) Try price explicitly for stock UOM (preferred)
-			price_row = frappe.db.get_value(
-				"Item Price",
-				{
-					"item_code": item["item_code"],
-					"price_list": pos_profile_doc.selling_price_list,
-					"uom": stock_uom
-				},
-				["price_list_rate", "uom"],
-				as_dict=1,
-			)
+			if stock_uom and stock_uom in item_prices:
+				price_row = {"price_list_rate": item_prices[stock_uom], "uom": stock_uom}
 
 			# 2) If not found, try any price for the item (and capture its UOM)
-			if not price_row:
-				price_row = frappe.db.get_value(
-					"Item Price",
-					{
-						"item_code": item["item_code"],
-						"price_list": pos_profile_doc.selling_price_list
-					},
-					["price_list_rate", "uom"],
-					as_dict=1
-				)
+			elif item_prices:
+				# Get first available price
+				first_uom = next(iter(item_prices.keys()))
+				price_row = {"price_list_rate": item_prices[first_uom], "uom": first_uom}
 
 			# 3) If still not found and it's a template, derive min variant price
 			derived_price = None
@@ -652,19 +661,8 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			item["conversion_factor"] = 1
 			item["price_list_rate_price_uom"] = display_rate
 
-			# Stock
-			if pos_profile_doc.warehouse and item.get("is_stock_item"):
-				stock = frappe.db.get_value(
-					"Bin",
-					{
-						"item_code": item["item_code"],
-						"warehouse": pos_profile_doc.warehouse
-					},
-					"actual_qty"
-				)
-				item["actual_qty"] = stock or 0
-			else:
-				item["actual_qty"] = 0
+			# Stock - use pre-loaded stock map (performance optimization)
+			item["actual_qty"] = stock_map.get(item["item_code"], 0) if item.get("is_stock_item") else 0
 
 			# Add warehouse to item (needed for stock validation)
 			item["warehouse"] = pos_profile_doc.warehouse

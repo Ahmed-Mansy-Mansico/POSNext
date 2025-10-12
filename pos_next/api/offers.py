@@ -46,81 +46,126 @@ def _get_pricing_rules(pos_profile, date):
         as_dict=1,
     ) or []
 
+    if not pricing_rules:
+        return []
+
+    # Performance: Batch query all slabs and eligibility criteria to avoid N+1 queries
+    scheme_names = list(set(rule["promotional_scheme"] for rule in pricing_rules))
+
+    # Batch query price discount slabs
+    price_slabs_results = frappe.db.sql(
+        """
+        SELECT
+            parent, min_qty, max_qty, min_amount, max_amount,
+            rate_or_discount, rate, discount_amount, discount_percentage,
+            apply_multiple_pricing_rules
+        FROM `tabPromotional Scheme Price Discount`
+        WHERE parent IN %s AND disable = 0
+        ORDER BY parent, min_amount ASC, min_qty ASC
+        """,
+        [scheme_names],
+        as_dict=1,
+    )
+
+    # Build price slabs map (scheme_name -> first slab)
+    price_slabs_map = {}
+    for slab in price_slabs_results:
+        if slab["parent"] not in price_slabs_map:
+            price_slabs_map[slab["parent"]] = slab
+
+    # Batch query product discount slabs
+    product_slabs_results = frappe.db.sql(
+        """
+        SELECT
+            parent, min_qty, max_qty, min_amount, max_amount,
+            apply_multiple_pricing_rules
+        FROM `tabPromotional Scheme Product Discount`
+        WHERE parent IN %s AND disable = 0
+        ORDER BY parent, min_amount ASC, min_qty ASC
+        """,
+        [scheme_names],
+        as_dict=1,
+    )
+
+    # Build product slabs map (scheme_name -> first slab)
+    product_slabs_map = {}
+    for slab in product_slabs_results:
+        if slab["parent"] not in product_slabs_map:
+            product_slabs_map[slab["parent"]] = slab
+
+    # Batch query all eligibility criteria
+    items_results = frappe.db.sql(
+        """
+        SELECT parent, item_code
+        FROM `tabPricing Rule Item Code`
+        WHERE parent IN %s
+        """,
+        [scheme_names],
+        as_dict=1,
+    )
+
+    items_map = {}
+    for row in items_results:
+        items_map.setdefault(row["parent"], []).append(row["item_code"])
+
+    item_groups_results = frappe.db.sql(
+        """
+        SELECT parent, item_group
+        FROM `tabPricing Rule Item Group`
+        WHERE parent IN %s
+        """,
+        [scheme_names],
+        as_dict=1,
+    )
+
+    item_groups_map = {}
+    for row in item_groups_results:
+        item_groups_map.setdefault(row["parent"], []).append(row["item_group"])
+
+    brands_results = frappe.db.sql(
+        """
+        SELECT parent, brand
+        FROM `tabPricing Rule Brand`
+        WHERE parent IN %s
+        """,
+        [scheme_names],
+        as_dict=1,
+    )
+
+    brands_map = {}
+    for row in brands_results:
+        brands_map.setdefault(row["parent"], []).append(row["brand"])
+
+    # Build offers from pricing rules using pre-loaded maps
     offers = []
     for rule in pricing_rules:
-        # Get slab details based on discount type
+        # Get slab from pre-loaded maps based on discount type
         if rule.price_or_product_discount == "Price":
-            # Fetch from Promotional Scheme Price Discount slabs
-            slabs = frappe.db.sql(
-                """
-                SELECT
-                    min_qty, max_qty, min_amount, max_amount,
-                    rate_or_discount, rate, discount_amount, discount_percentage,
-                    apply_multiple_pricing_rules
-                FROM `tabPromotional Scheme Price Discount`
-                WHERE parent = %(scheme)s AND disable = 0
-                ORDER BY min_amount ASC, min_qty ASC
-                LIMIT 1
-                """,
-                {"scheme": rule.promotional_scheme},
-                as_dict=1,
-            )
+            slab = price_slabs_map.get(rule.promotional_scheme)
         else:
-            # Fetch from Promotional Scheme Product Discount slabs
-            slabs = frappe.db.sql(
-                """
-                SELECT
-                    min_qty, max_qty, min_amount, max_amount,
-                    apply_multiple_pricing_rules
-                FROM `tabPromotional Scheme Product Discount`
-                WHERE parent = %(scheme)s AND disable = 0
-                ORDER BY min_amount ASC, min_qty ASC
-                LIMIT 1
-                """,
-                {"scheme": rule.promotional_scheme},
-                as_dict=1,
-            )
+            slab = product_slabs_map.get(rule.promotional_scheme)
 
         # Skip if no slabs found
-        if not slabs:
+        if not slab:
             continue
 
-        slab = slabs[0]
-
-        # Determine if offer should auto-apply:
-        # - Coupon-based offers are NEVER auto (must enter coupon code)
-        # - Offers with apply_multiple_pricing_rules enabled are manual selection
-        # - Otherwise, can auto-apply
+        # Determine if offer should auto-apply
         is_auto = 0
         if not rule.coupon_code_based:
-            # Only non-coupon offers can be auto-apply
-            # If apply_multiple_pricing_rules is not enabled, it's auto
-            if not slab.apply_multiple_pricing_rules:
+            if not slab.get("apply_multiple_pricing_rules"):
                 is_auto = 1
 
-        # Get eligible items/groups for this promotional scheme
+        # Get eligible items/groups from pre-loaded maps
         eligible_items = []
         eligible_item_groups = []
         eligible_brands = []
 
         if rule.apply_on == "Item Code":
-            eligible_items = frappe.db.sql_list(
-                """SELECT item_code FROM `tabPricing Rule Item Code`
-                WHERE parent = %s""",
-                rule.promotional_scheme
-            )
+            eligible_items = items_map.get(rule.promotional_scheme, [])
         elif rule.apply_on == "Item Group":
-            eligible_item_groups = frappe.db.sql_list(
-                """SELECT item_group FROM `tabPricing Rule Item Group`
-                WHERE parent = %s""",
-                rule.promotional_scheme
-            )
+            eligible_item_groups = item_groups_map.get(rule.promotional_scheme, [])
         elif rule.apply_on == "Brand":
-            eligible_brands = frappe.db.sql_list(
-                """SELECT brand FROM `tabPricing Rule Brand`
-                WHERE parent = %s""",
-                rule.promotional_scheme
-            )
+            eligible_brands = brands_map.get(rule.promotional_scheme, [])
 
         offer = {
             "name": rule.name,

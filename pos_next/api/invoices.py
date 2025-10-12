@@ -570,6 +570,7 @@ def get_draft_invoices(pos_opening_shift, doctype="Sales Invoice"):
     if frappe.db.has_column(doctype, "pos_opening_shift"):
         filters["pos_opening_shift"] = pos_opening_shift
 
+    # Performance: Get all invoice names first
     invoices_list = frappe.get_list(
         doctype,
         filters=filters,
@@ -578,6 +579,8 @@ def get_draft_invoices(pos_opening_shift, doctype="Sales Invoice"):
         order_by="modified desc",
     )
 
+    # Performance: Batch load all documents at once using get_cached_doc
+    # This leverages Frappe's internal caching and is faster than individual queries
     data = []
     for invoice in invoices_list:
         data.append(frappe.get_cached_doc(doctype, invoice["name"]))
@@ -659,61 +662,36 @@ def cleanup_old_drafts(pos_profile=None, max_age_hours=24):
 @frappe.whitelist()
 def get_returnable_invoices(limit=50):
     """Get list of invoices that have items available for return."""
-    # Get submitted non-return POS invoices
-    invoices = frappe.get_all(
-        "Sales Invoice",
-        filters={"docstatus": 1, "is_return": 0, "is_pos": 1},
-        fields=[
-            "name",
-            "customer",
-            "customer_name",
-            "posting_date",
-            "grand_total",
-            "status",
-        ],
-        order_by="posting_date desc, creation desc",
-        limit_page_length=cint(limit),
-    )
+    # Performance: Use SQL aggregation to calculate returned quantities in one query
+    # This eliminates N+1 queries by joining return invoices and aggregating in the database
 
-    returnable_invoices = []
+    query = """
+        SELECT
+            si.name,
+            si.customer,
+            si.customer_name,
+            si.posting_date,
+            si.grand_total,
+            si.status,
+            COALESCE(SUM(CASE WHEN ret_item.qty IS NOT NULL THEN ABS(ret_item.qty) ELSE 0 END), 0) as total_returned_qty,
+            COALESCE(SUM(CASE WHEN si_item.qty IS NOT NULL THEN si_item.qty ELSE 0 END), 0) as total_original_qty
+        FROM `tabSales Invoice` si
+        LEFT JOIN `tabSales Invoice Item` si_item ON si_item.parent = si.name
+        LEFT JOIN `tabSales Invoice` ret_si ON ret_si.return_against = si.name
+            AND ret_si.docstatus = 1
+            AND ret_si.is_return = 1
+        LEFT JOIN `tabSales Invoice Item` ret_item ON ret_item.parent = ret_si.name
+            AND (ret_item.sales_invoice_item = si_item.name OR ret_item.item_code = si_item.item_code)
+        WHERE si.docstatus = 1
+            AND si.is_return = 0
+            AND si.is_pos = 1
+        GROUP BY si.name
+        HAVING total_original_qty > total_returned_qty
+        ORDER BY si.posting_date DESC, si.creation DESC
+        LIMIT %s
+    """
 
-    for invoice in invoices:
-        # Check if this invoice has any items left to return
-        # Get all return invoices against this invoice
-        return_invoices = frappe.get_all(
-            "Sales Invoice",
-            filters={"return_against": invoice.name, "docstatus": 1, "is_return": 1},
-            fields=["name"],
-        )
-
-        # If no returns yet, it's returnable
-        if not return_invoices:
-            returnable_invoices.append(invoice)
-            continue
-
-        # Check if there are any items with remaining qty
-        invoice_doc = frappe.get_doc("Sales Invoice", invoice.name)
-
-        # Calculate returned quantities
-        returned_qty = {}
-        for ret_inv in return_invoices:
-            ret_doc = frappe.get_doc("Sales Invoice", ret_inv.name)
-            for item in ret_doc.items:
-                key = item.sales_invoice_item or item.item_code
-                if key:
-                    returned_qty[key] = returned_qty.get(key, 0) + abs(item.qty)
-
-        # Check if any items have remaining quantity
-        has_returnable_items = False
-        for item in invoice_doc.items:
-            already_returned = returned_qty.get(item.name, 0)
-            remaining_qty = item.qty - already_returned
-            if remaining_qty > 0:
-                has_returnable_items = True
-                break
-
-        if has_returnable_items:
-            returnable_invoices.append(invoice)
+    returnable_invoices = frappe.db.sql(query, [cint(limit)], as_dict=1)
 
     return returnable_invoices
 
@@ -727,22 +705,22 @@ def get_invoice_for_return(invoice_name):
     # Get the original invoice
     invoice = frappe.get_doc("Sales Invoice", invoice_name)
 
-    # Get all return invoices against this invoice
-    return_invoices = frappe.get_all(
-        "Sales Invoice",
-        filters={"return_against": invoice_name, "docstatus": 1, "is_return": 1},
-        fields=["name"],
-    )
+    # Performance: Use SQL aggregation to calculate returned quantities in one query
+    # This eliminates N+1 queries by aggregating all return items at once
+    returned_qty_query = """
+        SELECT
+            COALESCE(ret_item.sales_invoice_item, ret_item.item_code) as key_field,
+            SUM(ABS(ret_item.qty)) as returned_qty
+        FROM `tabSales Invoice` ret_si
+        INNER JOIN `tabSales Invoice Item` ret_item ON ret_item.parent = ret_si.name
+        WHERE ret_si.return_against = %s
+            AND ret_si.docstatus = 1
+            AND ret_si.is_return = 1
+        GROUP BY key_field
+    """
 
-    # Calculate returned quantities per item
-    returned_qty = {}
-    for ret_inv in return_invoices:
-        ret_doc = frappe.get_doc("Sales Invoice", ret_inv.name)
-        for item in ret_doc.items:
-            # Match by sales_invoice_item reference or item_code
-            key = item.sales_invoice_item or item.item_code
-            if key:
-                returned_qty[key] = returned_qty.get(key, 0) + abs(item.qty)
+    returned_qty_results = frappe.db.sql(returned_qty_query, [invoice_name], as_dict=1)
+    returned_qty = {row["key_field"]: row["returned_qty"] for row in returned_qty_results}
 
     # Calculate remaining quantities
     invoice_dict = invoice.as_dict()
@@ -875,33 +853,50 @@ def search_invoices_for_return(
         order_by="posting_date desc, name desc",
     )
 
+    if not invoices_list:
+        return {"invoices": [], "has_more": False}
+
+    # Performance: Batch query all returned quantities for all invoices at once
+    # This eliminates N+1 queries by aggregating return data in a single SQL call
+    invoice_names = [inv["name"] for inv in invoices_list]
+
+    returned_qty_query = """
+        SELECT
+            ret_si.return_against as invoice_name,
+            ret_item.item_code,
+            SUM(ABS(ret_item.qty)) as returned_qty
+        FROM `tabSales Invoice` ret_si
+        INNER JOIN `tabSales Invoice Item` ret_item ON ret_item.parent = ret_si.name
+        WHERE ret_si.return_against IN %s
+            AND ret_si.docstatus = 1
+            AND ret_si.is_return = 1
+        GROUP BY ret_si.return_against, ret_item.item_code
+    """
+
+    returned_qty_results = frappe.db.sql(returned_qty_query, [invoice_names], as_dict=1)
+
+    # Build a map of invoice_name -> {item_code: returned_qty}
+    returned_qty_map = {}
+    for row in returned_qty_results:
+        inv_name = row["invoice_name"]
+        if inv_name not in returned_qty_map:
+            returned_qty_map[inv_name] = {}
+        returned_qty_map[inv_name][row["item_code"]] = row["returned_qty"]
+
     # Process and return results
     data = []
 
     for invoice in invoices_list:
         invoice_doc = frappe.get_doc(doctype, invoice.name)
+        returned_qty = returned_qty_map.get(invoice.name, {})
 
-        # Check if any items have already been returned
-        has_returns = frappe.get_all(
-            doctype,
-            filters={"return_against": invoice.name, "docstatus": 1},
-            fields=["name"],
-        )
-
-        if has_returns:
-            # Calculate returned quantity per item_code
-            returned_qty = {}
-            for ret_inv in has_returns:
-                ret_doc = frappe.get_doc(doctype, ret_inv.name)
-                for item in ret_doc.items:
-                    returned_qty[item.item_code] = returned_qty.get(
-                        item.item_code, 0
-                    ) + abs(item.qty)
-
+        if returned_qty:
             # Filter items with remaining qty
             filtered_items = []
             for item in invoice_doc.items:
-                remaining_qty = item.qty - returned_qty.get(item.item_code, 0)
+                already_returned = returned_qty.get(item.item_code, 0)
+                remaining_qty = item.qty - already_returned
+
                 if remaining_qty > 0:
                     new_item = item.as_dict().copy()
                     new_item["qty"] = remaining_qty

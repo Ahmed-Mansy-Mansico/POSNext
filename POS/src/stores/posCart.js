@@ -29,6 +29,7 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		applyOffersResource,
 		getItemDetailsResource,
 		recalculateItem,
+		rebuildIncrementalCache,
 	} = useInvoice()
 
 	const offersStore = usePOSOffersStore()
@@ -173,8 +174,12 @@ export const usePOSCartStore = defineStore('posCart', () => {
 				hasDiscounts = true
 			}
 
-			updateItemQuantity(item.item_code, item.quantity)
+			// Recalculate item (from useInvoice)
+			recalculateItem(item)
 		})
+
+		// Rebuild cache after bulk operation
+		rebuildIncrementalCache()
 
 		return hasDiscounts
 	}

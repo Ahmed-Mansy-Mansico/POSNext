@@ -27,7 +27,7 @@ async function initDB() {
 			settings: 'key',
 			invoice_queue: '++id, synced, timestamp',
 			payment_queue: '++id, synced, timestamp',
-			items: '&item_code, item_group, *item_name, barcode',
+			items: '&item_code, item_group, *item_name, *barcodes',
 			customers: '&name, *customer_name, customer_group',
 			stock: '[item_code+warehouse]',
 		})
@@ -169,6 +169,19 @@ async function searchCachedItems(searchTerm = '', limit = 50) {
 			return await db.items.limit(limit).toArray()
 		}
 
+		// Performance: Use IndexedDB queries with multi-entry barcode index
+		// Try exact barcode match first (fastest)
+		const barcodeResults = await db.items
+			.where('barcodes')
+			.equals(term)
+			.limit(limit)
+			.toArray()
+
+		if (barcodeResults.length > 0) {
+			return barcodeResults
+		}
+
+		// Fall back to prefix searches on indexed fields
 		const results = await db.items
 			.where('item_code').startsWithIgnoreCase(term)
 			.or('item_name').startsWithIgnoreCase(term)
@@ -217,7 +230,31 @@ async function searchCachedCustomers(searchTerm = '', limit = 20) {
 async function cacheItemsFromServer(items) {
 	try {
 		const db = await initDB()
-		await db.items.bulkPut(items)
+
+		// Performance: Process items to extract barcodes for multi-entry index
+		const processedItems = items.map(item => {
+			// Extract barcodes array from various possible formats
+			let barcodes = []
+			if (item.barcode) {
+				// Single barcode field
+				barcodes = [item.barcode]
+			} else if (item.item_barcode) {
+				// item_barcode can be array or single value
+				barcodes = Array.isArray(item.item_barcode)
+					? item.item_barcode.map(b => typeof b === 'object' ? b.barcode : b).filter(Boolean)
+					: [item.item_barcode]
+			} else if (item.barcodes && Array.isArray(item.barcodes)) {
+				// Already processed barcodes array
+				barcodes = item.barcodes
+			}
+
+			return {
+				...item,
+				barcodes
+			}
+		})
+
+		await db.items.bulkPut(processedItems)
 
 		// Update settings
 		await db.settings.put({
