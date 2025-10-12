@@ -651,6 +651,13 @@ const offerReapplyTimer = ref(null)
 // Performance: Cache previous cart state to avoid unnecessary reapplications
 let previousCartHash = ''
 
+// Helper function to compute cart hash
+function computeCartHash() {
+	return cartStore.invoiceItems.map(i =>
+		`${i.item_code}-${i.quantity}-${i.rate}-${i.discount_percentage || 0}-${i.discount_amount || 0}-${i.uom || ''}-${i.warehouse || ''}`
+	).join('|')
+}
+
 // Promotion dialog
 const showPromotionManagement = ref(false)
 
@@ -749,37 +756,72 @@ watch(() => shiftStore.hasOpenShift, value => {
 	}
 })
 
-// Watch for cart changes to re-apply offers (optimized - only watch length and defer expensive calculations)
-// Performance: Only recalculate hash if cart length changed, then check if content actually changed
+// Watch for cart changes to re-apply offers
+// Comprehensive watcher that detects all cart changes including:
+// - Items added/removed (length changes)
+// - Quantity changes
+// - Rate/price changes
+// - Discount changes
+// - Item properties that affect offers
 watch(
-	() => cartStore.invoiceItems.length,
-	() => {
+	() => computeCartHash(),
+	(newHash) => {
 		// Only proceed if there are applied offers
 		if (cartStore.appliedOffers.length === 0) {
 			return
 		}
 
-		// Calculate hash only when length changes
-		const currentHash = cartStore.invoiceItems.map(i =>
-			`${i.item_code}-${i.quantity}-${i.rate}-${i.discount_percentage || 0}-${i.discount_amount || 0}`
-		).join(',')
-
 		// Skip if cart content hasn't actually changed
-		if (currentHash === previousCartHash) {
+		if (newHash === previousCartHash) {
 			return
 		}
 
-		previousCartHash = currentHash
+		previousCartHash = newHash
 
 		// Clear existing timer to prevent multiple API calls
 		if (offerReapplyTimer.value) {
 			clearTimeout(offerReapplyTimer.value)
 		}
 
-		// Set new timer - reapply offers after 800ms of no changes (increased for better performance)
+		// Set new timer - reapply offers after 500ms of no changes
 		offerReapplyTimer.value = setTimeout(async () => {
 			await cartStore.reapplyOffer(shiftStore.currentProfile)
-		}, 800)
+		}, 500)
+	}
+)
+
+// Watch for customer changes - customer affects which offers are applicable
+watch(
+	() => cartStore.customer,
+	(newCustomer, oldCustomer) => {
+		const newCustomerName = newCustomer?.name || newCustomer
+		const oldCustomerName = oldCustomer?.name || oldCustomer
+
+		// Only reapply if customer actually changed
+		if (newCustomerName !== oldCustomerName) {
+			// Clear existing timer
+			if (offerReapplyTimer.value) {
+				clearTimeout(offerReapplyTimer.value)
+			}
+
+			// Reapply offers immediately when customer changes
+			// This will discover newly eligible offers even if cart has no current offers
+			offerReapplyTimer.value = setTimeout(async () => {
+				await cartStore.reapplyOffer(shiftStore.currentProfile)
+			}, 300)
+		}
+	},
+	{ deep: true }
+)
+
+// Watch for applied offers changes - handle when offers are added/removed
+watch(
+	() => cartStore.appliedOffers.length,
+	() => {
+		// When offers are added or removed, update the cart hash to reflect new state
+		if (cartStore.invoiceItems.length > 0) {
+			previousCartHash = computeCartHash()
+		}
 	}
 )
 
@@ -998,6 +1040,8 @@ async function handlePaymentCompleted(paymentData) {
 			uiStore.showSuccess(`OFFLINE-${Date.now()}`, cartStore.grandTotal)
 			uiStore.showPaymentDialog = false
 			cartStore.clearCart()
+			// Reset cart hash after successful payment
+			previousCartHash = ''
 
 			toast.create({
 				title: "Saved Offline",
@@ -1014,6 +1058,8 @@ async function handlePaymentCompleted(paymentData) {
 
 				uiStore.showPaymentDialog = false
 				cartStore.clearCart()
+				// Reset cart hash after successful payment
+				previousCartHash = ''
 
 				if (itemsSelectorRef.value) {
 					itemsSelectorRef.value.loadItems()
@@ -1082,6 +1128,8 @@ function handleClearCart() {
 
 function confirmClearCart() {
 	cartStore.clearCart()
+	// Reset cart hash when cart is cleared
+	previousCartHash = ''
 	uiStore.showClearCartDialog = false
 	toast.create({
 		title: "Cart Cleared",
@@ -1214,6 +1262,8 @@ async function handleSaveDraft() {
 	)
 	if (success) {
 		cartStore.clearCart()
+		// Reset cart hash when cart is saved as draft and cleared
+		previousCartHash = ''
 	}
 }
 
@@ -1229,6 +1279,9 @@ async function handleLoadDraft(draft) {
 			// Trigger offer reapplication to ensure they apply to all items
 			await cartStore.reapplyOffer(shiftStore.currentProfile)
 		}
+
+		// Initialize cart hash for the loaded cart so watchers work correctly
+		previousCartHash = computeCartHash()
 
 		uiStore.showDraftDialog = false
 	} catch (error) {
@@ -1321,6 +1374,9 @@ async function handleEditOfflineInvoice(invoice) {
 				cartStore.addItem(item)
 			}
 		}
+
+		// Initialize cart hash for the loaded cart so watchers work correctly
+		previousCartHash = computeCartHash()
 
 		await offlineStore.deleteOfflineInvoice(invoice.id)
 

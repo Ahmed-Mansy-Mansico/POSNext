@@ -404,16 +404,16 @@ export const usePOSCartStore = defineStore('posCart', () => {
 	}
 
 	async function reapplyOffer(currentProfile) {
+		// Clear offers if cart is empty
 		if (invoiceItems.value.length === 0 && appliedOffers.value.length) {
 			appliedOffers.value = []
 			return
 		}
 
-		if (
-			invoiceItems.value.length > 0 &&
-			appliedOffers.value.length > 0 &&
-			!suppressOfferReapply.value
-		) {
+		// Reapply or discover offers when cart has items
+		// - If appliedOffers.length > 0: re-validates existing offers
+		// - If appliedOffers.length === 0: discovers new eligible offers
+		if (invoiceItems.value.length > 0 && !suppressOfferReapply.value) {
 			try {
 				const invoiceData = buildInvoiceDataForOffers(currentProfile)
 				const offerNames = getAppliedOfferCodes()
