@@ -634,6 +634,7 @@ export const usePOSCartStore = defineStore('posCart', () => {
 		updateItemDetails,
 		getItemDetailsResource,
 		recalculateItem,
+		rebuildIncrementalCache,
 		applyOffersResource,
 		buildInvoiceDataForOffers,
 	}

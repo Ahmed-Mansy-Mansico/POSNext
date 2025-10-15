@@ -1295,6 +1295,9 @@ async function handleLoadDraft(draft) {
 		cartStore.invoiceItems = draftData.items
 		cartStore.setCustomer(draftData.customer)
 
+		// Rebuild incremental cache to recalculate totals
+		cartStore.rebuildIncrementalCache()
+
 		// Restore applied offers if they were saved
 		if (draftData.applied_offers && draftData.applied_offers.length > 0) {
 			cartStore.appliedOffers = draftData.applied_offers
