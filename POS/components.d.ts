@@ -35,8 +35,6 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SelectField: typeof import('./src/components/settings/SelectField.vue')['default']
     SettingsSection: typeof import('./src/components/settings/SettingsSection.vue')['default']
-    SettingsSectionHeader: typeof import('./src/components/settings/SettingsSectionHeader.vue')['default']
-    SettingsSubsection: typeof import('./src/components/settings/SettingsSubsection.vue')['default']
     ShiftClosingDialog: typeof import('./src/components/ShiftClosingDialog.vue')['default']
     ShiftOpeningDialog: typeof import('./src/components/ShiftOpeningDialog.vue')['default']
     StatusBadge: typeof import('./src/components/common/StatusBadge.vue')['default']
