@@ -240,6 +240,9 @@
 					</span>
 				</div>
 			</button>
+
+			<!-- PWA Install Badge (Mobile Only) -->
+			<InstallAppBadge />
 		</div>
 		</div>
 
