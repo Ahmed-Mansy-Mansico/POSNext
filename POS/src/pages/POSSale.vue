@@ -902,9 +902,6 @@ function handleItemSelected(item, autoAdd = false) {
 	if (autoAdd) {
 		try {
 			cartStore.addItem(item, 1, true, shiftStore.currentProfile)
-			if (!uiStore.isDesktop) {
-				uiStore.setMobileTab('cart')
-			}
 		} catch (error) {
 			uiStore.showError("Insufficient Stock", error.message, `Item: ${item.item_code}`)
 		}
@@ -935,9 +932,6 @@ function handleItemSelected(item, autoAdd = false) {
 	// Add to cart
 	try {
 		cartStore.addItem(item, 1, false, shiftStore.currentProfile)
-		if (!uiStore.isDesktop) {
-			uiStore.setMobileTab('cart')
-		}
 	} catch (error) {
 		uiStore.showError("Insufficient Stock", error.message, `Item: ${item.item_code}`)
 	}

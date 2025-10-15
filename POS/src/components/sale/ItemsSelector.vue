@@ -201,9 +201,13 @@
 							<!-- Stock Badge -->
 							<div
 								:class="[
-									'absolute top-0.5 right-0.5 sm:top-1 sm:right-1 text-white text-[9px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full shadow-sm',
-									(item.actual_qty || item.stock_qty || 0) > 0 ? 'bg-green-500' : 'bg-red-500'
+									'absolute top-1.5 right-1.5 sm:top-2 sm:right-2 rounded-md shadow-sm',
+									'px-2 sm:px-2.5 py-1 sm:py-1',
+									'text-[10px] sm:text-xs font-bold',
+									getStockStatus(item.actual_qty || item.stock_qty).color,
+									getStockStatus(item.actual_qty || item.stock_qty).textColor
 								]"
+								:title="`${getStockStatus(item.actual_qty || item.stock_qty).label}: ${Math.floor(item.actual_qty || item.stock_qty || 0)} ${item.uom || item.stock_uom || 'Nos'}`"
 							>
 								{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
 							</div>
@@ -359,7 +363,15 @@
 							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.item_code }}</div></td>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</div></td>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
-								<span :class="['text-xs sm:text-sm font-medium', (item.actual_qty || item.stock_qty || 0) > 0 ? 'text-green-600' : 'text-red-600']">
+								<span
+									:class="[
+										'inline-block px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md shadow-sm',
+										'text-xs sm:text-sm font-bold',
+										getStockStatus(item.actual_qty || item.stock_qty).color,
+										getStockStatus(item.actual_qty || item.stock_qty).textColor
+									]"
+									:title="`${getStockStatus(item.actual_qty || item.stock_qty).label}: ${Math.floor(item.actual_qty || item.stock_qty || 0)} ${item.uom || item.stock_uom || 'Nos'}`"
+								>
 									{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
 								</span>
 							</td>
@@ -908,6 +920,35 @@ function getPaginationRange() {
 	}
 
 	return range
+}
+
+// Get stock status based on quantity
+function getStockStatus(qty) {
+	const quantity = Math.floor(qty || 0)
+	const lowStockThreshold = 10 // Items with 10 or less are considered low stock
+
+	if (quantity <= 0) {
+		return {
+			level: 'out',
+			color: 'bg-red-500',
+			textColor: 'text-white',
+			label: 'Out of Stock'
+		}
+	} else if (quantity <= lowStockThreshold) {
+		return {
+			level: 'low',
+			color: 'bg-orange-500',
+			textColor: 'text-white',
+			label: 'Low Stock'
+		}
+	} else {
+		return {
+			level: 'safe',
+			color: 'bg-green-500',
+			textColor: 'text-white',
+			label: 'In Stock'
+		}
+	}
 }
 </script>
 
