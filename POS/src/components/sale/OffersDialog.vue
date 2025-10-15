@@ -54,6 +54,18 @@
 							<span>APPLIED</span>
 						</div>
 
+						<!-- Source Badge (Pricing Rule vs Promotional Scheme) -->
+						<div
+							:class="[
+								'absolute top-2 right-12 text-[10px] font-bold px-2 py-1 rounded-full',
+								offer.source === 'Pricing Rule'
+									? 'bg-blue-600 text-white'
+									: 'bg-purple-600 text-white'
+							]"
+						>
+							{{ offer.source === 'Pricing Rule' ? 'PRICING RULE' : 'PROMO SCHEME' }}
+						</div>
+
 						<!-- Offer Header -->
 						<div class="flex items-start justify-between mb-3">
 							<div class="flex-1 pr-4">
