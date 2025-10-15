@@ -1469,6 +1469,11 @@ async function handleSyncAll() {
 	try {
 		const result = await offlineStore.syncAllPending()
 
+		// Refresh stock after successful sync (when online)
+		if (result.success > 0 && itemsSelectorRef.value) {
+			await itemsSelectorRef.value.loadItems()
+		}
+
 		if (result.failed > 0 && result.errors && result.errors.length > 0) {
 			const firstError = result.errors[0]
 			const errorContext = parseError(firstError.error)
