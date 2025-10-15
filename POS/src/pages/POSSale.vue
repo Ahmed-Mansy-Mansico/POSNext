@@ -397,6 +397,14 @@
 			@promotion-saved="handlePromotionSaved"
 		/>
 
+		<!-- POS Settings -->
+		<POSSettings
+			v-model="showPOSSettings"
+			:pos-profile="shiftStore.profileName"
+			:current-warehouse="shiftStore.profileWarehouse"
+			@warehouse-changed="handleWarehouseChanged"
+		/>
+
 		<!-- Clear Cart Confirmation Dialog -->
 		<Dialog
 			v-model="uiStore.showClearCartDialog"
@@ -622,6 +630,7 @@ import OfflineInvoicesDialog from "@/components/sale/OfflineInvoicesDialog.vue"
 import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
 import ItemSelectionDialog from "@/components/sale/ItemSelectionDialog.vue"
 import PromotionManagement from "@/components/sale/PromotionManagement.vue"
+import POSSettings from "@/components/settings/POSSettings.vue"
 import { printInvoiceByName } from "@/utils/printInvoice"
 import { useRealtimeStock } from "@/composables/useRealtimeStock"
 import { offlineWorker } from "@/utils/offline/workerClient"
@@ -668,6 +677,9 @@ function computeCartHash() {
 
 // Promotion dialog
 const showPromotionManagement = ref(false)
+
+// Settings dialog
+const showPOSSettings = ref(false)
 
 // Warehouses state and resource
 const warehousesList = ref([])
@@ -1586,6 +1598,42 @@ function restoreBodyStyles() {
 function handleManagementMenuClick(menuItem) {
 	if (menuItem === 'promotions') {
 		showPromotionManagement.value = true
+	} else if (menuItem === 'settings') {
+		showPOSSettings.value = true
+	}
+}
+
+async function handleWarehouseChanged(newWarehouse) {
+	console.log('Warehouse changed to:', newWarehouse)
+
+	try {
+		// Update the shift store with new warehouse
+		if (shiftStore.currentProfile) {
+			shiftStore.currentProfile.warehouse = newWarehouse
+		}
+
+		// Clear item search cache to force reload from new warehouse
+		itemStore.invalidateCache()
+
+		// Reload items with new warehouse stock quantities
+		if (itemsSelectorRef.value) {
+			await itemsSelectorRef.value.loadItems()
+		}
+
+		toast.create({
+			title: "Warehouse Updated",
+			text: `Switched to ${newWarehouse}. Stock quantities refreshed.`,
+			icon: "check",
+			iconClasses: "text-green-600",
+		})
+	} catch (error) {
+		console.error('Error handling warehouse change:', error)
+		toast.create({
+			title: "Warning",
+			text: `Warehouse updated but failed to reload stock. Please refresh manually.`,
+			icon: "alert-circle",
+			iconClasses: "text-orange-600",
+		})
 	}
 }
 
