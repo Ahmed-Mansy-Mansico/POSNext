@@ -29,8 +29,16 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	const cacheSyncing = ref(false)
 	const cacheStats = ref({ items: 0, lastSync: null })
 
-	// Performance optimization: Result cache for instant searches
-	const resultCache = ref(new Map())
+	// Performance helpers
+	const allItemsVersion = ref(0)
+	const searchResultsVersion = ref(0)
+
+	const MAX_CACHE_ENTRIES = 50
+	const baseResultCache = new Map()
+	const itemRegistry = new Map()
+	const registeredAllItems = new Set()
+	const registeredSearchItems = new Set()
+	let cartReservedLookup = new Map()
 
 	// Search debounce timer
 	let searchDebounceTimer = null
@@ -60,74 +68,164 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	})
 
 	// Getters
+	function setCache(map, key, value) {
+		if (map.size >= MAX_CACHE_ENTRIES) {
+			const firstKey = map.keys().next().value
+			if (firstKey !== undefined) {
+				map.delete(firstKey)
+			}
+		}
+		map.set(key, value)
+	}
+
+	function clearBaseCache() {
+		baseResultCache.clear()
+	}
+
+	function ensureOriginalStock(item) {
+		if (!item) return 0
+		if (item.original_stock === undefined) {
+			const fallback = item.actual_qty !== undefined
+				? item.actual_qty
+				: (item.stock_qty || 0)
+			item.original_stock = fallback
+		}
+		return item.original_stock ?? 0
+	}
+
+	function removeRegisteredItems(registrySet) {
+		if (!registrySet || registrySet.size === 0) return
+
+		registrySet.forEach(item => {
+			const code = item?.item_code
+			if (!code) return
+			const bucket = itemRegistry.get(code)
+			if (bucket) {
+				bucket.delete(item)
+				if (bucket.size === 0) {
+					itemRegistry.delete(code)
+				}
+			}
+		})
+
+		registrySet.clear()
+	}
+
+	function registerItems(items, registrySet) {
+		if (!Array.isArray(items) || items.length === 0) return
+
+		items.forEach(item => {
+			if (!item || !item.item_code) return
+
+			ensureOriginalStock(item)
+
+			let bucket = itemRegistry.get(item.item_code)
+			if (!bucket) {
+				bucket = new Set()
+				itemRegistry.set(item.item_code, bucket)
+			}
+			bucket.add(item)
+			registrySet.add(item)
+		})
+	}
+
+	function replaceAllItems(items) {
+		const next = Array.isArray(items) ? items : []
+		removeRegisteredItems(registeredAllItems)
+		allItems.value = next
+		allItemsVersion.value += 1
+		registerItems(next, registeredAllItems)
+		clearBaseCache()
+
+		// Re-apply cart reservations to ensure new references reflect locked stock
+		cartReservedLookup.forEach((qty, code) => {
+			if (!code) return
+			updateReservedStock(code, qty)
+		})
+	}
+
+	function appendAllItems(items) {
+		if (!Array.isArray(items) || items.length === 0) return
+		allItems.value.push(...items)
+		allItemsVersion.value += 1
+		registerItems(items, registeredAllItems)
+		clearBaseCache()
+
+		const impactedCodes = new Set()
+		items.forEach(item => {
+			if (!item || !item.item_code) return
+			if (cartReservedLookup.has(item.item_code)) {
+				impactedCodes.add(item.item_code)
+			}
+		})
+
+		impactedCodes.forEach(code => {
+			const qty = cartReservedLookup.get(code) || 0
+			updateReservedStock(code, qty)
+		})
+	}
+
+	function setSearchResults(items) {
+		const next = Array.isArray(items) ? items : []
+
+		removeRegisteredItems(registeredSearchItems)
+		searchResults.value = next
+		searchResultsVersion.value += 1
+		registerItems(next, registeredSearchItems)
+		clearBaseCache()
+
+		const impactedCodes = new Set()
+		next.forEach(item => {
+			if (!item || !item.item_code) return
+			if (cartReservedLookup.has(item.item_code)) {
+				impactedCodes.add(item.item_code)
+			}
+		})
+
+		impactedCodes.forEach(code => {
+			const qty = cartReservedLookup.get(code) || 0
+			updateReservedStock(code, qty)
+		})
+	}
+
+	function updateReservedStock(itemCode, reservedQty) {
+		const bucket = itemRegistry.get(itemCode)
+		if (!bucket || bucket.size === 0) {
+			return
+		}
+
+		const reservation = Math.max(parseFloat(reservedQty) || 0, 0)
+
+		bucket.forEach(item => {
+			const original = ensureOriginalStock(item)
+			const updated = Math.max(original - reservation, 0)
+			item.actual_qty = updated
+			item.stock_qty = updated
+		})
+	}
+
 	const filteredItems = computed(() => {
 		// When searching, use search results from server
 		// When browsing, use loaded items with client-side filtering
-		const sourceItems = (searchTerm.value && searchTerm.value.trim().length > 0)
-			? searchResults.value
-			: allItems.value
+		const term = (searchTerm.value || '').trim()
+		const usingSearch = term.length > 0
+		const sourceItems = usingSearch ? searchResults.value : allItems.value
 
 		if (!sourceItems || sourceItems.length === 0) return []
 
-		// Performance: Build cache key for memoization
-		// Include cart item quantities to detect stock changes when quantities change
-		const cartSignature = cartItems.value.length > 0
-			? cartItems.value.map(ci => `${ci.item_code}:${ci.quantity}`).join(',')
-			: ''
-		const cacheKey = `${searchTerm.value || ''}|${selectedItemGroup.value || ''}|${cartSignature}|${sourceItems.length}`
+		const sourceVersion = usingSearch ? searchResultsVersion.value : allItemsVersion.value
+		const selectionKey = selectedItemGroup.value || ''
+		const cacheKey = `${usingSearch ? 'search' : 'browse'}|${term}|${selectionKey}|${sourceVersion}`
 
-		// Check cache for instant results
-		if (resultCache.value.has(cacheKey)) {
-			return resultCache.value.get(cacheKey)
+		let list = baseResultCache.get(cacheKey)
+		if (!list) {
+			list = selectedItemGroup.value
+				? sourceItems.filter(item => item.item_group === selectedItemGroup.value)
+				: sourceItems
+			setCache(baseResultCache, cacheKey, list)
 		}
 
-		let filtered = sourceItems
-
-		// Filter by item group (works for both search results and browse)
-		if (selectedItemGroup.value) {
-			filtered = filtered.filter(
-				(item) => item.item_group === selectedItemGroup.value
-			)
-		}
-
-		// Performance: Only clone items that need cart adjustment
-		// Create a map of cart items for O(1) lookup
-		const cartItemsMap = new Map()
-		if (cartItems.value.length > 0) {
-			cartItems.value.forEach(ci => {
-				cartItemsMap.set(ci.item_code, ci.quantity)
-			})
-		}
-
-		// Adjust stock quantities only for items in cart (avoid cloning all items)
-		const result = filtered.map(item => {
-			const cartQty = cartItemsMap.get(item.item_code)
-			if (cartQty) {
-				// Only clone items that are in the cart
-				const originalStock = item.actual_qty || item.stock_qty || 0
-				const availableStock = originalStock - cartQty
-				return {
-					...item,
-					actual_qty: availableStock,
-					stock_qty: availableStock,
-					original_stock: originalStock
-				}
-			}
-			// Return original reference for items not in cart (no cloning needed)
-			return item
-		})
-
-		// Cache the result for instant repeat searches
-		resultCache.value.set(cacheKey, result)
-
-		// Limit cache size to prevent memory issues
-		if (resultCache.value.size > 50) {
-			// Remove oldest entries (first entries in Map)
-			const firstKey = resultCache.value.keys().next().value
-			resultCache.value.delete(firstKey)
-		}
-
-		return result
+		return list
 	})
 
 	// Actions
@@ -163,7 +261,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 				console.log('Loading initial items from cache (instant)...')
 				const cached = await offlineWorker.searchCachedItems('', itemsPerPage.value)
 				if (cached && cached.length > 0) {
-					allItems.value = cached
+					replaceAllItems(cached)
 					totalItemsLoaded.value = cached.length
 					currentOffset.value = cached.length
 					loading.value = false  // Show UI immediately with cached data
@@ -184,7 +282,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 
 			// Update UI with fresh server data
 			if (list.length > 0) {
-				allItems.value = list
+				replaceAllItems(list)
 				totalItemsLoaded.value = list.length
 				currentOffset.value = list.length
 				hasMore.value = true  // There's likely more on server
@@ -193,9 +291,6 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 				await offlineWorker.cacheItems(list)
 				console.log(`Loaded ${list.length} items from server`)
 			}
-
-			// Clear result cache when new data is loaded
-			resultCache.value.clear()
 
 			// Start background sync to populate cache (don't await!)
 			if (!stats.cacheReady || stats.items < 100) {
@@ -208,14 +303,14 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			// Fallback to cached items if server fails (offline support)
 			try {
 				const cached = await offlineWorker.searchCachedItems('', itemsPerPage.value)
-				allItems.value = cached || []
+				replaceAllItems(cached || [])
 				totalItemsLoaded.value = cached?.length || 0
 				currentOffset.value = cached?.length || 0
 				hasMore.value = (cached?.length || 0) >= itemsPerPage.value
 				console.log(`Loaded ${cached?.length || 0} items from cache (fallback)`)
 			} catch (cacheError) {
 				console.error('Cache also failed:', cacheError)
-				allItems.value = []
+				replaceAllItems([])
 				totalItemsLoaded.value = 0
 				currentOffset.value = 0
 				hasMore.value = false
@@ -247,29 +342,26 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 				start: currentOffset.value,
 				limit: itemsPerPage.value,  // 50 items per batch
 			})
-			const list = response?.message || response || []
+		const list = response?.message || response || []
 
-			if (list.length > 0) {
-				// Append new items to existing list
-				allItems.value = [...allItems.value, ...list]
-				totalItemsLoaded.value += list.length
+		if (list.length > 0) {
+			// Append new items to existing list without breaking reactivity
+			appendAllItems(list)
+			totalItemsLoaded.value += list.length
 
-				// Update pagination state
-				currentOffset.value += list.length
-				hasMore.value = list.length === itemsPerPage.value
+			// Update pagination state
+			currentOffset.value += list.length
+			hasMore.value = list.length === itemsPerPage.value
 
-				// Cache new items for offline support
-				await offlineWorker.cacheItems(list)
+			// Cache new items for offline support
+			await offlineWorker.cacheItems(list)
 
-				// Clear result cache when new data is loaded
-				resultCache.value.clear()
-
-				console.log(`Loaded ${list.length} more items, total: ${totalItemsLoaded.value}`)
-			} else {
-				// No more items to load
-				hasMore.value = false
-				console.log('All items loaded from server')
-			}
+			console.log(`Loaded ${list.length} more items, total: ${totalItemsLoaded.value}`)
+		} else {
+			// No more items to load
+			hasMore.value = false
+			console.log('All items loaded from server')
+		}
 		} catch (error) {
 			console.error('Error loading more items:', error)
 			hasMore.value = false
@@ -361,7 +453,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 
 		// If search term is empty, clear search results
 		if (!term || term.trim().length === 0) {
-			searchResults.value = []
+			setSearchResults([])
 			searching.value = false
 			return
 		}
@@ -377,50 +469,47 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 					// 2. If cache has results, show them immediately
 					// 3. Then search server for fresh results in background
 
-					console.log(`Searching cache for: "${term}"`)
-					const cached = await offlineWorker.searchCachedItems(term, 500)
+				console.log(`Searching cache for: "${term}"`)
+				const cached = await offlineWorker.searchCachedItems(term, 500)
 
-					if (cached && cached.length > 0) {
-						// Show cached results immediately (instant!)
-						searchResults.value = cached
-						searching.value = false
-						console.log(`Found ${cached.length} items in cache`)
+				if (cached && cached.length > 0) {
+					// Show cached results immediately (instant!)
+					setSearchResults(cached)
+					searching.value = false
+					console.log(`Found ${cached.length} items in cache`)
 
-						// Resolve with cached results
-						resolve(cached)
+					// Resolve with cached results
+					resolve(cached)
+				}
+
+				// Now search server in background for fresh results
+				console.log(`Searching server for: "${term}"`)
+				const response = await call('pos_next.api.items.get_items', {
+					pos_profile: posProfile.value,
+					search_term: term,
+					item_group: selectedItemGroup.value,
+					start: 0,
+					limit: 500,  // Reasonable limit for search results
+				})
+				const serverResults = response?.message || response || []
+
+				if (serverResults.length > 0) {
+					// Update with fresh server results
+					setSearchResults(serverResults)
+					console.log(`Found ${serverResults.length} items on server`)
+
+					// Cache server results for future searches
+					await offlineWorker.cacheItems(serverResults)
+
+					// If we didn't resolve with cache, resolve with server results
+					if (!cached || cached.length === 0) {
+						resolve(serverResults)
 					}
-
-					// Now search server in background for fresh results
-					console.log(`Searching server for: "${term}"`)
-					const response = await call('pos_next.api.items.get_items', {
-						pos_profile: posProfile.value,
-						search_term: term,
-						item_group: selectedItemGroup.value,
-						start: 0,
-						limit: 500,  // Reasonable limit for search results
-					})
-					const serverResults = response?.message || response || []
-
-					if (serverResults.length > 0) {
-						// Update with fresh server results
-						searchResults.value = serverResults
-						console.log(`Found ${serverResults.length} items on server`)
-
-						// Cache server results for future searches
-						await offlineWorker.cacheItems(serverResults)
-
-						// If we didn't resolve with cache, resolve with server results
-						if (!cached || cached.length === 0) {
-							resolve(serverResults)
-						}
-					} else if (!cached || cached.length === 0) {
-						// No results from either cache or server
-						searchResults.value = []
-						resolve([])
-					}
-
-					// Clear result cache when new search is performed
-					resultCache.value.clear()
+				} else if (!cached || cached.length === 0) {
+					// No results from either cache or server
+					setSearchResults([])
+					resolve([])
+				}
 
 				} catch (error) {
 					console.error('Error searching items:', error)
@@ -429,12 +518,12 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 					if (!searchResults.value || searchResults.value.length === 0) {
 						try {
 							const cached = await offlineWorker.searchCachedItems(term, 500)
-							searchResults.value = cached || []
+							setSearchResults(cached || [])
 							resolve(cached || [])
 							console.log(`Fallback: found ${cached?.length || 0} items in cache`)
 						} catch (cacheError) {
 							console.error('Cache search also failed:', cacheError)
-							searchResults.value = []
+							setSearchResults([])
 							resolve([])
 						}
 					}
@@ -497,14 +586,14 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			searchItems(term)
 		} else {
 			// Clear search results when term is cleared
-			searchResults.value = []
+			setSearchResults([])
 			searching.value = false
 		}
 	}
 
 	function clearSearch() {
 		searchTerm.value = ''
-		searchResults.value = []
+		setSearchResults([])
 		searching.value = false
 
 		// Clear debounce timer
@@ -527,12 +616,35 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 
 	function setSelectedItemGroup(group) {
 		selectedItemGroup.value = group
-		// Clear result cache when item group changes to force re-filtering
-		resultCache.value.clear()
+		// Item group impacts filtering; drop filtered cache so UI reflects new subset
+		clearBaseCache()
 	}
 
 	function setCartItems(items) {
 		cartItems.value = items
+
+		const nextLookup = new Map()
+		if (Array.isArray(items) && items.length > 0) {
+			items.forEach(item => {
+				const code = item?.item_code
+				if (!code) return
+				const qty = Number(item.quantity) || 0
+				nextLookup.set(code, qty)
+			})
+		}
+
+		const previousLookup = cartReservedLookup
+		cartReservedLookup = nextLookup
+
+		const touched = new Set([
+			...previousLookup.keys(),
+			...nextLookup.keys(),
+		])
+
+		touched.forEach(code => {
+			const reserved = nextLookup.get(code) || 0
+			updateReservedStock(code, reserved)
+		})
 	}
 
 	function setPosProfile(profile) {
@@ -540,8 +652,8 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	}
 
 	function invalidateCache() {
-		// Clear result cache to force UI refresh with updated stock
-		resultCache.value.clear()
+		// Clear caches to force UI refresh with updated stock
+		clearBaseCache()
 	}
 
 	function applyStockUpdates(stockUpdates) {
@@ -550,34 +662,33 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			return
 		}
 
-		// Build lookup map for O(1) access
-		const updateMap = new Map()
 		stockUpdates.forEach(update => {
-			updateMap.set(update.item_code, update)
-		})
+			if (!update || !update.item_code) return
 
-		// Update allItems array in-place
-		allItems.value.forEach(item => {
-			const update = updateMap.get(item.item_code)
-			if (update) {
-				item.actual_qty = update.actual_qty
-				item.stock_qty = update.stock_qty
-				item.warehouse = update.warehouse
+			const bucket = itemRegistry.get(update.item_code)
+			if (!bucket || bucket.size === 0) {
+				return
 			}
+
+			const reserved = cartReservedLookup.get(update.item_code) || 0
+			const baseline = update.actual_qty ?? update.stock_qty
+
+			bucket.forEach(item => {
+				const baseStock = (baseline !== undefined && baseline !== null)
+					? baseline
+					: ensureOriginalStock(item)
+				item.original_stock = baseStock
+				const available = Math.max(baseStock - reserved, 0)
+				item.actual_qty = available
+				item.stock_qty = available
+				if (update.warehouse) {
+					item.warehouse = update.warehouse
+				}
+			})
 		})
 
-		// Update searchResults array in-place
-		searchResults.value.forEach(item => {
-			const update = updateMap.get(item.item_code)
-			if (update) {
-				item.actual_qty = update.actual_qty
-				item.stock_qty = update.stock_qty
-				item.warehouse = update.warehouse
-			}
-		})
-
-		// Clear result cache to force recomputation
-		resultCache.value.clear()
+		// Clear cached filters so the next compute uses fresh references
+		clearBaseCache()
 	}
 
 	return {

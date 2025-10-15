@@ -196,22 +196,23 @@
 						@click="handleItemClick(item)"
 						class="relative bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-lg transition-all touch-manipulation active:scale-95 active:shadow-xl"
 					>
-						<!-- Item Image with Stock Badge -->
-						<div class="relative aspect-square bg-gray-100 rounded-md mb-1.5 sm:mb-2 flex items-center justify-center overflow-hidden">
-							<!-- Stock Badge -->
-							<div
-								:class="[
-									'absolute top-1.5 right-1.5 sm:top-2 sm:right-2 rounded-md shadow-sm',
-									'px-2 sm:px-2.5 py-1 sm:py-1',
-									'text-[10px] sm:text-xs font-bold',
-									getStockStatus(item.actual_qty || item.stock_qty).color,
-									getStockStatus(item.actual_qty || item.stock_qty).textColor
-								]"
-								:title="`${getStockStatus(item.actual_qty || item.stock_qty).label}: ${Math.floor(item.actual_qty || item.stock_qty || 0)} ${item.uom || item.stock_uom || 'Nos'}`"
-							>
-								{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
-							</div>
+						<!-- Stock Badge - Positioned at top right of card -->
+						<div
+							:class="[
+								'absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 rounded-md shadow-lg z-10',
+								'px-2 sm:px-2.5 py-1 sm:py-1',
+								'text-[10px] sm:text-xs font-bold',
+								'border-2 border-white',
+								getStockStatus(item.actual_qty || item.stock_qty).color,
+								getStockStatus(item.actual_qty || item.stock_qty).textColor
+							]"
+							:title="`${getStockStatus(item.actual_qty || item.stock_qty).label}: ${Math.floor(item.actual_qty || item.stock_qty || 0)} ${item.uom || item.stock_uom || 'Nos'}`"
+						>
+							{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
+						</div>
 
+						<!-- Item Image -->
+						<div class="relative aspect-square bg-gray-100 rounded-md mb-1.5 sm:mb-2 flex items-center justify-center overflow-hidden">
 							<img
 								v-if="item.image"
 								:src="item.image"
@@ -493,6 +494,8 @@ const itemThreshold = ref(50) // Threshold for auto-switching to list view
 const userManuallySetView = ref(false) // Track if user manually changed view mode
 const scannerInputDetected = ref(false) // Track if current input is from scanner
 const autoSearchTimer = ref(null) // Timer for auto-search when typing stops
+const lastAutoSwitchCount = ref(0)
+const lastFilterSignature = ref('')
 
 // Infinite scroll refs
 const gridScrollContainer = ref(null)
@@ -556,16 +559,23 @@ watch(
 	{ immediate: true },
 )
 
-// Reset to page 1 when filtered items change
+// Reset to page 1 when filtered items meaningfully change
 watch(
 	filteredItems,
 	(newItems) => {
 		if (!newItems) return
 
 		const itemCount = newItems.length
+		const firstCode = itemCount > 0 ? newItems[0]?.item_code || '' : ''
+		const lastCode = itemCount > 0 ? newItems[itemCount - 1]?.item_code || '' : ''
+		const middleIndex = itemCount > 2 ? Math.floor(itemCount / 2) : -1
+		const middleCode = middleIndex >= 0 ? newItems[middleIndex]?.item_code || '' : ''
+		const signature = `${itemCount}|${firstCode}|${middleCode}|${lastCode}`
 
-		// Reset pagination when items change
-		currentPage.value = 1
+		if (signature !== lastFilterSignature.value) {
+			currentPage.value = 1
+			lastFilterSignature.value = signature
+		}
 
 		// Only auto-switch if user hasn't manually set a preference
 		// and we're in grid view with many items
@@ -574,14 +584,19 @@ watch(
 			viewMode.value === "grid" &&
 			itemCount > itemThreshold.value
 		) {
-			viewMode.value = "list"
+			if (lastAutoSwitchCount.value !== itemCount) {
+				viewMode.value = "list"
+				lastAutoSwitchCount.value = itemCount
 
-			toast.create({
-				title: "Switched to List View",
-				text: `Displaying ${itemCount} items - automatically switched to list view for better performance`,
-				icon: "list",
-				iconClasses: "text-blue-600",
-			})
+				toast.create({
+					title: "Switched to List View",
+					text: `Displaying ${itemCount} items - automatically switched to list view for better performance`,
+					icon: "list",
+					iconClasses: "text-blue-600",
+				})
+			}
+		} else if (itemCount <= itemThreshold.value) {
+			lastAutoSwitchCount.value = 0
 		}
 	},
 	{ immediate: false },
@@ -937,7 +952,7 @@ function getStockStatus(qty) {
 	} else if (quantity <= lowStockThreshold) {
 		return {
 			level: 'low',
-			color: 'bg-orange-500',
+			color: 'bg-amber-500',
 			textColor: 'text-white',
 			label: 'Low Stock'
 		}
