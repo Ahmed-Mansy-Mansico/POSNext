@@ -210,8 +210,9 @@ function printInvoiceCustom(invoiceData) {
 				<!-- Items -->
 				<div class="items-table">
 					${invoiceData.items.map(item => {
-						const hasItemDiscount = item.discount_percentage || item.discount_amount;
-						const hasDistributedDiscount = item.distributed_discount_amount;
+						const hasItemDiscount = (item.discount_percentage && parseFloat(item.discount_percentage) > 0) ||
+												(item.discount_amount && parseFloat(item.discount_amount) > 0);
+						const hasDistributedDiscount = item.distributed_discount_amount && parseFloat(item.distributed_discount_amount) > 0;
 						const isFree = item.is_free_item;
 						const qty = item.qty || item.quantity;
 						const amount = item.amount || (item.rate * qty);
@@ -256,28 +257,30 @@ function printInvoiceCustom(invoiceData) {
 				<!-- Totals -->
 				<div class="totals">
 					${(() => {
-						// Calculate total discount from items
+						// Calculate actual subtotal from item amounts
+						let subtotal = 0;
 						let totalItemDiscount = 0;
-						let subtotalBeforeDiscount = 0;
 
 						invoiceData.items.forEach(item => {
 							const qty = item.qty || item.quantity;
-							// Use price_list_rate if available, otherwise use rate
-							const originalRate = item.price_list_rate || item.rate;
-							subtotalBeforeDiscount += originalRate * qty;
+							const amount = item.amount || (item.rate * qty);
+							subtotal += amount;
 
-							// Sum up item-level discounts
-							if (item.discount_amount) {
+							// Sum up item-level discounts - only if they actually exist
+							if (item.discount_amount && parseFloat(item.discount_amount) > 0) {
 								totalItemDiscount += parseFloat(item.discount_amount);
 							}
-							if (item.distributed_discount_amount) {
+							if (item.distributed_discount_amount && parseFloat(item.distributed_discount_amount) > 0) {
 								totalItemDiscount += parseFloat(item.distributed_discount_amount);
 							}
 						});
 
-						// Add invoice-level additional discount
+						// Add invoice-level additional discount - only if it exists
 						const additionalDiscount = parseFloat(invoiceData.discount_amount || 0);
 						const totalDiscount = totalItemDiscount + additionalDiscount;
+
+						// Calculate subtotal before discount (only if there is a discount)
+						const subtotalBeforeDiscount = totalDiscount > 0 ? subtotal + totalDiscount : subtotal;
 
 						return `
 					<div class="total-row">

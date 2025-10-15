@@ -32,7 +32,7 @@ def check_promotion_permissions(action="read"):
 
 @frappe.whitelist()
 def get_promotions(pos_profile=None, company=None, include_disabled=False):
-	"""Get all promotional schemes for POS with simplified structure."""
+	"""Get all promotional schemes AND standalone pricing rules for POS with simplified structure."""
 	check_promotion_permissions("read")
 
 	filters = {}
@@ -62,6 +62,9 @@ def get_promotions(pos_profile=None, company=None, include_disabled=False):
 	today = getdate(nowdate())
 
 	for scheme in schemes:
+		# Mark as Promotional Scheme
+		scheme["source"] = "Promotional Scheme"
+
 		# Get pricing rules count
 		scheme["pricing_rules_count"] = frappe.db.count(
 			"Pricing Rule",
@@ -93,30 +96,107 @@ def get_promotions(pos_profile=None, company=None, include_disabled=False):
 		else:
 			scheme["status"] = "Active"
 
-	return schemes
+	# Get standalone pricing rules (not associated with promotional schemes)
+	pr_filters = filters.copy()
+	pr_filters["promotional_scheme"] = ["is", "not set"]
+
+	pricing_rules = frappe.get_all(
+		"Pricing Rule",
+		filters=pr_filters,
+		fields=[
+			"name", "title", "apply_on", "disable", "selling", "buying",
+			"applicable_for", "valid_from", "valid_upto", "company",
+			"rate_or_discount", "discount_percentage", "discount_amount",
+			"min_qty", "max_qty", "min_amt", "max_amt", "priority"
+		],
+		order_by="modified desc"
+	)
+
+	# Transform pricing rules to match promotional scheme structure
+	for pr in pricing_rules:
+		# Mark as Pricing Rule
+		pr["source"] = "Pricing Rule"
+		pr["pricing_rules_count"] = 1  # Itself
+		pr["price_slabs"] = 1
+		pr["product_slabs"] = 0
+
+		# Get items/groups/brands count
+		pr_doc = frappe.get_doc("Pricing Rule", pr.name)
+		if pr.apply_on == "Item Code":
+			pr["items_count"] = len(pr_doc.items or [])
+		elif pr.apply_on == "Item Group":
+			pr["items_count"] = len(pr_doc.item_groups or [])
+		elif pr.apply_on == "Brand":
+			pr["items_count"] = len(pr_doc.brands or [])
+		else:
+			pr["items_count"] = 0
+
+		# Calculate status
+		if pr.disable:
+			pr["status"] = "Disabled"
+		elif pr.valid_from and getdate(pr.valid_from) > today:
+			pr["status"] = "Not Started"
+		elif pr.valid_upto and getdate(pr.valid_upto) < today:
+			pr["status"] = "Expired"
+		else:
+			pr["status"] = "Active"
+
+	# Combine both lists
+	all_promotions = schemes + pricing_rules
+
+	return all_promotions
 
 
 @frappe.whitelist()
 def get_promotion_details(scheme_name):
-	"""Get detailed information about a promotional scheme."""
+	"""Get detailed information about a promotional scheme OR standalone pricing rule."""
 	check_promotion_permissions("read")
 
-	if not frappe.db.exists("Promotional Scheme", scheme_name):
-		frappe.throw(_("Promotional Scheme {0} not found").format(scheme_name))
+	# Check if it's a Promotional Scheme
+	if frappe.db.exists("Promotional Scheme", scheme_name):
+		scheme = frappe.get_doc("Promotional Scheme", scheme_name)
+		data = scheme.as_dict()
+		data["source"] = "Promotional Scheme"
 
-	scheme = frappe.get_doc("Promotional Scheme", scheme_name)
+		# Get active pricing rules
+		data["pricing_rules"] = frappe.get_all(
+			"Pricing Rule",
+			filters={"promotional_scheme": scheme_name, "disable": 0},
+			fields=["name", "title", "priority", "valid_from", "valid_upto"]
+		)
 
-	# Convert to dict with all details
-	data = scheme.as_dict()
+		return data
 
-	# Get active pricing rules
-	data["pricing_rules"] = frappe.get_all(
-		"Pricing Rule",
-		filters={"promotional_scheme": scheme_name, "disable": 0},
-		fields=["name", "title", "priority", "valid_from", "valid_upto"]
-	)
+	# Check if it's a standalone Pricing Rule
+	elif frappe.db.exists("Pricing Rule", scheme_name):
+		pr = frappe.get_doc("Pricing Rule", scheme_name)
+		data = pr.as_dict()
+		data["source"] = "Pricing Rule"
 
-	return data
+		# Transform pricing rule to match promotional scheme structure for frontend
+		# Map pricing rule fields to promotional scheme fields
+		data["items_count"] = len(pr.items or []) + len(pr.item_groups or []) + len(pr.brands or [])
+
+		# Create a synthetic price discount slab from pricing rule fields
+		if pr.rate_or_discount in ["Discount Percentage", "Discount Amount"]:
+			data["price_discount_slabs"] = [{
+				"min_qty": pr.min_qty or 0,
+				"max_qty": pr.max_qty or 0,
+				"min_amount": pr.min_amt or 0,
+				"max_amount": pr.max_amt or 0,
+				"discount_percentage": pr.discount_percentage if pr.rate_or_discount == "Discount Percentage" else 0,
+				"discount_amount": pr.discount_amount if pr.rate_or_discount == "Discount Amount" else 0,
+				"rate_or_discount": pr.rate_or_discount
+			}]
+		else:
+			data["price_discount_slabs"] = []
+
+		data["product_discount_slabs"] = []
+
+		return data
+
+	else:
+		frappe.throw(_("Promotion or Pricing Rule {0} not found").format(scheme_name))
 
 
 @frappe.whitelist()

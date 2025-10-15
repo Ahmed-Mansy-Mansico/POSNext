@@ -128,12 +128,30 @@
 									>
 										<div class="flex items-start justify-between mb-2">
 											<div class="flex-1 min-w-0">
-												<p :class="[
-													'text-sm font-medium truncate',
-													selectedPromotion?.name === promotion.name ? 'text-blue-900' : 'text-gray-900'
-												]">
-													{{ promotion.name }}
-												</p>
+												<div class="flex items-center space-x-2">
+													<p :class="[
+														'text-sm font-medium truncate',
+														selectedPromotion?.name === promotion.name ? 'text-blue-900' : 'text-gray-900'
+													]">
+														{{ promotion.name }}
+													</p>
+													<Badge
+														v-if="promotion.source === 'Pricing Rule'"
+														variant="subtle"
+														theme="blue"
+														size="sm"
+													>
+														Rule
+													</Badge>
+													<Badge
+														v-else-if="promotion.source === 'Promotional Scheme'"
+														variant="subtle"
+														theme="purple"
+														size="sm"
+													>
+														Scheme
+													</Badge>
+												</div>
 												<p class="text-xs text-gray-500 mt-0.5">{{ promotion.items_count || 0 }} items</p>
 											</div>
 											<Badge
@@ -185,16 +203,40 @@
 									<!-- Form Header -->
 									<div class="flex items-center justify-between mb-6 pb-4 border-b">
 										<div>
-											<h3 class="text-xl font-semibold text-gray-900">
-												{{ isCreating ? 'Create New Promotion' : 'Edit Promotion' }}
-											</h3>
+											<div class="flex items-center space-x-3">
+												<h3 class="text-xl font-semibold text-gray-900">
+													{{ isCreating ? 'Create New Promotion' : 'Edit Promotion' }}
+												</h3>
+												<Badge
+													v-if="!isCreating && selectedPromotion?.source === 'Pricing Rule'"
+													variant="subtle"
+													theme="blue"
+													size="md"
+												>
+													Pricing Rule
+												</Badge>
+												<Badge
+													v-else-if="!isCreating && selectedPromotion?.source === 'Promotional Scheme'"
+													variant="subtle"
+													theme="purple"
+													size="md"
+												>
+													Promotional Scheme
+												</Badge>
+											</div>
 											<p class="text-sm text-gray-600 mt-1">
-												{{ isCreating ? 'Fill in the details to create a new promotional scheme' : 'Update the promotion details below' }}
+												{{ isCreating ? 'Fill in the details to create a new promotional scheme' : isPricingRule ? 'View pricing rule details (read-only)' : 'Update the promotion details below' }}
 											</p>
 										</div>
 										<div class="flex items-center space-x-2">
+											<!-- Show info badge for read-only Pricing Rules -->
+											<div v-if="isPricingRule" class="flex items-center space-x-2 px-3 py-1 bg-blue-50 rounded-lg">
+												<FeatherIcon name="info" class="w-4 h-4 text-blue-600" />
+												<span class="text-xs text-blue-700 font-medium">Read-only: Edit in ERPNext</span>
+											</div>
+
 											<Button
-												v-if="!isCreating"
+												v-if="!isCreating && !isPricingRule"
 												@click="handleDelete(selectedPromotion)"
 												variant="ghost"
 												theme="red"
@@ -205,7 +247,7 @@
 												Delete
 											</Button>
 											<Button
-												v-if="!isCreating"
+												v-if="!isCreating && !isPricingRule"
 												@click="handleToggle(selectedPromotion)"
 												variant="outline"
 												:theme="selectedPromotion.disable ? 'green' : 'orange'"
@@ -215,14 +257,15 @@
 												</template>
 												{{ selectedPromotion.disable ? 'Enable' : 'Disable' }}
 											</Button>
-											<div class="w-px h-6 bg-gray-200"></div>
+											<div v-if="!isPricingRule" class="w-px h-6 bg-gray-200"></div>
 											<Button
 												@click="handleCancel"
 												variant="ghost"
 											>
-												Cancel
+												{{ isPricingRule ? 'Close' : 'Cancel' }}
 											</Button>
 											<Button
+												v-if="!isPricingRule"
 												@click="handleSubmit"
 												:loading="loading"
 												variant="solid"
@@ -260,19 +303,21 @@
 														type="date"
 														label="Valid From"
 														v-model="form.valid_from"
+														:disabled="isPricingRule"
 													/>
 
 													<FormControl
 														type="date"
 														label="Valid Until"
 														v-model="form.valid_upto"
+														:disabled="isPricingRule"
 													/>
 
 													<FormControl
 														type="select"
 														label="Apply On"
 														v-model="form.apply_on"
-														:disabled="!isCreating"
+														:disabled="!isCreating || isPricingRule"
 														:options="[
 															{ label: 'Specific Items', value: 'Item Code' },
 															{ label: 'Item Groups', value: 'Item Group' },
@@ -449,6 +494,7 @@
 															:label="form.discount_type === 'percentage' ? 'Discount (%)' : `Discount (${currency})`"
 															v-model="form.discount_value"
 															placeholder="0"
+															:disabled="isPricingRule"
 															required
 														/>
 
@@ -505,6 +551,7 @@
 															label="Free Quantity"
 															v-model="form.free_qty"
 															placeholder="1"
+															:disabled="isPricingRule"
 															required
 														/>
 
@@ -513,6 +560,7 @@
 															label="Minimum Quantity"
 															v-model="form.min_qty"
 															placeholder="0"
+															:disabled="isPricingRule"
 														/>
 
 														<FormControl
@@ -520,6 +568,7 @@
 															label="Maximum Quantity"
 															v-model="form.max_qty"
 															placeholder="0"
+															:disabled="isPricingRule"
 														/>
 
 														<FormControl
@@ -527,6 +576,7 @@
 															:label="`Minimum Amount (${currency})`"
 															v-model="form.min_amt"
 															placeholder="0"
+															:disabled="isPricingRule"
 														/>
 
 														<FormControl
@@ -534,6 +584,7 @@
 															:label="`Maximum Amount (${currency})`"
 															v-model="form.max_amt"
 															placeholder="0"
+															:disabled="isPricingRule"
 														/>
 													</div>
 												</div>
@@ -667,6 +718,10 @@ const discountTypes = [
 ]
 
 // Computed
+const isPricingRule = computed(() => {
+	return !isCreating.value && selectedPromotion.value?.source === 'Pricing Rule'
+})
+
 const filteredPromotions = computed(() => {
 	let filtered = promotions.value
 

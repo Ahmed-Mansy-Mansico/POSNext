@@ -190,23 +190,11 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"pos_next.tasks.all"
-# 	],
-# 	"daily": [
-# 		"pos_next.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"pos_next.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"pos_next.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"pos_next.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"daily": [
+		"pos_next.tasks.cleanup_expired_promotions.cleanup_expired_promotions",
+	],
+}
 
 # Testing
 # -------

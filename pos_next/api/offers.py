@@ -12,9 +12,16 @@ def get_offers(pos_profile):
     profile = frappe.get_doc("POS Profile", pos_profile)
     date = nowdate()
 
-    # Promotional Schemes generate pricing rules automatically, so we
-    # only need to fetch the relevant pricing rules.
-    return _get_pricing_rules(profile, date)
+    # Get both promotional scheme pricing rules and standalone pricing rules
+    offers = []
+
+    # Get pricing rules from promotional schemes
+    offers.extend(_get_pricing_rules(profile, date))
+
+    # Get standalone pricing rules
+    offers.extend(_get_standalone_pricing_rules(profile, date))
+
+    return offers
 
 
 def _get_pricing_rules(pos_profile, date):
@@ -199,6 +206,140 @@ def _get_pricing_rules(pos_profile, date):
         offers.append(offer)
 
     return offers
+
+
+def _get_standalone_pricing_rules(pos_profile, date):
+    """Return standalone Pricing Rules (not from Promotional Schemes) with discount details."""
+    filters = {
+        "company": pos_profile.company,
+        "date": date,
+    }
+
+    # Fetch standalone pricing rules (not linked to promotional schemes)
+    pricing_rules = frappe.db.sql(
+        """
+        SELECT
+                name, title, apply_on, selling,
+                coupon_code_based, price_or_product_discount,
+                rate_or_discount, rate, discount_amount, discount_percentage,
+                min_qty, max_qty, min_amt, max_amt,
+                priority, valid_from, valid_upto
+        FROM `tabPricing Rule`
+        WHERE
+                disable = 0
+                AND selling = 1
+                AND promotional_scheme IS NULL
+                AND company = %(company)s
+                AND (valid_from IS NULL OR valid_from <= %(date)s)
+                AND (valid_upto IS NULL OR valid_upto >= %(date)s)
+                AND price_or_product_discount = 'Price'
+        ORDER BY priority DESC, name
+        """,
+        filters,
+        as_dict=1,
+    ) or []
+
+    if not pricing_rules:
+        return []
+
+    # Get rule names for batch queries
+    rule_names = [rule["name"] for rule in pricing_rules]
+
+    # Batch query eligibility criteria
+    items_results = frappe.db.sql(
+        """
+        SELECT parent, item_code
+        FROM `tabPricing Rule Item Code`
+        WHERE parent IN %s
+        """,
+        [rule_names],
+        as_dict=1,
+    )
+
+    items_map = {}
+    for row in items_results:
+        items_map.setdefault(row["parent"], []).append(row["item_code"])
+
+    item_groups_results = frappe.db.sql(
+        """
+        SELECT parent, item_group
+        FROM `tabPricing Rule Item Group`
+        WHERE parent IN %s
+        """,
+        [rule_names],
+        as_dict=1,
+    )
+
+    item_groups_map = {}
+    for row in item_groups_results:
+        item_groups_map.setdefault(row["parent"], []).append(row["item_group"])
+
+    brands_results = frappe.db.sql(
+        """
+        SELECT parent, brand
+        FROM `tabPricing Rule Brand`
+        WHERE parent IN %s
+        """,
+        [rule_names],
+        as_dict=1,
+    )
+
+    brands_map = {}
+    for row in brands_results:
+        brands_map.setdefault(row["parent"], []).append(row["brand"])
+
+    # Build offers from standalone pricing rules
+    offers = []
+    for rule in pricing_rules:
+        # Standalone pricing rules are auto-applied unless coupon-based
+        is_auto = 0 if rule.coupon_code_based else 1
+
+        # Get eligible items/groups from pre-loaded maps
+        eligible_items = []
+        eligible_item_groups = []
+        eligible_brands = []
+
+        if rule.apply_on == "Item Code":
+            eligible_items = items_map.get(rule.name, [])
+        elif rule.apply_on == "Item Group":
+            eligible_item_groups = item_groups_map.get(rule.name, [])
+        elif rule.apply_on == "Brand":
+            eligible_brands = brands_map.get(rule.name, [])
+
+        offer = {
+            "name": rule.name,
+            "title": rule.title or rule.name,
+            "description": rule.title or f"Pricing Rule: {rule.name}",
+            "apply_on": rule.apply_on,
+            "offer": "Item Price",
+            "auto": is_auto,
+            "coupon_based": 1 if rule.coupon_code_based else 0,
+            # Min/max from rule
+            "min_qty": flt(rule.min_qty),
+            "max_qty": flt(rule.max_qty),
+            "min_amt": flt(rule.min_amt),
+            "max_amt": flt(rule.max_amt),
+            # Discount info from rule
+            "discount_type": rule.rate_or_discount,
+            "rate": flt(rule.rate),
+            "discount_amount": flt(rule.discount_amount),
+            "discount_percentage": flt(rule.discount_percentage),
+            # Validity from pricing rule
+            "valid_from": rule.valid_from,
+            "valid_upto": rule.valid_upto,
+            "source": "Pricing Rule",  # Tag to identify standalone pricing rules
+            "promotional_scheme": None,
+            "promotional_scheme_id": None,
+            # Eligibility criteria
+            "eligible_items": eligible_items,
+            "eligible_item_groups": eligible_item_groups,
+            "eligible_brands": eligible_brands,
+        }
+        offers.append(offer)
+
+    return offers
+
+
 @frappe.whitelist()
 def validate_coupon(coupon_code, customer=None, company=None):
 	"""
