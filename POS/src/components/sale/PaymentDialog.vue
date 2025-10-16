@@ -240,8 +240,10 @@ const paymentEntries = ref([])
 
 const paymentMethodsResource = createResource({
 	url: "pos_next.api.pos_profile.get_payment_methods",
-	params: {
-		pos_profile: props.posProfile,
+	makeParams() {
+		return {
+			pos_profile: props.posProfile,
+		}
 	},
 	auto: false,
 	onSuccess(data) {
@@ -256,6 +258,12 @@ const paymentMethodsResource = createResource({
 
 // Load payment methods - from cache if offline, from server if online
 async function loadPaymentMethods() {
+	// Guard: Don't load if posProfile is not set
+	if (!props.posProfile) {
+		console.warn("PaymentDialog: Cannot load payment methods - posProfile is not set")
+		return
+	}
+
 	if (props.isOffline) {
 		// Load from cache when offline
 		const cached = await getCachedPaymentMethods(props.posProfile)
@@ -268,7 +276,12 @@ async function loadPaymentMethods() {
 		}
 	} else {
 		// Load from server when online
-		paymentMethodsResource.reload()
+		// Use fetch() instead of reload() for proper initialization
+		try {
+			await paymentMethodsResource.fetch()
+		} catch (error) {
+			console.error("Error loading payment methods:", error)
+		}
 	}
 }
 

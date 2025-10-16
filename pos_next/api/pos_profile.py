@@ -59,6 +59,10 @@ def get_pos_profile_data(pos_profile):
 def get_payment_methods(pos_profile):
 	"""Get available payment methods from POS Profile"""
 	try:
+		# Validate pos_profile parameter
+		if not pos_profile:
+			frappe.throw(_("POS Profile is required"))
+
 		payment_methods = frappe.get_list(
 			"POS Payment Method",
 			filters={"parent": pos_profile},

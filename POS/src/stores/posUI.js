@@ -127,6 +127,28 @@ export const usePOSUIStore = defineStore('posUI', () => {
 		}
 	}
 
+	function resetAllDialogs() {
+		// Close all dialogs on logout to prevent stale state
+		showPaymentDialog.value = false
+		showCustomerDialog.value = false
+		showSuccessDialog.value = false
+		showOpenShiftDialog.value = false
+		showCloseShiftDialog.value = false
+		showDraftDialog.value = false
+		showReturnDialog.value = false
+		showCouponDialog.value = false
+		showOffersDialog.value = false
+		showBatchSerialDialog.value = false
+		showHistoryDialog.value = false
+		showOfflineInvoicesDialog.value = false
+		showCreateCustomerDialog.value = false
+		showClearCartDialog.value = false
+		showLogoutDialog.value = false
+		showItemSelectionDialog.value = false
+		showErrorDialog.value = false
+		clearError()
+	}
+
 	return {
 		// State
 		isLoading,
@@ -177,5 +199,6 @@ export const usePOSUIStore = defineStore('posUI', () => {
 		setResizing,
 		updateLayoutBounds,
 		clampLeftPanelWidth,
+		resetAllDialogs,
 	}
 })

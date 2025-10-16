@@ -629,6 +629,7 @@ export function useInvoice() {
 
 	async function clearCart() {
 		invoiceItems.value = []
+		customer.value = null
 		payments.value = []
 		additionalDiscount.value = 0
 		couponCode.value = null

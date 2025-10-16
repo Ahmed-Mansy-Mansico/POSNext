@@ -904,6 +904,8 @@ function handleShiftClosed() {
 	// Check if logout should happen after closing shift
 	if (logoutAfterClose.value) {
 		logoutAfterClose.value = false
+		// Clear all dialog states to prevent stale state on next login
+		uiStore.resetAllDialogs()
 		session.logout.submit()
 	} else {
 		setTimeout(() => {
@@ -1279,7 +1281,10 @@ function getCurrentUser() {
 
 function confirmLogout() {
 	logoutAfterClose.value = false
-	uiStore.showLogoutDialog = false
+	// Clear cart to prevent stale items on next login
+	cartStore.clearCart()
+	// Clear all dialog states to prevent stale state on next login
+	uiStore.resetAllDialogs()
 	session.logout.submit()
 }
 

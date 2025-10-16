@@ -235,13 +235,19 @@ const paymentMethods = computed(() => {
 })
 
 // Watch dialog open state
-watch(open, (isOpen) => {
-  if (isOpen) {
-    initDialog()
-  } else {
-    resetDialog()
-  }
-})
+// Use { immediate: true } to ensure initDialog runs even when
+// the component mounts with open already true (e.g., after logout with dialog open)
+watch(
+	open,
+	(isOpen) => {
+		if (isOpen) {
+			initDialog()
+		} else {
+			resetDialog()
+		}
+	},
+	{ immediate: true }
+)
 
 watch(showClosingDialog, (isOpen) => {
 	closingExistingShift.value = isOpen
@@ -252,13 +258,24 @@ watch(showClosingDialog, (isOpen) => {
 
 async function initDialog() {
   step.value = 1
-  profilesResource.fetch()
+  selectedProfile.value = null
+  existingShift.value = null
+  openingBalances.value = {}
+  dialogDataResource.reset()
 
-  // Check if user already has an open shift
-  const checkResult = await checkOpeningShift.fetch()
-  if (checkResult) {
-    existingShift.value = checkResult
-    step.value = 3
+  try {
+    // Await profile fetch to ensure data is loaded before proceeding
+    await profilesResource.fetch()
+
+    // Check if user already has an open shift
+    const checkResult = await checkOpeningShift.fetch()
+    if (checkResult) {
+      existingShift.value = checkResult
+      step.value = 3
+    }
+  } catch (error) {
+    console.error("Error initializing shift dialog:", error)
+    // Error will be displayed via profilesResource.error in the UI
   }
 }
 
@@ -267,6 +284,9 @@ function resetDialog() {
   selectedProfile.value = null
   openingBalances.value = {}
   existingShift.value = null
+  profilesResource.reset()
+  dialogDataResource.reset()
+  createShiftResource.reset()
 }
 
 function selectPosProfile(profile) {

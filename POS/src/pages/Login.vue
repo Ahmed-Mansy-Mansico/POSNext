@@ -96,13 +96,19 @@
 </template>
 
 <script setup>
-import { reactive, watch, ref } from "vue"
+import { reactive, watch, ref, onMounted } from "vue"
 import { useRouter } from "vue-router"
 import { session } from "../data/session"
 import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
 import { FeatherIcon } from "frappe-ui"
+import { useShift } from "../composables/useShift"
+import { usePOSCartStore } from "@/stores/posCart"
+import { usePOSUIStore } from "@/stores/posUI"
 
 const router = useRouter()
+const { shiftState } = useShift()
+const cartStore = usePOSCartStore()
+const uiStore = usePOSUIStore()
 
 const loginForm = reactive({
 	email: "",
@@ -111,6 +117,33 @@ const loginForm = reactive({
 
 const showShiftDialog = ref(false)
 const showPassword = ref(false)
+
+// Reset state when login page mounts
+onMounted(() => {
+	// Clear login form
+	loginForm.email = ""
+	loginForm.password = ""
+	showPassword.value = false
+	showShiftDialog.value = false
+
+	// Clear any login errors
+	if (session.login.error) {
+		session.login.reset()
+	}
+
+	// Clear cart and UI state to ensure clean slate
+	cartStore.clearCart()
+	uiStore.resetAllDialogs()
+
+	// Clear any stale shift state
+	shiftState.value = {
+		pos_opening_shift: null,
+		pos_profile: null,
+		company: null,
+		isOpen: false,
+	}
+	localStorage.removeItem("pos_shift_data")
+})
 
 function submit() {
 	if (!loginForm.email || !loginForm.password) {
