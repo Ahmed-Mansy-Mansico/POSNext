@@ -6,7 +6,7 @@
  * Each handler is responsible for filtering by warehouse and updating its cache.
  */
 
-import { ref, onUnmounted } from 'vue'
+import { onUnmounted, ref } from "vue"
 
 // Shared state across all instances
 const isListening = ref(false)
@@ -34,15 +34,15 @@ async function processBatchedUpdates() {
 	try {
 		// Notify all registered handlers
 		// Each handler can filter by warehouse before applying updates
-		eventHandlers.forEach(handler => {
+		eventHandlers.forEach((handler) => {
 			try {
 				handler(updates)
 			} catch (error) {
-				console.error('[Realtime Stock] Handler error:', error)
+				console.error("[Realtime Stock] Handler error:", error)
 			}
 		})
 	} catch (error) {
-		console.error('[Realtime Stock] Failed to process batch updates:', error)
+		console.error("[Realtime Stock] Failed to process batch updates:", error)
 	}
 }
 
@@ -75,7 +75,7 @@ function handleStockUpdate(data) {
 	}
 
 	// Add updates to pending batch (deduplicate by item_code + warehouse)
-	data.stock_updates.forEach(update => {
+	data.stock_updates.forEach((update) => {
 		const key = `${update.item_code}|${update.warehouse}`
 		pendingUpdates.set(key, update)
 	})
@@ -99,13 +99,13 @@ function startListening() {
 	}
 
 	if (!window.frappe?.realtime) {
-		console.warn('[Realtime Stock] Socket.IO not available')
+		console.warn("[Realtime Stock] Socket.IO not available")
 		return
 	}
 
 	// Subscribe to stock update events
-	window.frappe.realtime.on('pos_stock_update', handleStockUpdate)
-	window.frappe.realtime.on('pos_invoice_created', handleInvoiceCreated)
+	window.frappe.realtime.on("pos_stock_update", handleStockUpdate)
+	window.frappe.realtime.on("pos_invoice_created", handleInvoiceCreated)
 
 	isListening.value = true
 }
@@ -119,8 +119,8 @@ function stopListening() {
 	}
 
 	if (window.frappe?.realtime) {
-		window.frappe.realtime.off('pos_stock_update', handleStockUpdate)
-		window.frappe.realtime.off('pos_invoice_created', handleInvoiceCreated)
+		window.frappe.realtime.off("pos_stock_update", handleStockUpdate)
+		window.frappe.realtime.off("pos_invoice_created", handleInvoiceCreated)
 	}
 
 	// Clear pending updates
@@ -154,8 +154,8 @@ export function useRealtimeStock() {
 	 * @returns {Function} Cleanup function to unregister handler
 	 */
 	function onStockUpdate(handler) {
-		if (typeof handler !== 'function') {
-			throw new Error('Handler must be a function')
+		if (typeof handler !== "function") {
+			throw new Error("Handler must be a function")
 		}
 
 		eventHandlers.add(handler)
@@ -187,6 +187,6 @@ export function useRealtimeStock() {
 		onStockUpdate,
 		flushUpdates,
 		startListening,
-		stopListening
+		stopListening,
 	}
 }

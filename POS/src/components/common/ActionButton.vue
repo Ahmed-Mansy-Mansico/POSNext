@@ -23,74 +23,75 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed } from "vue"
 
 const props = defineProps({
 	icon: {
 		type: String,
-		required: true
+		required: true,
 	},
 	title: {
 		type: String,
-		default: ''
+		default: "",
 	},
 	variant: {
 		type: String,
-		default: 'gray', // gray, green, orange, red, blue
-		validator: (value) => ['gray', 'green', 'orange', 'red', 'blue'].includes(value)
+		default: "gray", // gray, green, orange, red, blue
+		validator: (value) =>
+			["gray", "green", "orange", "red", "blue"].includes(value),
 	},
 	size: {
 		type: String,
-		default: 'md', // sm, md, lg
-		validator: (value) => ['sm', 'md', 'lg'].includes(value)
+		default: "md", // sm, md, lg
+		validator: (value) => ["sm", "md", "lg"].includes(value),
 	},
 	badge: {
 		type: [String, Number],
-		default: null
+		default: null,
 	},
 	iconFill: {
 		type: String,
-		default: 'none'
+		default: "none",
 	},
 	strokeLinecap: {
 		type: String,
-		default: 'round'
+		default: "round",
 	},
 	strokeLinejoin: {
 		type: String,
-		default: 'round'
+		default: "round",
 	},
 	strokeWidth: {
 		type: String,
-		default: '2'
+		default: "2",
 	},
 	animate: {
 		type: Boolean,
-		default: false
-	}
+		default: false,
+	},
 })
 
-defineEmits(['click'])
+defineEmits(["click"])
 
 const buttonClasses = computed(() => {
-	const base = 'p-2 hover:bg-gray-50 rounded-lg transition-colors group'
-	const animation = props.animate ? 'animate-pulse' : ''
+	const base = "p-2 hover:bg-gray-50 rounded-lg transition-colors group"
+	const animation = props.animate ? "animate-pulse" : ""
 	return `${base} ${animation}`.trim()
 })
 
 const iconClasses = computed(() => {
 	const sizes = {
-		sm: 'w-4 h-4',
-		md: 'w-5 h-5',
-		lg: 'w-6 h-6'
+		sm: "w-4 h-4",
+		md: "w-5 h-5",
+		lg: "w-6 h-6",
 	}
 
 	const variants = {
-		gray: 'text-gray-600 group-hover:text-gray-900',
-		green: 'text-green-600',
-		orange: 'text-orange-600',
-		red: 'text-red-600',
-		blue: 'text-blue-600'
+		gray: "text-gray-600 group-hover:text-gray-900",
+		green: "text-green-600",
+		orange: "text-orange-600",
+		red: "text-red-600",
+		blue: "text-blue-600",
 	}
 
 	return `${sizes[props.size]} ${variants[props.variant]}`

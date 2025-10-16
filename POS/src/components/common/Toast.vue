@@ -67,8 +67,8 @@
 </template>
 
 <script setup>
-import { FeatherIcon } from 'frappe-ui'
-import { useToast } from '@/composables/useToast'
+import { useToast } from "@/composables/useToast"
+import { FeatherIcon } from "frappe-ui"
 
 const { toastNotification, showToast, hideToast } = useToast()
 </script>

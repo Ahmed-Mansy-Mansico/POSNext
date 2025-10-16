@@ -153,20 +153,20 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { Dialog, Button, Input, createResource, toast } from 'frappe-ui'
-import { printInvoiceByName } from '@/utils/printInvoice'
+import { printInvoiceByName } from "@/utils/printInvoice"
+import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
+import { computed, ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
 	posProfile: String,
 })
 
-const emit = defineEmits(['update:modelValue', 'create-return'])
+const emit = defineEmits(["update:modelValue", "create-return"])
 
 const show = ref(props.modelValue)
 const invoices = ref([])
-const searchTerm = ref('')
+const searchTerm = ref("")
 const expandedInvoice = ref(null)
 const page = ref(0)
 const pageSize = 20
@@ -174,70 +174,74 @@ const hasMore = ref(true)
 
 // Create resource for loading invoices
 const invoicesResource = createResource({
-	url: 'frappe.client.get_list',
+	url: "frappe.client.get_list",
 	makeParams() {
 		return {
-			doctype: 'Sales Invoice',
+			doctype: "Sales Invoice",
 			filters: {
 				is_pos: 1,
-				...(props.posProfile && { pos_profile: props.posProfile })
+				...(props.posProfile && { pos_profile: props.posProfile }),
 			},
 			fields: [
-				'name',
-				'customer',
-				'customer_name',
-				'posting_date',
-				'posting_time',
-				'grand_total',
-				'status',
-				'docstatus',
-				'is_return',
+				"name",
+				"customer",
+				"customer_name",
+				"posting_date",
+				"posting_time",
+				"grand_total",
+				"status",
+				"docstatus",
+				"is_return",
 			],
-			order_by: 'creation desc',
+			order_by: "creation desc",
 			start: 0,
-			page_length: 100
+			page_length: 100,
 		}
 	},
 	auto: false,
 	onSuccess(data) {
-		console.log('Invoices loaded:', data)
+		console.log("Invoices loaded:", data)
 		if (data && Array.isArray(data)) {
 			// For simplicity, show item count as 0 initially
-			invoices.value = data.map(inv => ({
+			invoices.value = data.map((inv) => ({
 				...inv,
-				items_count: 0
+				items_count: 0,
 			}))
 		}
 	},
 	onError(error) {
-		console.error('Error loading invoices:', error)
+		console.error("Error loading invoices:", error)
 		toast.create({
-			title: 'Error',
-			text: 'Failed to load invoices',
-			icon: 'alert-circle',
-			iconClasses: 'text-red-600',
+			title: "Error",
+			text: "Failed to load invoices",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
 		})
-	}
+	},
 })
 
-watch(() => props.modelValue, (val) => {
-	show.value = val
-	if (val && props.posProfile) {
-		invoicesResource.reload()
-	}
-})
+watch(
+	() => props.modelValue,
+	(val) => {
+		show.value = val
+		if (val && props.posProfile) {
+			invoicesResource.reload()
+		}
+	},
+)
 
 watch(show, (val) => {
-	emit('update:modelValue', val)
+	emit("update:modelValue", val)
 })
 
 const filteredInvoices = computed(() => {
 	if (!searchTerm.value) return invoices.value
 
 	const term = searchTerm.value.toLowerCase()
-	return invoices.value.filter(inv =>
-		inv.name.toLowerCase().includes(term) ||
-		inv.customer_name?.toLowerCase().includes(term)
+	return invoices.value.filter(
+		(inv) =>
+			inv.name.toLowerCase().includes(term) ||
+			inv.customer_name?.toLowerCase().includes(term),
 	)
 })
 
@@ -268,25 +272,25 @@ async function printInvoice(invoice) {
 	try {
 		await printInvoiceByName(invoice.name)
 	} catch (error) {
-		console.error('Error printing invoice:', error)
+		console.error("Error printing invoice:", error)
 		window.frappe.msgprint({
-			title: 'Error',
-			message: 'Failed to print invoice',
-			indicator: 'red'
+			title: "Error",
+			message: "Failed to print invoice",
+			indicator: "red",
 		})
 	}
 }
 
 function createReturn(invoice) {
-	emit('create-return', invoice)
+	emit("create-return", invoice)
 	show.value = false
 }
 
 function formatDateTime(date, time) {
-	const dateStr = new Date(date).toLocaleDateString('en-US', {
-		month: 'short',
-		day: 'numeric',
-		year: 'numeric'
+	const dateStr = new Date(date).toLocaleDateString("en-US", {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
 	})
 	if (time) {
 		return `${dateStr} ${time}`
@@ -295,6 +299,6 @@ function formatDateTime(date, time) {
 }
 
 function formatCurrency(amount) {
-	return parseFloat(amount || 0).toFixed(2)
+	return Number.parseFloat(amount || 0).toFixed(2)
 }
 </script>

@@ -20,7 +20,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed } from "vue"
 
 const props = defineProps({
 	modelValue: {
@@ -33,7 +33,7 @@ const props = defineProps({
 	},
 	description: {
 		type: String,
-		default: '',
+		default: "",
 	},
 	min: {
 		type: Number,
@@ -49,7 +49,9 @@ const props = defineProps({
 	},
 })
 
-defineEmits(['update:modelValue'])
+defineEmits(["update:modelValue"])
 
-const fieldId = computed(() => `number-${Math.random().toString(36).substr(2, 9)}`)
+const fieldId = computed(
+	() => `number-${Math.random().toString(36).substr(2, 9)}`,
+)
 </script>

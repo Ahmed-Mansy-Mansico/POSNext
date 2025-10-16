@@ -1,5 +1,5 @@
-import { ref, computed } from "vue"
 import { createResource } from "frappe-ui"
+import { computed, ref } from "vue"
 
 export const shiftState = ref({
 	pos_opening_shift: null,

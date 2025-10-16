@@ -143,16 +143,16 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { Dialog, Button, Input, createResource, toast } from 'frappe-ui'
-import { formatCurrency as formatCurrencyUtil } from '@/utils/currency'
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
+import { ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
 	subtotal: {
 		type: Number,
 		required: true,
-		note: 'Cart subtotal BEFORE tax - used for discount calculations'
+		note: "Cart subtotal BEFORE tax - used for discount calculations",
 	},
 	items: Array,
 	posProfile: String,
@@ -160,77 +160,87 @@ const props = defineProps({
 	company: String,
 	currency: {
 		type: String,
-		default: 'USD'
+		default: "USD",
 	},
 	appliedCoupon: {
 		type: Object,
-		default: null
-	}
+		default: null,
+	},
 })
 
-const emit = defineEmits(['update:modelValue', 'discount-applied', 'discount-removed'])
+const emit = defineEmits([
+	"update:modelValue",
+	"discount-applied",
+	"discount-removed",
+])
 
 const show = ref(props.modelValue)
-const couponCode = ref('')
+const couponCode = ref("")
 const giftCards = ref([])
 const appliedDiscount = ref(null)
 const applying = ref(false)
-const errorMessage = ref('')
+const errorMessage = ref("")
 
 // Resource to load gift cards
 const giftCardsResource = createResource({
-	url: 'pos_next.api.offers.get_active_coupons',
+	url: "pos_next.api.offers.get_active_coupons",
 	makeParams() {
 		return {
 			customer: props.customer,
-			company: props.company
+			company: props.company,
 		}
 	},
 	auto: false,
 	onSuccess(data) {
 		giftCards.value = data?.message || data || []
-	}
+	},
 })
 
 // Resource to validate coupon
 const couponResource = createResource({
-	url: 'pos_next.api.offers.validate_coupon',
+	url: "pos_next.api.offers.validate_coupon",
 	makeParams() {
 		return {
 			coupon_code: couponCode.value,
 			customer: props.customer,
-			company: props.company
+			company: props.company,
 		}
 	},
-	auto: false
+	auto: false,
 })
 
-watch(() => props.modelValue, (val) => {
-	show.value = val
-	if (val) {
-		loadGiftCards()
-		errorMessage.value = ''
-		couponCode.value = ''
-		// Sync with external state
-		appliedDiscount.value = props.appliedCoupon
-	}
-})
+watch(
+	() => props.modelValue,
+	(val) => {
+		show.value = val
+		if (val) {
+			loadGiftCards()
+			errorMessage.value = ""
+			couponCode.value = ""
+			// Sync with external state
+			appliedDiscount.value = props.appliedCoupon
+		}
+	},
+)
 
 watch(show, (val) => {
-	emit('update:modelValue', val)
+	emit("update:modelValue", val)
 })
 
 // Watch for external coupon removal
-watch(() => props.appliedCoupon, (val) => {
-	appliedDiscount.value = val
-})
+watch(
+	() => props.appliedCoupon,
+	(val) => {
+		appliedDiscount.value = val
+	},
+)
 
 async function loadGiftCards() {
 	if (!props.customer || !props.company) return
 	try {
 		await giftCardsResource.reload()
 	} catch (error) {
-		console.error('Error loading gift cards:', error)
+		console.error("Error loading gift cards:", error)
 	}
 }
 
@@ -241,24 +251,25 @@ function applyGiftCard(card) {
 
 async function applyCoupon() {
 	if (!couponCode.value.trim()) {
-		errorMessage.value = 'Please enter a coupon code'
+		errorMessage.value = "Please enter a coupon code"
 		return
 	}
 
 	applying.value = true
-	errorMessage.value = ''
+	errorMessage.value = ""
 
 	try {
 		await couponResource.reload()
 		const result = couponResource.data?.message || couponResource.data
 
 		if (!result || !result.valid) {
-			errorMessage.value = result?.message || 'The coupon code you entered is not valid'
+			errorMessage.value =
+				result?.message || "The coupon code you entered is not valid"
 			toast.create({
-				title: 'Invalid Coupon',
+				title: "Invalid Coupon",
 				text: errorMessage.value,
-				icon: 'x',
-				iconClasses: 'text-red-600'
+				icon: "x",
+				iconClasses: "text-red-600",
 			})
 			return
 		}
@@ -269,10 +280,10 @@ async function applyCoupon() {
 		if (offer.min_amt && props.subtotal < offer.min_amt) {
 			errorMessage.value = `This offer requires a minimum purchase of ${formatCurrency(offer.min_amt)}`
 			toast.create({
-				title: 'Minimum Amount Required',
+				title: "Minimum Amount Required",
 				text: errorMessage.value,
-				icon: 'alert-circle',
-				iconClasses: 'text-orange-600'
+				icon: "alert-circle",
+				iconClasses: "text-orange-600",
 			})
 			return
 		}
@@ -281,10 +292,10 @@ async function applyCoupon() {
 		if (offer.max_amt && props.subtotal > offer.max_amt) {
 			errorMessage.value = `This offer is only valid for purchases up to ${formatCurrency(offer.max_amt)}`
 			toast.create({
-				title: 'Maximum Amount Exceeded',
+				title: "Maximum Amount Exceeded",
 				text: errorMessage.value,
-				icon: 'alert-circle',
-				iconClasses: 'text-orange-600'
+				icon: "alert-circle",
+				iconClasses: "text-orange-600",
 			})
 			return
 		}
@@ -295,10 +306,10 @@ async function applyCoupon() {
 			if (totalQty < offer.min_qty) {
 				errorMessage.value = `This offer requires at least ${offer.min_qty} items in your cart`
 				toast.create({
-					title: 'Minimum Quantity Required',
+					title: "Minimum Quantity Required",
 					text: errorMessage.value,
-					icon: 'alert-circle',
-					iconClasses: 'text-orange-600'
+					icon: "alert-circle",
+					iconClasses: "text-orange-600",
 				})
 				return
 			}
@@ -310,10 +321,10 @@ async function applyCoupon() {
 			if (totalQty > offer.max_qty) {
 				errorMessage.value = `This offer is only valid for up to ${offer.max_qty} items`
 				toast.create({
-					title: 'Maximum Quantity Exceeded',
+					title: "Maximum Quantity Exceeded",
 					text: errorMessage.value,
-					icon: 'alert-circle',
-					iconClasses: 'text-orange-600'
+					icon: "alert-circle",
+					iconClasses: "text-orange-600",
 				})
 				return
 			}
@@ -337,27 +348,27 @@ async function applyCoupon() {
 			amount: discountAmount,
 			type: offer.discount_type,
 			coupon: result.coupon,
-			offer: offer
+			offer: offer,
 		}
 
-		emit('discount-applied', appliedDiscount.value)
+		emit("discount-applied", appliedDiscount.value)
 
 		toast.create({
-			title: 'Coupon Applied!',
+			title: "Coupon Applied!",
 			text: `${couponCode.value.toUpperCase()} applied successfully`,
-			icon: 'check',
-			iconClasses: 'text-green-600'
+			icon: "check",
+			iconClasses: "text-green-600",
 		})
 
-		errorMessage.value = ''
+		errorMessage.value = ""
 	} catch (error) {
-		console.error('Error applying coupon:', error)
-		errorMessage.value = 'Failed to apply coupon. Please try again.'
+		console.error("Error applying coupon:", error)
+		errorMessage.value = "Failed to apply coupon. Please try again."
 		toast.create({
-			title: 'Error',
+			title: "Error",
 			text: errorMessage.value,
-			icon: 'x',
-			iconClasses: 'text-red-600'
+			icon: "x",
+			iconClasses: "text-red-600",
 		})
 	} finally {
 		applying.value = false
@@ -366,16 +377,16 @@ async function applyCoupon() {
 
 function removeDiscount() {
 	appliedDiscount.value = null
-	emit('discount-removed')
+	emit("discount-removed")
 	toast.create({
-		title: 'Removed',
-		text: 'Discount has been removed',
-		icon: 'info',
-		iconClasses: 'text-blue-600'
+		title: "Removed",
+		text: "Discount has been removed",
+		icon: "info",
+		iconClasses: "text-blue-600",
 	})
 }
 
 function formatCurrency(amount) {
-	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 </script>

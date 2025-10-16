@@ -183,24 +183,25 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue"
-import { Dialog, Input, Button } from "frappe-ui"
-import { useShift } from "../composables/useShift"
+import { Button, Dialog, Input } from "frappe-ui"
 import { createResource } from "frappe-ui"
+import { computed, ref, watch } from "vue"
+import { useShift } from "../composables/useShift"
 import ShiftClosingDialog from "./ShiftClosingDialog.vue"
 
 const props = defineProps({
-  modelValue: Boolean,
+	modelValue: Boolean,
 })
 
 const emit = defineEmits(["update:modelValue", "shift-opened"])
 
 const open = computed({
-  get: () => props.modelValue,
-  set: (value) => emit("update:modelValue", value),
+	get: () => props.modelValue,
+	set: (value) => emit("update:modelValue", value),
 })
 
-const { createOpeningShift, getOpeningDialogData, checkOpeningShift } = useShift()
+const { createOpeningShift, getOpeningDialogData, checkOpeningShift } =
+	useShift()
 
 const step = ref(1)
 const selectedProfile = ref(null)
@@ -212,14 +213,14 @@ const restartProfileName = ref(null)
 
 // Get POS Profiles
 const profilesResource = createResource({
-  url: "pos_next.api.pos_profile.get_pos_profiles",
-  auto: false,
+	url: "pos_next.api.pos_profile.get_pos_profiles",
+	auto: false,
 })
 
 // Get dialog data (payment methods)
 const dialogDataResource = createResource({
-  url: "pos_next.api.shifts.get_opening_dialog_data",
-  auto: false,
+	url: "pos_next.api.shifts.get_opening_dialog_data",
+	auto: false,
 })
 
 // Create shift resource
@@ -227,11 +228,11 @@ const createShiftResource = createOpeningShift
 
 // Computed payment methods for selected profile
 const paymentMethods = computed(() => {
-  if (!dialogDataResource.data || !selectedProfile.value) return []
+	if (!dialogDataResource.data || !selectedProfile.value) return []
 
-  return (dialogDataResource.data.payments_method || []).filter(
-    (method) => method.parent === selectedProfile.value.name
-  )
+	return (dialogDataResource.data.payments_method || []).filter(
+		(method) => method.parent === selectedProfile.value.name,
+	)
 })
 
 // Watch dialog open state
@@ -246,7 +247,7 @@ watch(
 			resetDialog()
 		}
 	},
-	{ immediate: true }
+	{ immediate: true },
 )
 
 watch(showClosingDialog, (isOpen) => {
@@ -257,93 +258,95 @@ watch(showClosingDialog, (isOpen) => {
 })
 
 async function initDialog() {
-  step.value = 1
-  selectedProfile.value = null
-  existingShift.value = null
-  openingBalances.value = {}
-  dialogDataResource.reset()
+	step.value = 1
+	selectedProfile.value = null
+	existingShift.value = null
+	openingBalances.value = {}
+	dialogDataResource.reset()
 
-  try {
-    // Await profile fetch to ensure data is loaded before proceeding
-    await profilesResource.fetch()
+	try {
+		// Await profile fetch to ensure data is loaded before proceeding
+		await profilesResource.fetch()
 
-    // Check if user already has an open shift
-    const checkResult = await checkOpeningShift.fetch()
-    if (checkResult) {
-      existingShift.value = checkResult
-      step.value = 3
-    }
-  } catch (error) {
-    console.error("Error initializing shift dialog:", error)
-    // Error will be displayed via profilesResource.error in the UI
-  }
+		// Check if user already has an open shift
+		const checkResult = await checkOpeningShift.fetch()
+		if (checkResult) {
+			existingShift.value = checkResult
+			step.value = 3
+		}
+	} catch (error) {
+		console.error("Error initializing shift dialog:", error)
+		// Error will be displayed via profilesResource.error in the UI
+	}
 }
 
 function resetDialog() {
-  step.value = 1
-  selectedProfile.value = null
-  openingBalances.value = {}
-  existingShift.value = null
-  profilesResource.reset()
-  dialogDataResource.reset()
-  createShiftResource.reset()
+	step.value = 1
+	selectedProfile.value = null
+	openingBalances.value = {}
+	existingShift.value = null
+	profilesResource.reset()
+	dialogDataResource.reset()
+	createShiftResource.reset()
 }
 
 function selectPosProfile(profile) {
-  selectedProfile.value = profile
+	selectedProfile.value = profile
 }
 
 async function nextStep() {
-  if (step.value === 1 && selectedProfile.value) {
-    await dialogDataResource.fetch()
-    step.value = 2
-  }
+	if (step.value === 1 && selectedProfile.value) {
+		await dialogDataResource.fetch()
+		step.value = 2
+	}
 }
 
 async function openShift() {
-  if (!selectedProfile.value) return
+	if (!selectedProfile.value) return
 
-  // Prepare balance details
-  const balance_details = paymentMethods.value.map((method) => ({
-    mode_of_payment: method.mode_of_payment,
-    opening_amount: parseFloat(openingBalances.value[method.mode_of_payment] || 0),
-  }))
+	// Prepare balance details
+	const balance_details = paymentMethods.value.map((method) => ({
+		mode_of_payment: method.mode_of_payment,
+		opening_amount: Number.parseFloat(
+			openingBalances.value[method.mode_of_payment] || 0,
+		),
+	}))
 
-  try {
-    await createShiftResource.submit({
-      pos_profile: selectedProfile.value.name,
-      company: selectedProfile.value.company,
-      balance_details,
-    })
+	try {
+		await createShiftResource.submit({
+			pos_profile: selectedProfile.value.name,
+			company: selectedProfile.value.company,
+			balance_details,
+		})
 
-    emit("shift-opened")
-    closeDialog()
-  } catch (error) {
-    console.error("Error opening shift:", error)
-  }
+		emit("shift-opened")
+		closeDialog()
+	} catch (error) {
+		console.error("Error opening shift:", error)
+	}
 }
 
 function resumeShift() {
-  emit("shift-opened")
-  closeDialog()
+	emit("shift-opened")
+	closeDialog()
 }
 
 function closeAndOpenNew() {
-  if (!existingShift.value?.pos_opening_shift?.name) {
-    return
-  }
+	if (!existingShift.value?.pos_opening_shift?.name) {
+		return
+	}
 
-  restartProfileName.value = existingShift.value.pos_profile?.name || null
-  showClosingDialog.value = true
+	restartProfileName.value = existingShift.value.pos_profile?.name || null
+	showClosingDialog.value = true
 }
 
 function closeDialog() {
-  open.value = false
+	open.value = false
 }
 
 function formatDateTime(datetime) {
-  if (!datetime) return ""
-  return new Date(datetime).toLocaleString()
+	if (!datetime) return ""
+	return new Date(datetime).toLocaleString()
 }
 
 async function handleExistingShiftClosed() {
@@ -362,7 +365,7 @@ async function handleExistingShiftClosed() {
 
 	if (profileToRestore) {
 		const matchedProfile = profilesResource.data?.find(
-			(profile) => profile.name === profileToRestore
+			(profile) => profile.name === profileToRestore,
 		)
 
 		if (matchedProfile) {

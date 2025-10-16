@@ -220,35 +220,41 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { Dialog, Button } from 'frappe-ui'
-import { formatCurrency as formatCurrencyUtil } from '@/utils/currency'
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { Button, Dialog } from "frappe-ui"
+import { computed, ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
 	isOffline: {
 		type: Boolean,
-		default: false
+		default: false,
 	},
 	pendingInvoices: {
 		type: Array,
-		default: () => []
+		default: () => [],
 	},
 	isSyncing: {
 		type: Boolean,
-		default: false
+		default: false,
 	},
 	currency: {
 		type: String,
-		default: 'USD'
-	}
+		default: "USD",
+	},
 })
 
-const emit = defineEmits(['update:modelValue', 'sync-all', 'delete-invoice', 'edit-invoice', 'refresh'])
+const emit = defineEmits([
+	"update:modelValue",
+	"sync-all",
+	"delete-invoice",
+	"edit-invoice",
+	"refresh",
+])
 
 const show = computed({
 	get: () => props.modelValue,
-	set: (val) => emit('update:modelValue', val)
+	set: (val) => emit("update:modelValue", val),
 })
 
 const loading = ref(false)
@@ -271,7 +277,7 @@ async function loadInvoices() {
 		// Get invoices from parent component
 		invoices.value = props.pendingInvoices
 	} catch (error) {
-		console.error('Error loading offline invoices:', error)
+		console.error("Error loading offline invoices:", error)
 	} finally {
 		loading.value = false
 	}
@@ -286,11 +292,13 @@ function formatDate(timestamp) {
 	const now = new Date()
 	const diffInSeconds = Math.floor((now - date) / 1000)
 
-	if (diffInSeconds < 60) return 'Just now'
-	if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
-	if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
+	if (diffInSeconds < 60) return "Just now"
+	if (diffInSeconds < 3600)
+		return `${Math.floor(diffInSeconds / 60)} minutes ago`
+	if (diffInSeconds < 86400)
+		return `${Math.floor(diffInSeconds / 3600)} hours ago`
 
-	return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
+	return date.toLocaleDateString() + " " + date.toLocaleTimeString()
 }
 
 function viewDetails(invoice) {
@@ -299,12 +307,12 @@ function viewDetails(invoice) {
 }
 
 function editInvoice(invoice) {
-	emit('edit-invoice', invoice)
+	emit("edit-invoice", invoice)
 	show.value = false
 }
 
 function syncAll() {
-	emit('sync-all')
+	emit("sync-all")
 }
 
 function deleteInvoice(invoice) {
@@ -314,7 +322,7 @@ function deleteInvoice(invoice) {
 
 async function confirmDelete() {
 	if (invoiceToDelete.value) {
-		emit('delete-invoice', invoiceToDelete.value.id)
+		emit("delete-invoice", invoiceToDelete.value.id)
 		showDeleteConfirm.value = false
 		invoiceToDelete.value = null
 		// Refresh list

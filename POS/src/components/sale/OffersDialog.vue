@@ -199,10 +199,10 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { Dialog, Button } from 'frappe-ui'
-import { formatCurrency as formatCurrencyUtil } from '@/utils/currency'
-import { usePOSOffersStore } from '@/stores/posOffers'
+import { usePOSOffersStore } from "@/stores/posOffers"
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { Button, Dialog } from "frappe-ui"
+import { computed, ref, watch } from "vue"
 
 // Use Pinia stores
 const offersStore = usePOSOffersStore()
@@ -212,7 +212,7 @@ const props = defineProps({
 	subtotal: {
 		type: Number,
 		required: true,
-		note: 'Cart subtotal BEFORE tax - used for discount calculations'
+		note: "Cart subtotal BEFORE tax - used for discount calculations",
 	},
 	items: Array,
 	posProfile: String,
@@ -220,20 +220,22 @@ const props = defineProps({
 	company: String,
 	currency: {
 		type: String,
-		default: 'USD'
+		default: "USD",
 	},
 	appliedOffers: {
 		type: Array,
-		default: () => []
-	}
+		default: () => [],
+	},
 })
 
-const emit = defineEmits(['update:modelValue', 'apply-offer', 'remove-offer'])
+const emit = defineEmits(["update:modelValue", "apply-offer", "remove-offer"])
 
 const show = ref(props.modelValue)
 const applyingOffer = ref(false)
 const appliedOfferCodes = computed(() => {
-	return new Set((props.appliedOffers || []).map(entry => entry?.code).filter(Boolean))
+	return new Set(
+		(props.appliedOffers || []).map((entry) => entry?.code).filter(Boolean),
+	)
 })
 
 // Use ALL eligible offers from store (includes both auto and manual offers)
@@ -244,13 +246,16 @@ const loading = computed(() => {
 	return !offersStore.hasFetched && eligibleOffers.value.length === 0
 })
 
-watch(() => props.modelValue, (val) => {
-	show.value = val
-	// No need to load offers - they're already in the store
-})
+watch(
+	() => props.modelValue,
+	(val) => {
+		show.value = val
+		// No need to load offers - they're already in the store
+	},
+)
 
 watch(show, (val) => {
-	emit('update:modelValue', val)
+	emit("update:modelValue", val)
 	// Reset applying state when dialog closes
 	if (!val) {
 		applyingOffer.value = false
@@ -266,9 +271,9 @@ async function handleApplyOffer(offer) {
 	if (isOfferApplied(offer)) {
 		applyingOffer.value = true
 		try {
-			emit('remove-offer', offer)
+			emit("remove-offer", offer)
 			// Close dialog after successful removal
-			await new Promise(resolve => setTimeout(resolve, 500))
+			await new Promise((resolve) => setTimeout(resolve, 500))
 			show.value = false
 		} finally {
 			applyingOffer.value = false
@@ -279,10 +284,10 @@ async function handleApplyOffer(offer) {
 	applyingOffer.value = true
 	try {
 		// Emit event to parent to handle the actual API call
-		emit('apply-offer', offer)
+		emit("apply-offer", offer)
 		// Don't close dialog yet - parent will close it after successful application
 	} catch (error) {
-		console.error('Error in handleApplyOffer:', error)
+		console.error("Error in handleApplyOffer:", error)
 		applyingOffer.value = false
 	}
 }
@@ -300,12 +305,16 @@ function isOfferApplied(offer) {
 }
 
 function formatCurrency(amount) {
-	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
 function formatDate(dateStr) {
-	if (!dateStr) return ''
+	if (!dateStr) return ""
 	const date = new Date(dateStr)
-	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+	return date.toLocaleDateString("en-US", {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	})
 }
 </script>

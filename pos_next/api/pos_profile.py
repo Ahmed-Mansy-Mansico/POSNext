@@ -190,8 +190,7 @@ def update_warehouse(pos_profile, warehouse):
 
 		# Update the POS Profile
 		profile_doc.warehouse = warehouse
-		profile_doc.save(ignore_permissions=True)
-		frappe.db.commit()
+		profile_doc.save()
 
 		return {
 			"success": True,

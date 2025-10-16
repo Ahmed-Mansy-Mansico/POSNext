@@ -1,15 +1,15 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { useOffline } from '@/composables/useOffline'
-import { toast } from 'frappe-ui'
-import { parseError } from '@/utils/errorHandler'
+import { useOffline } from "@/composables/useOffline"
+import { parseError } from "@/utils/errorHandler"
 import {
-	cacheItemsFromServer,
 	cacheCustomersFromServer,
-	cachePaymentMethodsFromServer
-} from '@/utils/offline'
+	cacheItemsFromServer,
+	cachePaymentMethodsFromServer,
+} from "@/utils/offline"
+import { toast } from "frappe-ui"
+import { defineStore } from "pinia"
+import { computed, ref } from "vue"
 
-export const usePOSSyncStore = defineStore('posSync', () => {
+export const usePOSSyncStore = defineStore("posSync", () => {
 	// Use the existing offline composable
 	const {
 		isOffline,
@@ -35,7 +35,7 @@ export const usePOSSyncStore = defineStore('posSync', () => {
 		try {
 			pendingInvoicesList.value = await getPending()
 		} catch (error) {
-			console.error('Error loading pending invoices:', error)
+			console.error("Error loading pending invoices:", error)
 			pendingInvoicesList.value = []
 		}
 	}
@@ -51,7 +51,7 @@ export const usePOSSyncStore = defineStore('posSync', () => {
 				iconClasses: "text-green-600",
 			})
 		} catch (error) {
-			console.error('Error deleting offline invoice:', error)
+			console.error("Error deleting offline invoice:", error)
 			toast.create({
 				title: "Delete Failed",
 				text: error.message || "Failed to delete offline invoice",
@@ -88,7 +88,7 @@ export const usePOSSyncStore = defineStore('posSync', () => {
 
 			return result
 		} catch (error) {
-			console.error('Sync error:', error)
+			console.error("Sync error:", error)
 			throw error
 		}
 	}
@@ -102,7 +102,8 @@ export const usePOSSyncStore = defineStore('posSync', () => {
 			// Check cache status
 			const cacheReady = await checkCacheReady()
 			const stats = await getCacheStats()
-			const needsRefresh = !stats.lastSync || (Date.now() - stats.lastSync) > (24 * 60 * 60 * 1000)
+			const needsRefresh =
+				!stats.lastSync || Date.now() - stats.lastSync > 24 * 60 * 60 * 1000
 
 			if (!cacheReady || needsRefresh) {
 				toast.create({
@@ -113,11 +114,12 @@ export const usePOSSyncStore = defineStore('posSync', () => {
 				})
 
 				// Fetch from server
-				const [itemsData, customersData, paymentMethodsData] = await Promise.all([
-					cacheItemsFromServer(currentProfile.name),
-					cacheCustomersFromServer(currentProfile.name),
-					cachePaymentMethodsFromServer(currentProfile.name)
-				])
+				const [itemsData, customersData, paymentMethodsData] =
+					await Promise.all([
+						cacheItemsFromServer(currentProfile.name),
+						cacheCustomersFromServer(currentProfile.name),
+						cachePaymentMethodsFromServer(currentProfile.name),
+					])
 
 				// Cache data using composable
 				await cacheData(itemsData.items || [], customersData.customers || [])
@@ -130,7 +132,7 @@ export const usePOSSyncStore = defineStore('posSync', () => {
 				})
 			}
 		} catch (error) {
-			console.error('Error pre-loading data:', error)
+			console.error("Error pre-loading data:", error)
 			toast.create({
 				title: "Sync Warning",
 				text: "Some data may not be available offline",

@@ -1,6 +1,6 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { offlineWorker } from '@/utils/offline/workerClient'
-import { syncOfflineInvoices } from '@/utils/offline'
+import { syncOfflineInvoices } from "@/utils/offline"
+import { offlineWorker } from "@/utils/offline/workerClient"
+import { computed, onMounted, onUnmounted, ref } from "vue"
 
 export function useOffline() {
 	const isOffline = ref(false)
@@ -30,7 +30,7 @@ export function useOffline() {
 			await updatePendingCount()
 			return true
 		} catch (error) {
-			console.error('Error saving invoice offline:', error)
+			console.error("Error saving invoice offline:", error)
 			throw error
 		}
 	}
@@ -38,7 +38,7 @@ export function useOffline() {
 	// Sync pending invoices (this still needs main thread for frappe.call)
 	const syncPending = async () => {
 		if (isOffline.value) {
-			throw new Error('Cannot sync while offline')
+			throw new Error("Cannot sync while offline")
 		}
 
 		isSyncing.value = true
@@ -47,7 +47,7 @@ export function useOffline() {
 			await updatePendingCount()
 			return result
 		} catch (error) {
-			console.error('Error syncing invoices:', error)
+			console.error("Error syncing invoices:", error)
 			throw error
 		} finally {
 			isSyncing.value = false
@@ -76,7 +76,7 @@ export function useOffline() {
 			}
 			return true
 		} catch (error) {
-			console.error('Error caching data:', error)
+			console.error("Error caching data:", error)
 			return false
 		}
 	}
@@ -123,17 +123,19 @@ export function useOffline() {
 		updatePendingCount()
 
 		// Listen to online/offline events (passive for better performance)
-		window.addEventListener('online', handleOnline, { passive: true })
-		window.addEventListener('offline', handleOffline, { passive: true })
+		window.addEventListener("online", handleOnline, { passive: true })
+		window.addEventListener("offline", handleOffline, { passive: true })
 
 		// Listen to worker status changes (passive for better performance)
-		window.addEventListener('offlineStatusChange', handleWorkerStatusChange, { passive: true })
+		window.addEventListener("offlineStatusChange", handleWorkerStatusChange, {
+			passive: true,
+		})
 	})
 
 	onUnmounted(() => {
-		window.removeEventListener('online', handleOnline)
-		window.removeEventListener('offline', handleOffline)
-		window.removeEventListener('offlineStatusChange', handleWorkerStatusChange)
+		window.removeEventListener("online", handleOnline)
+		window.removeEventListener("offline", handleOffline)
+		window.removeEventListener("offlineStatusChange", handleWorkerStatusChange)
 	})
 
 	return {

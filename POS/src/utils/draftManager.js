@@ -1,7 +1,7 @@
 // Draft Invoice Management with IndexedDB
-const DB_NAME = 'pos_next_drafts'
+const DB_NAME = "pos_next_drafts"
 const DB_VERSION = 1
-const STORE_NAME = 'invoices'
+const STORE_NAME = "invoices"
 
 let db = null
 
@@ -15,7 +15,7 @@ function sanitizeDraftData(data) {
 		// Serializing through JSON removes reactivity while keeping data shallow.
 		return JSON.parse(JSON.stringify(data))
 	} catch (error) {
-		console.warn('Failed to sanitize draft data for IndexedDB storage', error)
+		console.warn("Failed to sanitize draft data for IndexedDB storage", error)
 		throw error
 	}
 }
@@ -39,14 +39,14 @@ async function initDB() {
 			// Create object store if it doesn't exist
 			if (!database.objectStoreNames.contains(STORE_NAME)) {
 				const objectStore = database.createObjectStore(STORE_NAME, {
-					keyPath: 'id',
-					autoIncrement: true
+					keyPath: "id",
+					autoIncrement: true,
 				})
 
 				// Create indexes
-				objectStore.createIndex('draft_id', 'draft_id', { unique: true })
-				objectStore.createIndex('created_at', 'created_at', { unique: false })
-				objectStore.createIndex('customer', 'customer', { unique: false })
+				objectStore.createIndex("draft_id", "draft_id", { unique: true })
+				objectStore.createIndex("created_at", "created_at", { unique: false })
+				objectStore.createIndex("customer", "customer", { unique: false })
 			}
 		}
 	})
@@ -65,7 +65,7 @@ export async function saveDraft(invoiceData) {
 	}
 
 	return new Promise((resolve, reject) => {
-		const transaction = database.transaction([STORE_NAME], 'readwrite')
+		const transaction = database.transaction([STORE_NAME], "readwrite")
 		const store = transaction.objectStore(STORE_NAME)
 		const request = store.add(draft)
 
@@ -83,7 +83,7 @@ export async function updateDraft(draftId, invoiceData) {
 			// Get existing draft
 			const existingDraft = await getDraftById(draftId)
 			if (!existingDraft) {
-				return reject(new Error('Draft not found'))
+				return reject(new Error("Draft not found"))
 			}
 
 			const sanitizedInvoiceData = sanitizeDraftData(invoiceData) || {}
@@ -93,7 +93,7 @@ export async function updateDraft(draftId, invoiceData) {
 				updated_at: new Date().toISOString(),
 			}
 
-			const transaction = database.transaction([STORE_NAME], 'readwrite')
+			const transaction = database.transaction([STORE_NAME], "readwrite")
 			const store = transaction.objectStore(STORE_NAME)
 			const request = store.put(updatedDraft)
 
@@ -110,14 +110,14 @@ export async function getAllDrafts() {
 	const database = await initDB()
 
 	return new Promise((resolve, reject) => {
-		const transaction = database.transaction([STORE_NAME], 'readonly')
+		const transaction = database.transaction([STORE_NAME], "readonly")
 		const store = transaction.objectStore(STORE_NAME)
 		const request = store.getAll()
 
 		request.onsuccess = () => {
 			// Sort by created_at descending
-			const drafts = request.result.sort((a, b) =>
-				new Date(b.created_at) - new Date(a.created_at)
+			const drafts = request.result.sort(
+				(a, b) => new Date(b.created_at) - new Date(a.created_at),
 			)
 			resolve(drafts)
 		}
@@ -130,9 +130,9 @@ export async function getDraftById(draftId) {
 	const database = await initDB()
 
 	return new Promise((resolve, reject) => {
-		const transaction = database.transaction([STORE_NAME], 'readonly')
+		const transaction = database.transaction([STORE_NAME], "readonly")
 		const store = transaction.objectStore(STORE_NAME)
-		const index = store.index('draft_id')
+		const index = store.index("draft_id")
 		const request = index.get(draftId)
 
 		request.onsuccess = () => resolve(request.result)
@@ -148,10 +148,10 @@ export async function deleteDraft(draftId) {
 		try {
 			const draft = await getDraftById(draftId)
 			if (!draft) {
-				return reject(new Error('Draft not found'))
+				return reject(new Error("Draft not found"))
 			}
 
-			const transaction = database.transaction([STORE_NAME], 'readwrite')
+			const transaction = database.transaction([STORE_NAME], "readwrite")
 			const store = transaction.objectStore(STORE_NAME)
 			const request = store.delete(draft.id)
 
@@ -168,7 +168,7 @@ export async function clearAllDrafts() {
 	const database = await initDB()
 
 	return new Promise((resolve, reject) => {
-		const transaction = database.transaction([STORE_NAME], 'readwrite')
+		const transaction = database.transaction([STORE_NAME], "readwrite")
 		const store = transaction.objectStore(STORE_NAME)
 		const request = store.clear()
 
@@ -182,7 +182,7 @@ export async function getDraftsCount() {
 	const database = await initDB()
 
 	return new Promise((resolve, reject) => {
-		const transaction = database.transaction([STORE_NAME], 'readonly')
+		const transaction = database.transaction([STORE_NAME], "readonly")
 		const store = transaction.objectStore(STORE_NAME)
 		const request = store.count()
 

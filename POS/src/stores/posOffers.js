@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { defineStore } from "pinia"
+import { computed, ref } from "vue"
 
 const defaultSnapshot = () => ({
 	subtotal: 0,
@@ -10,24 +10,30 @@ const defaultSnapshot = () => ({
 })
 
 function getDiscountSortValue(offer) {
-	const percentage = parseFloat(offer?.discount_percentage) || 0
+	const percentage = Number.parseFloat(offer?.discount_percentage) || 0
 	if (percentage) {
 		return percentage
 	}
 
-	return parseFloat(offer?.discount_amount) || 0
+	return Number.parseFloat(offer?.discount_amount) || 0
 }
 
-export const usePOSOffersStore = defineStore('posOffers', () => {
+export const usePOSOffersStore = defineStore("posOffers", () => {
 	const availableOffers = ref([])
 	const cartSnapshot = ref(defaultSnapshot())
 	const hasFetched = ref(false)
 
 	function updateCartSnapshot(snapshot = {}) {
-		const subtotal = parseFloat(snapshot.subtotal) || 0
-		const itemCount = Number.isFinite(snapshot.itemCount) ? snapshot.itemCount : 0
-		const itemCodes = Array.isArray(snapshot.itemCodes) ? snapshot.itemCodes : []
-		const itemGroups = Array.isArray(snapshot.itemGroups) ? snapshot.itemGroups : []
+		const subtotal = Number.parseFloat(snapshot.subtotal) || 0
+		const itemCount = Number.isFinite(snapshot.itemCount)
+			? snapshot.itemCount
+			: 0
+		const itemCodes = Array.isArray(snapshot.itemCodes)
+			? snapshot.itemCodes
+			: []
+		const itemGroups = Array.isArray(snapshot.itemGroups)
+			? snapshot.itemGroups
+			: []
 		const brands = Array.isArray(snapshot.brands) ? snapshot.brands : []
 
 		cartSnapshot.value = {
@@ -68,7 +74,7 @@ export const usePOSOffersStore = defineStore('posOffers', () => {
 		if (itemCount === 0) {
 			return {
 				eligible: false,
-				reason: 'Cart is empty',
+				reason: "Cart is empty",
 			}
 		}
 
@@ -89,39 +95,45 @@ export const usePOSOffersStore = defineStore('posOffers', () => {
 		}
 
 		// Check item eligibility based on apply_on
-		if (offer?.apply_on === 'Item Code') {
+		if (offer?.apply_on === "Item Code") {
 			// Check if cart contains any of the eligible items
 			const eligibleItems = offer.eligible_items || []
 			if (eligibleItems.length > 0) {
-				const hasEligibleItem = eligibleItems.some(item => cartItemCodes.includes(item))
+				const hasEligibleItem = eligibleItems.some((item) =>
+					cartItemCodes.includes(item),
+				)
 				if (!hasEligibleItem) {
 					return {
 						eligible: false,
-						reason: 'Cart does not contain eligible items for this offer',
+						reason: "Cart does not contain eligible items for this offer",
 					}
 				}
 			}
-		} else if (offer?.apply_on === 'Item Group') {
+		} else if (offer?.apply_on === "Item Group") {
 			// Check if cart contains items from any of the eligible groups
 			const eligibleGroups = offer.eligible_item_groups || []
 			if (eligibleGroups.length > 0) {
-				const hasEligibleGroup = eligibleGroups.some(group => cartItemGroups.includes(group))
+				const hasEligibleGroup = eligibleGroups.some((group) =>
+					cartItemGroups.includes(group),
+				)
 				if (!hasEligibleGroup) {
 					return {
 						eligible: false,
-						reason: 'Cart does not contain items from eligible groups',
+						reason: "Cart does not contain items from eligible groups",
 					}
 				}
 			}
-		} else if (offer?.apply_on === 'Brand') {
+		} else if (offer?.apply_on === "Brand") {
 			// Check if cart contains items from any of the eligible brands
 			const eligibleBrands = offer.eligible_brands || []
 			if (eligibleBrands.length > 0) {
-				const hasEligibleBrand = eligibleBrands.some(brand => cartBrands.includes(brand))
+				const hasEligibleBrand = eligibleBrands.some((brand) =>
+					cartBrands.includes(brand),
+				)
 				if (!hasEligibleBrand) {
 					return {
 						eligible: false,
-						reason: 'Cart does not contain items from eligible brands',
+						reason: "Cart does not contain items from eligible brands",
 					}
 				}
 			}
@@ -132,7 +144,7 @@ export const usePOSOffersStore = defineStore('posOffers', () => {
 	}
 
 	const allEligibleOffers = computed(() => {
-		return availableOffers.value.filter(offer => {
+		return availableOffers.value.filter((offer) => {
 			if (offer?.coupon_based) {
 				return false
 			}
@@ -149,7 +161,7 @@ export const usePOSOffersStore = defineStore('posOffers', () => {
 	})
 
 	const autoEligibleOffers = computed(() => {
-		return availableOffers.value.filter(offer => {
+		return availableOffers.value.filter((offer) => {
 			if (!offer?.auto || offer?.coupon_based) {
 				return false
 			}

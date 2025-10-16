@@ -1,11 +1,11 @@
-import { ref } from 'vue'
+import { ref } from "vue"
 
 // Global toast state
 const toastNotification = ref(null)
 const showToast = ref(false)
 
 export function useToast() {
-	function showToastNotification(title, message, type = 'success') {
+	function showToastNotification(title, message, type = "success") {
 		toastNotification.value = { title, message, type }
 		showToast.value = true
 
@@ -19,15 +19,15 @@ export function useToast() {
 	}
 
 	function showSuccess(message) {
-		showToastNotification('Success', message, 'success')
+		showToastNotification("Success", message, "success")
 	}
 
 	function showError(message) {
-		showToastNotification('Error', message, 'error')
+		showToastNotification("Error", message, "error")
 	}
 
 	function showWarning(message) {
-		showToastNotification('Validation Error', message, 'warning')
+		showToastNotification("Validation Error", message, "warning")
 	}
 
 	function hideToast() {
@@ -43,6 +43,6 @@ export function useToast() {
 		showSuccess,
 		showError,
 		showWarning,
-		hideToast
+		hideToast,
 	}
 }

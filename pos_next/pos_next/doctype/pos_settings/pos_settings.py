@@ -53,8 +53,7 @@ def create_default_settings(pos_profile):
 	doc = frappe.new_doc("POS Settings")
 	doc.pos_profile = pos_profile
 	doc.enabled = 1
-	doc.insert(ignore_permissions=True)
-	frappe.db.commit()
+	doc.insert()
 
 	return doc.as_dict()
 
@@ -83,12 +82,11 @@ def update_pos_settings(pos_profile, settings):
 	if existing:
 		doc = frappe.get_doc("POS Settings", existing)
 		doc.update(settings)
-		doc.save(ignore_permissions=True)
+		doc.save()
 	else:
 		doc = frappe.new_doc("POS Settings")
 		doc.pos_profile = pos_profile
 		doc.update(settings)
-		doc.insert(ignore_permissions=True)
+		doc.insert()
 
-	frappe.db.commit()
 	return doc.as_dict()

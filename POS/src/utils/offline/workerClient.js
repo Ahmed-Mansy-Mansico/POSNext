@@ -17,27 +17,32 @@ class OfflineWorkerClient {
 
 		// Create worker using Vite's worker import syntax
 		this.worker = new Worker(
-			new URL('../../workers/offline.worker.js?worker', import.meta.url),
-			{ type: 'module' }
+			new URL("../../workers/offline.worker.js?worker", import.meta.url),
+			{ type: "module" },
 		)
 
 		// Handle messages from worker
 		this.worker.onmessage = (event) => {
 			const { type, id, payload } = event.data
 
-			if (type === 'WORKER_READY') {
+			if (type === "WORKER_READY") {
 				this.ready = true
 				this.serverOnline = payload.serverOnline
-				console.log('Offline worker ready, server online:', payload.serverOnline)
+				console.log(
+					"Offline worker ready, server online:",
+					payload.serverOnline,
+				)
 				return
 			}
 
-			if (type === 'SERVER_STATUS_CHANGE') {
+			if (type === "SERVER_STATUS_CHANGE") {
 				this.serverOnline = payload.serverOnline
 				// Emit custom event for status changes
-				window.dispatchEvent(new CustomEvent('offlineStatusChange', {
-					detail: { serverOnline: payload.serverOnline }
-				}))
+				window.dispatchEvent(
+					new CustomEvent("offlineStatusChange", {
+						detail: { serverOnline: payload.serverOnline },
+					}),
+				)
 				return
 			}
 
@@ -45,9 +50,9 @@ class OfflineWorkerClient {
 				const { resolve, reject } = this.pendingMessages.get(id)
 				this.pendingMessages.delete(id)
 
-				if (type === 'SUCCESS') {
+				if (type === "SUCCESS") {
 					resolve(payload)
-				} else if (type === 'ERROR') {
+				} else if (type === "ERROR") {
 					reject(new Error(payload.message))
 				}
 			}
@@ -55,12 +60,12 @@ class OfflineWorkerClient {
 
 		// Handle worker errors
 		this.worker.onerror = (error) => {
-			console.error('Worker error:', error)
-			console.error('Error details:', {
+			console.error("Worker error:", error)
+			console.error("Error details:", {
 				message: error.message,
 				filename: error.filename,
 				lineno: error.lineno,
-				colno: error.colno
+				colno: error.colno,
 			})
 		}
 	}
@@ -88,59 +93,59 @@ class OfflineWorkerClient {
 
 	// API Methods
 	async pingServer() {
-		return this.sendMessage('PING_SERVER')
+		return this.sendMessage("PING_SERVER")
 	}
 
 	async checkOffline(browserOnline) {
-		return this.sendMessage('CHECK_OFFLINE', { browserOnline })
+		return this.sendMessage("CHECK_OFFLINE", { browserOnline })
 	}
 
 	async getOfflineInvoiceCount() {
-		return this.sendMessage('GET_INVOICE_COUNT')
+		return this.sendMessage("GET_INVOICE_COUNT")
 	}
 
 	async getOfflineInvoices() {
-		return this.sendMessage('GET_INVOICES')
+		return this.sendMessage("GET_INVOICES")
 	}
 
 	async saveOfflineInvoice(invoiceData) {
-		return this.sendMessage('SAVE_INVOICE', { invoiceData })
+		return this.sendMessage("SAVE_INVOICE", { invoiceData })
 	}
 
-	async searchCachedItems(searchTerm = '', limit = 50) {
-		return this.sendMessage('SEARCH_ITEMS', { searchTerm, limit })
+	async searchCachedItems(searchTerm = "", limit = 50) {
+		return this.sendMessage("SEARCH_ITEMS", { searchTerm, limit })
 	}
 
-	async searchCachedCustomers(searchTerm = '', limit = 20) {
-		return this.sendMessage('SEARCH_CUSTOMERS', { searchTerm, limit })
+	async searchCachedCustomers(searchTerm = "", limit = 20) {
+		return this.sendMessage("SEARCH_CUSTOMERS", { searchTerm, limit })
 	}
 
 	async cacheItems(items) {
-		return this.sendMessage('CACHE_ITEMS', { items })
+		return this.sendMessage("CACHE_ITEMS", { items })
 	}
 
 	async cacheCustomers(customers) {
-		return this.sendMessage('CACHE_CUSTOMERS', { customers })
+		return this.sendMessage("CACHE_CUSTOMERS", { customers })
 	}
 
 	async isCacheReady() {
-		return this.sendMessage('IS_CACHE_READY')
+		return this.sendMessage("IS_CACHE_READY")
 	}
 
 	async getCacheStats() {
-		return this.sendMessage('GET_CACHE_STATS')
+		return this.sendMessage("GET_CACHE_STATS")
 	}
 
 	async deleteOfflineInvoice(id) {
-		return this.sendMessage('DELETE_INVOICE', { id })
+		return this.sendMessage("DELETE_INVOICE", { id })
 	}
 
 	async setManualOffline(value) {
-		return this.sendMessage('SET_MANUAL_OFFLINE', { value })
+		return this.sendMessage("SET_MANUAL_OFFLINE", { value })
 	}
 
 	async updateStockQuantities(stockUpdates) {
-		return this.sendMessage('UPDATE_STOCK_QUANTITIES', { stockUpdates })
+		return this.sendMessage("UPDATE_STOCK_QUANTITIES", { stockUpdates })
 	}
 
 	terminate() {
@@ -156,6 +161,6 @@ class OfflineWorkerClient {
 export const offlineWorker = new OfflineWorkerClient()
 
 // Initialize worker on import
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
 	offlineWorker.init()
 }

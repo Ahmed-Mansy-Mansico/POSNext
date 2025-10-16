@@ -216,10 +216,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { Dialog, Button } from 'frappe-ui'
-import { getItemStock } from '@/utils/stockValidator'
-import { useToast } from '@/composables/useToast'
+import { useToast } from "@/composables/useToast"
+import { getItemStock } from "@/utils/stockValidator"
+import { Button, Dialog } from "frappe-ui"
+import { computed, ref, watch } from "vue"
 
 const { showSuccess, showError, showWarning } = useToast()
 
@@ -228,23 +228,23 @@ const props = defineProps({
 	item: Object,
 	warehouses: {
 		type: Array,
-		default: () => []
+		default: () => [],
 	},
 	currency: {
 		type: String,
-		default: 'EGP'
-	}
+		default: "EGP",
+	},
 })
 
-const emit = defineEmits(['update:modelValue', 'update-item'])
+const emit = defineEmits(["update:modelValue", "update-item"])
 
 // Local state
 const localItem = ref(null)
 const localQuantity = ref(1)
-const localUom = ref('')
+const localUom = ref("")
 const localRate = ref(0)
-const localWarehouse = ref('')
-const discountType = ref('percentage')
+const localWarehouse = ref("")
+const discountType = ref("percentage")
 const discountValue = ref(0)
 const calculatedSubtotal = ref(0)
 const calculatedDiscount = ref(0)
@@ -254,42 +254,49 @@ const isCheckingStock = ref(false)
 
 const show = computed({
 	get: () => props.modelValue,
-	set: (val) => emit('update:modelValue', val)
+	set: (val) => emit("update:modelValue", val),
 })
 
 const availableUoms = computed(() => {
 	if (!localItem.value || !localItem.value.item_uoms) return []
-	return localItem.value.item_uoms.filter(u => u.uom !== localItem.value.stock_uom)
+	return localItem.value.item_uoms.filter(
+		(u) => u.uom !== localItem.value.stock_uom,
+	)
 })
 
 // Initialize local state when item changes
-watch(() => props.item, (newItem) => {
-	if (newItem) {
-		localItem.value = { ...newItem }
-		localQuantity.value = newItem.quantity || 1
-		localUom.value = newItem.uom || newItem.stock_uom || 'Nos'
-		localRate.value = newItem.rate || 0
-		localWarehouse.value = newItem.warehouse || (props.warehouses[0]?.name || '')
+watch(
+	() => props.item,
+	(newItem) => {
+		if (newItem) {
+			localItem.value = { ...newItem }
+			localQuantity.value = newItem.quantity || 1
+			localUom.value = newItem.uom || newItem.stock_uom || "Nos"
+			localRate.value = newItem.rate || 0
+			localWarehouse.value =
+				newItem.warehouse || props.warehouses[0]?.name || ""
 
-		// Initialize discount
-		if (newItem.discount_percentage && newItem.discount_percentage > 0) {
-			discountType.value = 'percentage'
-			discountValue.value = newItem.discount_percentage
-		} else if (newItem.discount_amount && newItem.discount_amount > 0) {
-			discountType.value = 'amount'
-			discountValue.value = newItem.discount_amount
-		} else {
-			discountType.value = 'percentage'
-			discountValue.value = 0
+			// Initialize discount
+			if (newItem.discount_percentage && newItem.discount_percentage > 0) {
+				discountType.value = "percentage"
+				discountValue.value = newItem.discount_percentage
+			} else if (newItem.discount_amount && newItem.discount_amount > 0) {
+				discountType.value = "amount"
+				discountValue.value = newItem.discount_amount
+			} else {
+				discountType.value = "percentage"
+				discountValue.value = 0
+			}
+
+			// Reset stock check state
+			hasStock.value = true
+			isCheckingStock.value = false
+
+			calculateTotals()
 		}
-
-		// Reset stock check state
-		hasStock.value = true
-		isCheckingStock.value = false
-
-		calculateTotals()
-	}
-}, { immediate: true })
+	},
+	{ immediate: true },
+)
 
 function incrementQuantity() {
 	localQuantity.value++
@@ -322,26 +329,29 @@ async function handleWarehouseChange() {
 	isCheckingStock.value = true
 	try {
 		// Check stock availability in the new warehouse
-		const availableStock = await getItemStock(localItem.value.item_code, localWarehouse.value)
+		const availableStock = await getItemStock(
+			localItem.value.item_code,
+			localWarehouse.value,
+		)
 
 		if (availableStock === 0) {
 			hasStock.value = false
 			showError(
-				`"${localItem.value.item_name}" is not available in warehouse "${localWarehouse.value}". Please select another warehouse.`
+				`"${localItem.value.item_name}" is not available in warehouse "${localWarehouse.value}". Please select another warehouse.`,
 			)
 		} else if (availableStock < localQuantity.value) {
 			hasStock.value = false
 			showWarning(
-				`Only ${availableStock} units of "${localItem.value.item_name}" available in "${localWarehouse.value}". Current quantity: ${localQuantity.value}`
+				`Only ${availableStock} units of "${localItem.value.item_name}" available in "${localWarehouse.value}". Current quantity: ${localQuantity.value}`,
 			)
 		} else {
 			hasStock.value = true
 			showSuccess(
-				`${availableStock} units available in "${localWarehouse.value}"`
+				`${availableStock} units available in "${localWarehouse.value}"`,
 			)
 		}
 	} catch (error) {
-		console.error('Error checking warehouse stock:', error)
+		console.error("Error checking warehouse stock:", error)
 		hasStock.value = true // Allow update if stock check fails
 	} finally {
 		isCheckingStock.value = false
@@ -355,12 +365,13 @@ function handleDiscountTypeChange() {
 }
 
 function calculateDiscount() {
-	if (discountType.value === 'percentage') {
+	if (discountType.value === "percentage") {
 		// Ensure percentage doesn't exceed 100
 		if (discountValue.value > 100) {
 			discountValue.value = 100
 		}
-		calculatedDiscount.value = (calculatedSubtotal.value * discountValue.value) / 100
+		calculatedDiscount.value =
+			(calculatedSubtotal.value * discountValue.value) / 100
 	} else {
 		// Ensure amount doesn't exceed subtotal
 		if (discountValue.value > calculatedSubtotal.value) {
@@ -377,7 +388,7 @@ function calculateTotals() {
 }
 
 function formatNumber(num) {
-	return parseFloat(num || 0).toFixed(2)
+	return Number.parseFloat(num || 0).toFixed(2)
 }
 
 function updateItem() {
@@ -387,12 +398,16 @@ function updateItem() {
 		uom: localUom.value,
 		rate: localRate.value,
 		warehouse: localWarehouse.value,
-		discount_percentage: discountType.value === 'percentage' ? discountValue.value : 0,
-		discount_amount: discountType.value === 'amount' ? discountValue.value : calculatedDiscount.value,
-		amount: calculatedTotal.value
+		discount_percentage:
+			discountType.value === "percentage" ? discountValue.value : 0,
+		discount_amount:
+			discountType.value === "amount"
+				? discountValue.value
+				: calculatedDiscount.value,
+		amount: calculatedTotal.value,
 	}
 
-	emit('update-item', updatedItem)
+	emit("update-item", updatedItem)
 	show.value = false
 }
 

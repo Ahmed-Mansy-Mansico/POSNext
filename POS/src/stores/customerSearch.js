@@ -1,13 +1,13 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { offlineWorker } from '@/utils/offline/workerClient'
-import { call } from '@/utils/apiWrapper'
-import { isOffline } from '@/utils/offline'
+import { call } from "@/utils/apiWrapper"
+import { isOffline } from "@/utils/offline"
+import { offlineWorker } from "@/utils/offline/workerClient"
+import { defineStore } from "pinia"
+import { computed, ref } from "vue"
 
-export const useCustomerSearchStore = defineStore('customerSearch', () => {
+export const useCustomerSearchStore = defineStore("customerSearch", () => {
 	// State
 	const allCustomers = ref([])
-	const searchTerm = ref('')
+	const searchTerm = ref("")
 	const loading = ref(false)
 	const selectedIndex = ref(-1)
 	const recentSearches = ref([])
@@ -25,12 +25,12 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 		let cached = searchIndex.value.get(customer.name)
 		if (!cached) {
 			cached = {
-				name: (customer.customer_name || '').toLowerCase(),
-				mobile: (customer.mobile_no || '').toLowerCase(),
-				email: (customer.email_id || '').toLowerCase(),
-				id: (customer.name || '').toLowerCase(),
+				name: (customer.customer_name || "").toLowerCase(),
+				mobile: (customer.mobile_no || "").toLowerCase(),
+				email: (customer.email_id || "").toLowerCase(),
+				id: (customer.name || "").toLowerCase(),
 				// Pre-compute word starts for super fast word matching
-				nameWords: (customer.customer_name || '').toLowerCase().split(' '),
+				nameWords: (customer.customer_name || "").toLowerCase().split(" "),
 			}
 			searchIndex.value.set(customer.name, cached)
 		}
@@ -70,7 +70,7 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 
 		// Show recent/frequent customers when no search term (CACHED)
 		if (!term) {
-			const cacheKey = 'empty'
+			const cacheKey = "empty"
 			let cached = resultCache.value.get(cacheKey)
 
 			if (!cached) {
@@ -94,16 +94,20 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 			}
 
 			const elapsed = performance.now() - startTime
-			console.log(`⚡⚡ Showing ${cached.length} customers in ${elapsed.toFixed(3)}ms (CACHED)`)
+			console.log(
+				`⚡⚡ Showing ${cached.length} customers in ${elapsed.toFixed(3)}ms (CACHED)`,
+			)
 			return cached
 		}
 
 		// Check result cache first
 		const cacheKey = term.toLowerCase()
-		let cachedResult = resultCache.value.get(cacheKey)
+		const cachedResult = resultCache.value.get(cacheKey)
 		if (cachedResult) {
 			const elapsed = performance.now() - startTime
-			console.log(`⚡⚡⚡ INSTANT ${cachedResult.length} results in ${elapsed.toFixed(3)}ms (FROM CACHE: "${term}")`)
+			console.log(
+				`⚡⚡⚡ INSTANT ${cachedResult.length} results in ${elapsed.toFixed(3)}ms (FROM CACHE: "${term}")`,
+			)
 			return cachedResult
 		}
 
@@ -117,7 +121,8 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 			scanned++
 			const score = quickMatch(term, cust)
 
-			if (score >= 240) { // High priority matches
+			if (score >= 240) {
+				// High priority matches
 				results.push({ customer: cust, score })
 				if (results.length >= maxResults) break // Exit immediately when we have enough
 			}
@@ -138,7 +143,7 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 
 		// Sort ONLY what we found (much faster than sorting everything)
 		results.sort((a, b) => b.score - a.score)
-		const final = results.map(r => r.customer)
+		const final = results.map((r) => r.customer)
 
 		// Cache this result for instant retrieval
 		resultCache.value.set(cacheKey, final)
@@ -150,7 +155,9 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 		}
 
 		const elapsed = performance.now() - startTime
-		console.log(`⚡⚡ Ultra-fast ${final.length} results in ${elapsed.toFixed(3)}ms (search: "${term}")`)
+		console.log(
+			`⚡⚡ Ultra-fast ${final.length} results in ${elapsed.toFixed(3)}ms (search: "${term}")`,
+		)
 		return final
 	})
 
@@ -164,30 +171,30 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 		// Check if it looks like a phone number
 		if (/^\d+$/.test(term)) {
 			recs.push({
-				type: 'phone',
+				type: "phone",
 				text: `Search by phone: ${term}`,
-				icon: '📱'
+				icon: "📱",
 			})
 		}
 
 		// Check if it looks like an email
-		if (term.includes('@')) {
+		if (term.includes("@")) {
 			recs.push({
-				type: 'email',
+				type: "email",
 				text: `Search by email: ${term}`,
-				icon: '✉️'
+				icon: "✉️",
 			})
 		}
 
 		// Suggest creating new customer if no exact matches
-		const exactMatch = allCustomers.value.some(c =>
-			c.customer_name?.toLowerCase() === term
+		const exactMatch = allCustomers.value.some(
+			(c) => c.customer_name?.toLowerCase() === term,
 		)
 		if (!exactMatch && filteredCustomers.value.length < 5) {
 			recs.push({
-				type: 'create',
+				type: "create",
 				text: `Create new customer "${term}"`,
-				icon: '➕'
+				icon: "➕",
 			})
 		}
 
@@ -203,16 +210,21 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 		loading.value = true
 		try {
 			// Try to get from worker cache first
-			const cachedCustomers = await offlineWorker.searchCachedCustomers('', 9999)
+			const cachedCustomers = await offlineWorker.searchCachedCustomers(
+				"",
+				9999,
+			)
 
 			if (cachedCustomers && cachedCustomers.length > 0) {
 				allCustomers.value = cachedCustomers
-				console.log(`✓ Loaded ${cachedCustomers.length} customers for instant search`)
+				console.log(
+					`✓ Loaded ${cachedCustomers.length} customers for instant search`,
+				)
 			} else if (!isOffline()) {
 				// Fetch from server if cache is empty
-				const response = await call('pos_next.api.customers.get_customers', {
+				const response = await call("pos_next.api.customers.get_customers", {
 					pos_profile: posProfile,
-					search_term: '',
+					search_term: "",
 					start: 0,
 					limit: 9999,
 				})
@@ -230,7 +242,7 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 			searchIndex.value.clear()
 			resultCache.value.clear()
 		} catch (error) {
-			console.error('Error loading customers:', error)
+			console.error("Error loading customers:", error)
 			allCustomers.value = []
 		} finally {
 			loading.value = false
@@ -241,7 +253,7 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 		try {
 			// Add to local array
 			const existingWithoutNew = allCustomers.value.filter(
-				(cust) => cust.name !== customer.name
+				(cust) => cust.name !== customer.name,
 			)
 			allCustomers.value = [customer, ...existingWithoutNew]
 
@@ -251,9 +263,9 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 			// Clear result cache to include new customer
 			resultCache.value.clear()
 
-			console.log('✓ New customer cached for instant search')
+			console.log("✓ New customer cached for instant search")
 		} catch (error) {
-			console.error('Error caching newly created customer:', error)
+			console.error("Error caching newly created customer:", error)
 		}
 	}
 
@@ -263,7 +275,7 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 	}
 
 	function clearSearch() {
-		searchTerm.value = ''
+		searchTerm.value = ""
 		selectedIndex.value = -1
 		// Don't clear resultCache on empty search - it's beneficial
 	}
@@ -280,7 +292,7 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 		// Add to recent searches (max 10)
 		recentSearches.value = [
 			customerId,
-			...recentSearches.value.filter(id => id !== customerId)
+			...recentSearches.value.filter((id) => id !== customerId),
 		].slice(0, 10)
 
 		// Track frequency
@@ -289,26 +301,35 @@ export const useCustomerSearchStore = defineStore('customerSearch', () => {
 			// Move to front if already exists
 			frequentCustomers.value.splice(index, 1)
 		}
-		frequentCustomers.value = [customerId, ...frequentCustomers.value].slice(0, 20)
+		frequentCustomers.value = [customerId, ...frequentCustomers.value].slice(
+			0,
+			20,
+		)
 
 		// Persist to localStorage
 		try {
-			localStorage.setItem('pos_recent_customers', JSON.stringify(recentSearches.value))
-			localStorage.setItem('pos_frequent_customers', JSON.stringify(frequentCustomers.value))
+			localStorage.setItem(
+				"pos_recent_customers",
+				JSON.stringify(recentSearches.value),
+			)
+			localStorage.setItem(
+				"pos_frequent_customers",
+				JSON.stringify(frequentCustomers.value),
+			)
 		} catch (e) {
-			console.warn('Failed to persist customer history:', e)
+			console.warn("Failed to persist customer history:", e)
 		}
 	}
 
 	function loadCustomerHistory() {
 		try {
-			const recent = localStorage.getItem('pos_recent_customers')
-			const frequent = localStorage.getItem('pos_frequent_customers')
+			const recent = localStorage.getItem("pos_recent_customers")
+			const frequent = localStorage.getItem("pos_frequent_customers")
 
 			if (recent) recentSearches.value = JSON.parse(recent)
 			if (frequent) frequentCustomers.value = JSON.parse(frequent)
 		} catch (e) {
-			console.warn('Failed to load customer history:', e)
+			console.warn("Failed to load customer history:", e)
 		}
 	}
 

@@ -1,9 +1,9 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { saveDraft, getDraftsCount, deleteDraft } from '@/utils/draftManager'
-import { toast } from 'frappe-ui'
+import { deleteDraft, getDraftsCount, saveDraft } from "@/utils/draftManager"
+import { toast } from "frappe-ui"
+import { defineStore } from "pinia"
+import { ref } from "vue"
 
-export const usePOSDraftsStore = defineStore('posDrafts', () => {
+export const usePOSDraftsStore = defineStore("posDrafts", () => {
 	// State
 	const draftsCount = ref(0)
 
@@ -16,7 +16,12 @@ export const usePOSDraftsStore = defineStore('posDrafts', () => {
 		}
 	}
 
-	async function saveDraftInvoice(invoiceItems, customer, posProfile, appliedOffers = []) {
+	async function saveDraftInvoice(
+		invoiceItems,
+		customer,
+		posProfile,
+		appliedOffers = [],
+	) {
 		if (invoiceItems.length === 0) {
 			toast.create({
 				title: "Empty Cart",
@@ -74,7 +79,7 @@ export const usePOSDraftsStore = defineStore('posDrafts', () => {
 			return {
 				items: draft.items || [],
 				customer: draft.customer,
-				applied_offers: draft.applied_offers || [] // Restore applied offers
+				applied_offers: draft.applied_offers || [], // Restore applied offers
 			}
 		} catch (error) {
 			console.error("Error loading draft:", error)

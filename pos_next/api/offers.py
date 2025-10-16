@@ -3,6 +3,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.utils import flt, nowdate, getdate
 
 
@@ -442,6 +443,10 @@ def apply_coupon_to_invoice(invoice_name, coupon_code):
 	if not frappe.db.table_exists("POS Coupon"):
 		frappe.throw("Coupon system not available")
 
+	# Check if user has permission to write to POS Coupon
+	if not frappe.has_permission("POS Coupon", "write"):
+		frappe.throw(_("You don't have permission to apply coupons"), frappe.PermissionError)
+
 	# Get coupon
 	if not frappe.db.exists("POS Coupon", {"coupon_code": coupon_code.upper()}):
 		frappe.throw("Invalid coupon code")
@@ -453,7 +458,7 @@ def apply_coupon_to_invoice(invoice_name, coupon_code):
 		frappe.throw("Coupon usage limit exceeded")
 
 	coupon.used = (coupon.used or 0) + 1
-	coupon.save(ignore_permissions=True)
+	coupon.save()
 
 	return {
 		"success": True,
@@ -471,6 +476,10 @@ def cancel_coupon_usage(coupon_code):
 	if not frappe.db.table_exists("POS Coupon"):
 		return
 
+	# Check if user has permission to write to POS Coupon
+	if not frappe.has_permission("POS Coupon", "write"):
+		frappe.throw(_("You don't have permission to cancel coupons"), frappe.PermissionError)
+
 	if not frappe.db.exists("POS Coupon", {"coupon_code": coupon_code.upper()}):
 		return
 
@@ -478,7 +487,7 @@ def cancel_coupon_usage(coupon_code):
 
 	if coupon.used > 0:
 		coupon.used = coupon.used - 1
-		coupon.save(ignore_permissions=True)
+		coupon.save()
 
 	return {
 		"success": True,
@@ -542,6 +551,10 @@ def create_promotional_coupon(pos_offer, coupon_name, maximum_use=None, valid_fr
 	if not frappe.db.table_exists("POS Coupon"):
 		frappe.throw("Coupon system not available")
 
+	# Check if user has permission to create coupons
+	if not frappe.has_permission("POS Coupon", "create"):
+		frappe.throw(_("You don't have permission to create coupons"), frappe.PermissionError)
+
 	# Verify POS Offer exists
 	if not frappe.db.exists("POS Offer", pos_offer):
 		frappe.throw("POS Offer not found")
@@ -565,7 +578,7 @@ def create_promotional_coupon(pos_offer, coupon_name, maximum_use=None, valid_fr
 	if valid_upto:
 		coupon.valid_upto = valid_upto
 
-	coupon.insert(ignore_permissions=True)
+	coupon.insert()
 
 	return {
 		"success": True,
@@ -582,6 +595,10 @@ def create_gift_card(pos_offer, customer, amount=None):
 	if not frappe.db.table_exists("POS Coupon"):
 		frappe.throw("Coupon system not available")
 
+	# Check if user has permission to create coupons
+	if not frappe.has_permission("POS Coupon", "create"):
+		frappe.throw(_("You don't have permission to create gift cards"), frappe.PermissionError)
+
 	# Verify POS Offer exists
 	if not frappe.db.exists("POS Offer", pos_offer):
 		frappe.throw("POS Offer not found")
@@ -597,7 +614,7 @@ def create_gift_card(pos_offer, customer, amount=None):
 	coupon.customer = customer
 	coupon.maximum_use = 1
 
-	coupon.insert(ignore_permissions=True)
+	coupon.insert()
 
 	return {
 		"success": True,

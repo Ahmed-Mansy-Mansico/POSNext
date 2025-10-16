@@ -1,27 +1,32 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { useShift } from '@/composables/useShift'
+import { useShift } from "@/composables/useShift"
+import { defineStore } from "pinia"
+import { computed, ref } from "vue"
 
-export const usePOSShiftStore = defineStore('posShift', () => {
+export const usePOSShiftStore = defineStore("posShift", () => {
 	// Use the existing shift composable
-	const { currentProfile, currentShift, hasOpenShift, checkOpeningShift } = useShift()
+	const { currentProfile, currentShift, hasOpenShift, checkOpeningShift } =
+		useShift()
 
 	// Additional shift state
-	const currentTime = ref('')
-	const shiftDuration = ref('')
+	const currentTime = ref("")
+	const shiftDuration = ref("")
 
 	// Computed
 	const profileName = computed(() => currentProfile.value?.name)
-	const profileCurrency = computed(() => currentProfile.value?.currency || 'USD')
+	const profileCurrency = computed(
+		() => currentProfile.value?.currency || "USD",
+	)
 	const profileWarehouse = computed(() => currentProfile.value?.warehouse)
 	const profileCompany = computed(() => currentProfile.value?.company)
 	const profileCustomer = computed(() => currentProfile.value?.customer)
-	const autoPrintEnabled = computed(() => currentProfile.value?.print_receipt_on_order_complete)
+	const autoPrintEnabled = computed(
+		() => currentProfile.value?.print_receipt_on_order_complete,
+	)
 
 	// Actions
 	function updateShiftDuration() {
 		if (!hasOpenShift.value || !currentShift.value?.period_start_date) {
-			shiftDuration.value = ''
+			shiftDuration.value = ""
 			return
 		}
 
@@ -38,7 +43,7 @@ export const usePOSShiftStore = defineStore('posShift', () => {
 
 	function updateCurrentTime() {
 		const now = new Date()
-		currentTime.value = now.toLocaleTimeString('en-US', { hour12: false })
+		currentTime.value = now.toLocaleTimeString("en-US", { hour12: false })
 	}
 
 	function startTimers() {

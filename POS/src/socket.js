@@ -10,7 +10,7 @@ export function initSocket() {
 		const protocol = port ? "http" : "https"
 		const url = `${protocol}://${host}${port}/${siteName}`
 
-		console.log('Initializing socket connection to:', url)
+		console.log("Initializing socket connection to:", url)
 
 		socket = io(url, {
 			withCredentials: true,
@@ -19,12 +19,12 @@ export function initSocket() {
 		})
 
 		// Connect with error handling
-		socket.on('connect_error', (error) => {
-			console.warn('Socket connection error:', error.message)
+		socket.on("connect_error", (error) => {
+			console.warn("Socket connection error:", error.message)
 		})
 
-		socket.on('connect', () => {
-			console.log('Socket connected successfully')
+		socket.on("connect", () => {
+			console.log("Socket connected successfully")
 		})
 
 		// Attempt connection
@@ -32,7 +32,7 @@ export function initSocket() {
 
 		return socket
 	} catch (error) {
-		console.error('Failed to initialize socket:', error)
+		console.error("Failed to initialize socket:", error)
 		// Return a mock socket object to prevent crashes
 		return {
 			on: () => {},

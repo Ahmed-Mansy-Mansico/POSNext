@@ -135,40 +135,40 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { Dialog, Button, createResource } from 'frappe-ui'
+import { Button, Dialog, createResource } from "frappe-ui"
+import { computed, ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
 	item: Object,
 	quantity: {
 		type: Number,
-		default: 1
+		default: 1,
 	},
 	warehouse: String,
 })
 
-const emit = defineEmits(['update:modelValue', 'batch-serial-selected'])
+const emit = defineEmits(["update:modelValue", "batch-serial-selected"])
 
 const show = ref(props.modelValue)
 const availableBatches = ref([])
 const availableSerials = ref([])
 const selectedBatch = ref(null)
 const selectedSerials = ref([])
-const manualSerials = ref('')
+const manualSerials = ref("")
 
 // Resource for loading batches
 const batchesResource = createResource({
-	url: 'frappe.client.get_list',
+	url: "frappe.client.get_list",
 	makeParams() {
 		return {
-			doctype: 'Batch',
+			doctype: "Batch",
 			filters: {
 				item: props.item?.item_code,
-				disabled: 0
+				disabled: 0,
 			},
-			fields: ['name as batch_no', 'expiry_date'],
-			limit_page_length: 100
+			fields: ["name as batch_no", "expiry_date"],
+			limit_page_length: 100,
 		}
 	},
 	auto: false,
@@ -176,30 +176,30 @@ const batchesResource = createResource({
 		if (data && Array.isArray(data)) {
 			// For simplicity, set qty to 999 for all batches
 			// In production, you'd want to query actual stock
-			availableBatches.value = data.map(batch => ({
+			availableBatches.value = data.map((batch) => ({
 				...batch,
-				qty: 999
+				qty: 999,
 			}))
 		}
 	},
 	onError(error) {
-		console.error('Error loading batches:', error)
-	}
+		console.error("Error loading batches:", error)
+	},
 })
 
 // Resource for loading serials
 const serialsResource = createResource({
-	url: 'frappe.client.get_list',
+	url: "frappe.client.get_list",
 	makeParams() {
 		return {
-			doctype: 'Serial No',
+			doctype: "Serial No",
 			filters: {
 				item_code: props.item?.item_code,
 				warehouse: props.warehouse,
-				status: 'Active'
+				status: "Active",
 			},
-			fields: ['name as serial_no', 'warehouse'],
-			limit_page_length: 100
+			fields: ["name as serial_no", "warehouse"],
+			limit_page_length: 100,
 		}
 	},
 	auto: false,
@@ -209,19 +209,22 @@ const serialsResource = createResource({
 		}
 	},
 	onError(error) {
-		console.error('Error loading serials:', error)
-	}
+		console.error("Error loading serials:", error)
+	},
 })
 
-watch(() => props.modelValue, (val) => {
-	show.value = val
-	if (val && props.item) {
-		loadBatchesOrSerials()
-	}
-})
+watch(
+	() => props.modelValue,
+	(val) => {
+		show.value = val
+		if (val && props.item) {
+			loadBatchesOrSerials()
+		}
+	},
+)
 
 watch(show, (val) => {
-	emit('update:modelValue', val)
+	emit("update:modelValue", val)
 	if (!val) {
 		resetSelection()
 	}
@@ -232,8 +235,11 @@ const isValid = computed(() => {
 		return selectedBatch.value !== null
 	}
 	if (props.item?.has_serial_no) {
-		const totalSerials = selectedSerials.value.length +
-			(manualSerials.value ? manualSerials.value.split('\n').filter(s => s.trim()).length : 0)
+		const totalSerials =
+			selectedSerials.value.length +
+			(manualSerials.value
+				? manualSerials.value.split("\n").filter((s) => s.trim()).length
+				: 0)
 		return totalSerials === props.quantity
 	}
 	return true
@@ -252,7 +258,9 @@ function selectBatch(batch) {
 }
 
 function toggleSerial(serial) {
-	const index = selectedSerials.value.findIndex(s => s.serial_no === serial.serial_no)
+	const index = selectedSerials.value.findIndex(
+		(s) => s.serial_no === serial.serial_no,
+	)
 	if (index > -1) {
 		selectedSerials.value.splice(index, 1)
 	} else if (selectedSerials.value.length < props.quantity) {
@@ -261,7 +269,7 @@ function toggleSerial(serial) {
 }
 
 function isSerialSelected(serialNo) {
-	return selectedSerials.value.some(s => s.serial_no === serialNo)
+	return selectedSerials.value.some((s) => s.serial_no === serialNo)
 }
 
 function handleConfirm() {
@@ -273,26 +281,29 @@ function handleConfirm() {
 
 	if (props.item?.has_serial_no) {
 		const manualList = manualSerials.value
-			? manualSerials.value.split('\n').filter(s => s.trim()).map(s => s.trim())
+			? manualSerials.value
+					.split("\n")
+					.filter((s) => s.trim())
+					.map((s) => s.trim())
 			: []
-		const selectedList = selectedSerials.value.map(s => s.serial_no)
-		result.serial_no = [...selectedList, ...manualList].join('\n')
+		const selectedList = selectedSerials.value.map((s) => s.serial_no)
+		result.serial_no = [...selectedList, ...manualList].join("\n")
 	}
 
-	emit('batch-serial-selected', result)
+	emit("batch-serial-selected", result)
 	show.value = false
 }
 
 function resetSelection() {
 	selectedBatch.value = null
 	selectedSerials.value = []
-	manualSerials.value = ''
+	manualSerials.value = ""
 	availableBatches.value = []
 	availableSerials.value = []
 }
 
 function formatDate(dateStr) {
-	if (!dateStr) return ''
+	if (!dateStr) return ""
 	return new Date(dateStr).toLocaleDateString()
 }
 </script>

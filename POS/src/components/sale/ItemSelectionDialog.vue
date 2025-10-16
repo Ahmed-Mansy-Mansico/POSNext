@@ -142,30 +142,30 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { Dialog, Button } from 'frappe-ui'
-import { createResource } from 'frappe-ui'
-import { formatCurrency as formatCurrencyUtil } from '@/utils/currency'
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { Button, Dialog } from "frappe-ui"
+import { createResource } from "frappe-ui"
+import { computed, ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
 	item: Object,
 	mode: {
 		type: String, // 'uom' or 'variant'
-		default: 'uom'
+		default: "uom",
 	},
 	posProfile: String,
 	currency: {
 		type: String,
-		default: 'USD'
-	}
+		default: "USD",
+	},
 })
 
-const emit = defineEmits(['update:modelValue', 'option-selected'])
+const emit = defineEmits(["update:modelValue", "option-selected"])
 
 const isOpen = computed({
 	get: () => props.modelValue,
-	set: (value) => emit('update:modelValue', value)
+	set: (value) => emit("update:modelValue", value),
 })
 
 const loading = ref(false)
@@ -175,25 +175,27 @@ const selectedAttributes = ref({}) // For variant attribute selection
 
 // Computed properties for dialog customization
 const dialogTitle = computed(() => {
-	return props.mode === 'variant' ? 'Select Item Variant' : 'Select Unit of Measure'
+	return props.mode === "variant"
+		? "Select Item Variant"
+		: "Select Unit of Measure"
 })
 
 const dialogDescription = computed(() => {
-	return props.mode === 'variant'
-		? 'Choose a variant of this item:'
-		: 'Select the unit of measure for this item:'
+	return props.mode === "variant"
+		? "Choose a variant of this item:"
+		: "Select the unit of measure for this item:"
 })
 
 const confirmButtonText = computed(() => {
-	return props.mode === 'variant' ? 'Add to Cart' : 'Add to Cart'
+	return props.mode === "variant" ? "Add to Cart" : "Add to Cart"
 })
 
 // Computed: Build a map of all available attribute values
 const variantAttributesMap = computed(() => {
-	if (props.mode !== 'variant' || options.value.length === 0) return {}
+	if (props.mode !== "variant" || options.value.length === 0) return {}
 
 	const attrMap = {}
-	options.value.forEach(option => {
+	options.value.forEach((option) => {
 		Object.entries(option.attributes || {}).forEach(([key, value]) => {
 			if (!attrMap[key]) {
 				attrMap[key] = new Set()
@@ -204,7 +206,7 @@ const variantAttributesMap = computed(() => {
 
 	// Convert Sets to sorted Arrays
 	const result = {}
-	Object.keys(attrMap).forEach(key => {
+	Object.keys(attrMap).forEach((key) => {
 		result[key] = Array.from(attrMap[key]).sort()
 	})
 
@@ -214,14 +216,17 @@ const variantAttributesMap = computed(() => {
 // Computed: Check if all attributes are selected
 const allAttributesSelected = computed(() => {
 	const attrKeys = Object.keys(variantAttributesMap.value)
-	return attrKeys.length > 0 && attrKeys.every(key => selectedAttributes.value[key])
+	return (
+		attrKeys.length > 0 &&
+		attrKeys.every((key) => selectedAttributes.value[key])
+	)
 })
 
 // Computed: Find variant that matches selected attributes
 const matchedVariant = computed(() => {
 	if (!allAttributesSelected.value) return null
 
-	return options.value.find(option => {
+	return options.value.find((option) => {
 		return Object.entries(selectedAttributes.value).every(([key, value]) => {
 			return option.attributes[key] === value
 		})
@@ -230,18 +235,18 @@ const matchedVariant = computed(() => {
 
 // Resource for fetching variants
 const variantsResource = createResource({
-	url: 'pos_next.api.items.get_item_variants',
+	url: "pos_next.api.items.get_item_variants",
 	makeParams() {
 		return {
 			template_item: props.item?.item_code,
-			pos_profile: props.posProfile
+			pos_profile: props.posProfile,
 		}
 	},
 	auto: false,
 	onSuccess(data) {
 		const variants = data?.message || data || []
-		options.value = variants.map(v => ({
-			type: 'variant',
+		options.value = variants.map((v) => ({
+			type: "variant",
 			item_code: v.item_code,
 			label: v.item_name,
 			description: v.item_code,
@@ -249,22 +254,25 @@ const variantsResource = createResource({
 			rate: v.rate || 0,
 			priceLabel: `per ${v.stock_uom}`,
 			stock: v.actual_qty,
-			data: v // Full variant data
+			data: v, // Full variant data
 		}))
 		loading.value = false
 	},
 	onError(error) {
-		console.error('Error loading variants:', error)
+		console.error("Error loading variants:", error)
 		loading.value = false
-	}
+	},
 })
 
 // Load options when dialog opens
-watch(() => props.modelValue, (isOpen) => {
-	if (isOpen && props.item) {
-		loadOptions()
-	}
-})
+watch(
+	() => props.modelValue,
+	(isOpen) => {
+		if (isOpen && props.item) {
+			loadOptions()
+		}
+	},
+)
 
 // Watch mode and item changes to reload options
 watch([() => props.mode, () => props.item], ([newMode, newItem]) => {
@@ -277,7 +285,7 @@ function loadOptions() {
 	selectedOption.value = null
 	selectedAttributes.value = {} // Reset attribute selection
 
-	if (props.mode === 'variant') {
+	if (props.mode === "variant") {
 		// Load variants from API
 		loading.value = true
 		variantsResource.reload()
@@ -304,26 +312,26 @@ function buildUomOptions() {
 
 	// Stock UOM option
 	uomOptions.push({
-		type: 'uom',
+		type: "uom",
 		uom: props.item.stock_uom,
 		conversion_factor: 1,
 		label: props.item.stock_uom,
-		description: 'Stock unit',
+		description: "Stock unit",
 		rate: getUomPrice(props.item.stock_uom),
-		priceLabel: `per ${props.item.stock_uom}`
+		priceLabel: `per ${props.item.stock_uom}`,
 	})
 
 	// Additional UOMs
 	if (props.item.item_uoms && props.item.item_uoms.length > 0) {
-		props.item.item_uoms.forEach(uomData => {
+		props.item.item_uoms.forEach((uomData) => {
 			uomOptions.push({
-				type: 'uom',
+				type: "uom",
 				uom: uomData.uom,
 				conversion_factor: uomData.conversion_factor,
 				label: uomData.uom,
 				description: `1 ${uomData.uom} = ${uomData.conversion_factor} ${props.item.stock_uom}`,
 				rate: getUomPrice(uomData.uom),
-				priceLabel: `per ${uomData.uom}`
+				priceLabel: `per ${uomData.uom}`,
 			})
 		})
 	}
@@ -357,7 +365,7 @@ function confirm() {
 	if (selectedOption.value) {
 		// Emit first, let parent decide if dialog should close
 		// Parent can keep dialog open by switching mode (variant → UOM)
-		emit('option-selected', selectedOption.value)
+		emit("option-selected", selectedOption.value)
 	}
 }
 
@@ -368,6 +376,6 @@ function cancel() {
 }
 
 function formatCurrency(amount) {
-	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 </script>

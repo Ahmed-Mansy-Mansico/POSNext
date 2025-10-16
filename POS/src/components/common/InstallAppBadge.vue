@@ -70,10 +70,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { usePWAInstall } from '@/composables/usePWAInstall'
+import { usePWAInstall } from "@/composables/usePWAInstall"
+import { computed } from "vue"
 
-const { showInstallBadge, promptInstall, dismissBadge, snoozeBadge } = usePWAInstall()
+const { showInstallBadge, promptInstall, dismissBadge, snoozeBadge } =
+	usePWAInstall()
 
 const showBadge = computed(() => showInstallBadge.value)
 

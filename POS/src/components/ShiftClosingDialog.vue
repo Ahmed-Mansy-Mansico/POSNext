@@ -406,20 +406,20 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, reactive } from "vue"
-import { Dialog, Input, Button } from "frappe-ui"
+import { Button, Dialog, Input } from "frappe-ui"
+import { computed, reactive, ref, watch } from "vue"
 import { useShift } from "../composables/useShift"
 
 const props = defineProps({
-  modelValue: Boolean,
-  openingShift: String,
+	modelValue: Boolean,
+	openingShift: String,
 })
 
 const emit = defineEmits(["update:modelValue", "shift-closed"])
 
 const open = computed({
-  get: () => props.modelValue,
-  set: (value) => emit("update:modelValue", value),
+	get: () => props.modelValue,
+	set: (value) => emit("update:modelValue", value),
 })
 
 const { getClosingShiftData, submitClosingShift } = useShift()
@@ -431,170 +431,199 @@ const showInvoiceDetails = ref(false)
 
 // Watch dialog open state
 watch(open, (isOpen) => {
-  if (isOpen && props.openingShift) {
-    loadClosingData()
-  }
+	if (isOpen && props.openingShift) {
+		loadClosingData()
+	}
 })
 
 async function loadClosingData() {
-  try {
-    const data = await closingDataResource.submit({ opening_shift: props.openingShift })
+	try {
+		const data = await closingDataResource.submit({
+			opening_shift: props.openingShift,
+		})
 
-    // Make payment_reconciliation reactive
-    if (data.payment_reconciliation) {
-      data.payment_reconciliation = data.payment_reconciliation.map(payment =>
-        reactive({
-          ...payment,
-          closing_amount: payment.closing_amount ?? payment.expected_amount ?? 0,
-          difference: 0
-        })
-      )
+		// Make payment_reconciliation reactive
+		if (data.payment_reconciliation) {
+			data.payment_reconciliation = data.payment_reconciliation.map((payment) =>
+				reactive({
+					...payment,
+					closing_amount:
+						payment.closing_amount ?? payment.expected_amount ?? 0,
+					difference: 0,
+				}),
+			)
 
-      // Calculate initial differences
-      data.payment_reconciliation.forEach(payment => {
-        calculateDifference(payment)
-      })
-    }
+			// Calculate initial differences
+			data.payment_reconciliation.forEach((payment) => {
+				calculateDifference(payment)
+			})
+		}
 
-    closingData.value = data
+		closingData.value = data
 
-    // Auto-expand invoice details if there are few invoices
-    if (getInvoiceCount() > 0 && getInvoiceCount() <= 10) {
-      showInvoiceDetails.value = true
-    }
-  } catch (error) {
-    console.error("Error loading closing data:", error)
-  }
+		// Auto-expand invoice details if there are few invoices
+		if (getInvoiceCount() > 0 && getInvoiceCount() <= 10) {
+			showInvoiceDetails.value = true
+		}
+	} catch (error) {
+		console.error("Error loading closing data:", error)
+	}
 }
 
 function calculateDifference(payment) {
-  const closing = parseFloat(payment.closing_amount) || 0
-  const expected = parseFloat(payment.expected_amount) || 0
-  payment.difference = closing - expected
+	const closing = Number.parseFloat(payment.closing_amount) || 0
+	const expected = Number.parseFloat(payment.expected_amount) || 0
+	payment.difference = closing - expected
 }
 
 // New function to handle closing amount updates with proper reactivity
 function updateClosingAmount(payment, value) {
-  payment.closing_amount = value
-  calculateDifference(payment)
+	payment.closing_amount = value
+	calculateDifference(payment)
 }
 
 const canSubmit = computed(() => {
-  if (!closingData.value || !closingData.value.payment_reconciliation) return false
+	if (!closingData.value || !closingData.value.payment_reconciliation)
+		return false
 
-  // Check if all closing amounts are filled
-  return closingData.value.payment_reconciliation.every(
-    payment => payment.closing_amount !== null && payment.closing_amount !== undefined && payment.closing_amount !== ''
-  )
+	// Check if all closing amounts are filled
+	return closingData.value.payment_reconciliation.every(
+		(payment) =>
+			payment.closing_amount !== null &&
+			payment.closing_amount !== undefined &&
+			payment.closing_amount !== "",
+	)
 })
 
 async function submitClosing() {
-  if (!closingData.value) return
+	if (!closingData.value) return
 
-  try {
-    // Ensure all differences are calculated
-    if (closingData.value.payment_reconciliation) {
-      closingData.value.payment_reconciliation.forEach(payment => {
-        calculateDifference(payment)
-      })
-    }
+	try {
+		// Ensure all differences are calculated
+		if (closingData.value.payment_reconciliation) {
+			closingData.value.payment_reconciliation.forEach((payment) => {
+				calculateDifference(payment)
+			})
+		}
 
-    // Submit the closing shift
-    await submitResource.submit({ closing_shift: closingData.value })
-    emit("shift-closed")
-    closeDialog()
-  } catch (error) {
-    console.error("Error submitting closing shift:", error)
-  }
+		// Submit the closing shift
+		await submitResource.submit({ closing_shift: closingData.value })
+		emit("shift-closed")
+		closeDialog()
+	} catch (error) {
+		console.error("Error submitting closing shift:", error)
+	}
 }
 
 function closeDialog() {
-  open.value = false
-  closingData.value = null
-  showInvoiceDetails.value = false
+	open.value = false
+	closingData.value = null
+	showInvoiceDetails.value = false
 }
 
 // Formatting Functions
 function formatCurrency(amount) {
-  if (amount === null || amount === undefined) return "0.00"
-  return parseFloat(amount).toFixed(2)
+	if (amount === null || amount === undefined) return "0.00"
+	return Number.parseFloat(amount).toFixed(2)
 }
 
 function formatDateTime(datetime) {
-  if (!datetime) return ""
-  return new Date(datetime).toLocaleString()
+	if (!datetime) return ""
+	return new Date(datetime).toLocaleString()
 }
 
 function formatTime(datetime) {
-  if (!datetime) return ""
-  return new Date(datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+	if (!datetime) return ""
+	return new Date(datetime).toLocaleTimeString([], {
+		hour: "2-digit",
+		minute: "2-digit",
+	})
 }
 
 // Calculation Functions
 function getInvoiceCount() {
-  if (!closingData.value) return 0
-  const transactions = closingData.value.pos_transactions || []
-  return transactions.length
+	if (!closingData.value) return 0
+	const transactions = closingData.value.pos_transactions || []
+	return transactions.length
 }
 
 function getTotalTax() {
-  if (!closingData.value || !closingData.value.taxes) return 0
-  return closingData.value.taxes.reduce((sum, tax) => sum + parseFloat(tax.amount || 0), 0)
+	if (!closingData.value || !closingData.value.taxes) return 0
+	return closingData.value.taxes.reduce(
+		(sum, tax) => sum + Number.parseFloat(tax.amount || 0),
+		0,
+	)
 }
 
 // Computed properties for real-time recalculation
 const getTotalExpected = computed(() => {
-  if (!closingData.value || !closingData.value.payment_reconciliation) return 0
-  return closingData.value.payment_reconciliation.reduce((sum, payment) =>
-    sum + parseFloat(payment.expected_amount || 0), 0)
+	if (!closingData.value || !closingData.value.payment_reconciliation) return 0
+	return closingData.value.payment_reconciliation.reduce(
+		(sum, payment) => sum + Number.parseFloat(payment.expected_amount || 0),
+		0,
+	)
 })
 
 const getTotalActual = computed(() => {
-  if (!closingData.value || !closingData.value.payment_reconciliation) return 0
-  return closingData.value.payment_reconciliation.reduce((sum, payment) =>
-    sum + parseFloat(payment.closing_amount || 0), 0)
+	if (!closingData.value || !closingData.value.payment_reconciliation) return 0
+	return closingData.value.payment_reconciliation.reduce(
+		(sum, payment) => sum + Number.parseFloat(payment.closing_amount || 0),
+		0,
+	)
 })
 
 const getTotalDifference = computed(() => {
-  return getTotalActual.value - getTotalExpected.value
+	return getTotalActual.value - getTotalExpected.value
 })
 
 function getSalesForPayment(payment) {
-  return parseFloat(payment.expected_amount || 0) - parseFloat(payment.opening_amount || 0)
+	return (
+		Number.parseFloat(payment.expected_amount || 0) -
+		Number.parseFloat(payment.opening_amount || 0)
+	)
 }
 
 function getShiftDuration() {
-  if (!closingData.value || !closingData.value.period_start_date) return "N/A"
+	if (!closingData.value || !closingData.value.period_start_date) return "N/A"
 
-  const start = new Date(closingData.value.period_start_date)
-  const end = new Date()
-  const diff = end - start
+	const start = new Date(closingData.value.period_start_date)
+	const end = new Date()
+	const diff = end - start
 
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+	const hours = Math.floor(diff / (1000 * 60 * 60))
+	const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
 
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`
-  }
-  return `${minutes}m`
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`
+	}
+	return `${minutes}m`
 }
 
 function getPaymentIcon(method) {
-  const methodLower = method.toLowerCase()
+	const methodLower = method.toLowerCase()
 
-  if (methodLower.includes('cash')) {
-    return { icon: '💵', color: 'bg-green-500' }
-  } else if (methodLower.includes('card') || methodLower.includes('credit') || methodLower.includes('debit')) {
-    return { icon: '💳', color: 'bg-blue-500' }
-  } else if (methodLower.includes('mobile') || methodLower.includes('wallet') || methodLower.includes('upi') || methodLower.includes('phone')) {
-    return { icon: '📱', color: 'bg-purple-500' }
-  } else if (methodLower.includes('bank') || methodLower.includes('transfer')) {
-    return { icon: '🏦', color: 'bg-indigo-500' }
-  } else if (methodLower.includes('cheque') || methodLower.includes('check')) {
-    return { icon: '📝', color: 'bg-yellow-500' }
-  } else {
-    return { icon: '💰', color: 'bg-gray-500' }
-  }
+	if (methodLower.includes("cash")) {
+		return { icon: "💵", color: "bg-green-500" }
+	} else if (
+		methodLower.includes("card") ||
+		methodLower.includes("credit") ||
+		methodLower.includes("debit")
+	) {
+		return { icon: "💳", color: "bg-blue-500" }
+	} else if (
+		methodLower.includes("mobile") ||
+		methodLower.includes("wallet") ||
+		methodLower.includes("upi") ||
+		methodLower.includes("phone")
+	) {
+		return { icon: "📱", color: "bg-purple-500" }
+	} else if (methodLower.includes("bank") || methodLower.includes("transfer")) {
+		return { icon: "🏦", color: "bg-indigo-500" }
+	} else if (methodLower.includes("cheque") || methodLower.includes("check")) {
+		return { icon: "📝", color: "bg-yellow-500" }
+	} else {
+		return { icon: "💰", color: "bg-gray-500" }
+	}
 }
 </script>
 

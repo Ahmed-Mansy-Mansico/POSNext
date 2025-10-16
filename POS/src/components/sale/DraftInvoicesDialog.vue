@@ -147,20 +147,20 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
-import { Dialog, Button, toast } from 'frappe-ui'
-import { getAllDrafts, deleteDraft, clearAllDrafts } from '@/utils/draftManager'
-import { formatCurrency as formatCurrencyUtil } from '@/utils/currency'
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { clearAllDrafts, deleteDraft, getAllDrafts } from "@/utils/draftManager"
+import { Button, Dialog, toast } from "frappe-ui"
+import { onMounted, ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
 	currency: {
 		type: String,
-		default: 'USD'
-	}
+		default: "USD",
+	},
 })
 
-const emit = defineEmits(['update:modelValue', 'load-draft', 'drafts-updated'])
+const emit = defineEmits(["update:modelValue", "load-draft", "drafts-updated"])
 
 const show = ref(props.modelValue)
 const drafts = ref([])
@@ -168,15 +168,18 @@ const showDeleteDialog = ref(false)
 const showClearAllDialog = ref(false)
 const draftToDelete = ref(null)
 
-watch(() => props.modelValue, (val) => {
-	show.value = val
-	if (val) {
-		loadDrafts()
-	}
-})
+watch(
+	() => props.modelValue,
+	(val) => {
+		show.value = val
+		if (val) {
+			loadDrafts()
+		}
+	},
+)
 
 watch(show, (val) => {
-	emit('update:modelValue', val)
+	emit("update:modelValue", val)
 })
 
 onMounted(() => {
@@ -187,12 +190,12 @@ async function loadDrafts() {
 	try {
 		drafts.value = await getAllDrafts()
 	} catch (error) {
-		console.error('Error loading drafts:', error)
+		console.error("Error loading drafts:", error)
 		toast.create({
-			title: 'Error',
-			text: 'Failed to load draft invoices',
-			icon: 'x',
-			iconClasses: 'text-red-600'
+			title: "Error",
+			text: "Failed to load draft invoices",
+			icon: "x",
+			iconClasses: "text-red-600",
 		})
 	}
 }
@@ -210,21 +213,21 @@ async function confirmDeleteDraft() {
 		draftToDelete.value = null
 
 		// Notify parent to update count
-		emit('drafts-updated')
+		emit("drafts-updated")
 
 		toast.create({
-			title: 'Deleted',
-			text: 'Draft invoice deleted',
-			icon: 'check',
-			iconClasses: 'text-green-600'
+			title: "Deleted",
+			text: "Draft invoice deleted",
+			icon: "check",
+			iconClasses: "text-green-600",
 		})
 	} catch (error) {
-		console.error('Error deleting draft:', error)
+		console.error("Error deleting draft:", error)
 		toast.create({
-			title: 'Error',
-			text: 'Failed to delete draft',
-			icon: 'x',
-			iconClasses: 'text-red-600'
+			title: "Error",
+			text: "Failed to delete draft",
+			icon: "x",
+			iconClasses: "text-red-600",
 		})
 	}
 }
@@ -236,37 +239,37 @@ async function confirmClearAll() {
 		showClearAllDialog.value = false
 
 		// Notify parent to update count
-		emit('drafts-updated')
+		emit("drafts-updated")
 
 		toast.create({
-			title: 'Cleared',
-			text: 'All draft invoices deleted',
-			icon: 'check',
-			iconClasses: 'text-green-600'
+			title: "Cleared",
+			text: "All draft invoices deleted",
+			icon: "check",
+			iconClasses: "text-green-600",
 		})
 	} catch (error) {
-		console.error('Error clearing drafts:', error)
+		console.error("Error clearing drafts:", error)
 		toast.create({
-			title: 'Error',
-			text: 'Failed to clear drafts',
-			icon: 'x',
-			iconClasses: 'text-red-600'
+			title: "Error",
+			text: "Failed to clear drafts",
+			icon: "x",
+			iconClasses: "text-red-600",
 		})
 	}
 }
 
 function formatDateTime(dateStr) {
 	const date = new Date(dateStr)
-	return date.toLocaleString('en-US', {
-		month: 'short',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit'
+	return date.toLocaleString("en-US", {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
 	})
 }
 
 function formatCurrency(amount) {
-	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
 function calculateTotal(items) {
@@ -274,7 +277,7 @@ function calculateTotal(items) {
 	return items.reduce((sum, item) => {
 		const qty = item.quantity || item.qty || 1
 		const rate = item.rate || 0
-		return sum + (qty * rate)
+		return sum + qty * rate
 	}, 0)
 }
 </script>

@@ -263,10 +263,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import StatusBadge from '@/components/common/StatusBadge.vue'
-import ActionButton from '@/components/common/ActionButton.vue'
-import UserMenu from '@/components/common/UserMenu.vue'
+import ActionButton from "@/components/common/ActionButton.vue"
+import StatusBadge from "@/components/common/StatusBadge.vue"
+import UserMenu from "@/components/common/UserMenu.vue"
+import { ref } from "vue"
 
 // Mobile tooltip state
 const showCacheTooltip = ref(false)
@@ -278,108 +278,119 @@ function toggleCacheTooltip() {
 const props = defineProps({
 	currentTime: {
 		type: String,
-		required: true
+		required: true,
 	},
 	shiftDuration: {
 		type: String,
-		default: null
+		default: null,
 	},
 	hasOpenShift: {
 		type: Boolean,
-		default: false
+		default: false,
 	},
 	profileName: {
 		type: String,
-		default: null
+		default: null,
 	},
 	userName: {
 		type: String,
-		required: true
+		required: true,
 	},
 	isOffline: {
 		type: Boolean,
-		default: false
+		default: false,
 	},
 	isSyncing: {
 		type: Boolean,
-		default: false
+		default: false,
 	},
 	pendingInvoicesCount: {
 		type: Number,
-		default: 0
+		default: 0,
 	},
 	isAnyDialogOpen: {
 		type: Boolean,
-		default: false
+		default: false,
 	},
 	cacheSyncing: {
 		type: Boolean,
-		default: false
+		default: false,
 	},
 	cacheStats: {
 		type: Object,
-		default: () => ({ items: 0, lastSync: null })
-	}
+		default: () => ({ items: 0, lastSync: null }),
+	},
 })
 
-defineEmits(['sync-click', 'printer-click', 'refresh-click', 'menu-click', 'logout', 'menu-opened', 'menu-closed'])
+defineEmits([
+	"sync-click",
+	"printer-click",
+	"refresh-click",
+	"menu-click",
+	"logout",
+	"menu-opened",
+	"menu-closed",
+])
 
 // Cache status helpers
 function getCacheIconColor() {
 	if (!props.cacheStats || props.cacheStats.items === 0) {
-		return 'text-red-600' // Red: No cache
+		return "text-red-600" // Red: No cache
 	}
 	if (props.cacheSyncing) {
-		return 'text-orange-600' // Orange: Syncing in progress
+		return "text-orange-600" // Orange: Syncing in progress
 	}
-	return 'text-green-600' // Green: Cache ready
+	return "text-green-600" // Green: Cache ready
 }
 
 function getCacheStatus() {
 	if (!props.cacheStats || props.cacheStats.items === 0) {
-		return 'Empty'
+		return "Empty"
 	}
 	if (props.cacheSyncing) {
-		return 'Syncing'
+		return "Syncing"
 	}
-	return 'Ready'
+	return "Ready"
 }
 
 function getCacheStatusBadgeClass() {
 	if (!props.cacheStats || props.cacheStats.items === 0) {
-		return 'bg-red-500/20 text-red-300'
+		return "bg-red-500/20 text-red-300"
 	}
 	if (props.cacheSyncing) {
-		return 'bg-orange-500/20 text-orange-300'
+		return "bg-orange-500/20 text-orange-300"
 	}
-	return 'bg-green-500/20 text-green-300'
+	return "bg-green-500/20 text-green-300"
 }
 
 function formatLastSync() {
 	if (!props.cacheStats?.lastSync) {
-		return 'Never'
+		return "Never"
 	}
 	const date = new Date(props.cacheStats.lastSync)
-	return date.toLocaleTimeString('en-US', {
-		hour: '2-digit',
-		minute: '2-digit',
-		second: '2-digit'
+	return date.toLocaleTimeString("en-US", {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
 	})
 }
 
 function getCacheAriaLabel() {
 	if (!props.cacheStats || props.cacheStats.items === 0) {
-		return 'Cache empty'
+		return "Cache empty"
 	}
 	if (props.cacheSyncing) {
-		return 'Cache syncing'
+		return "Cache syncing"
 	}
-	return 'Cache ready'
+	return "Cache ready"
 }
 
 // SVG Path Icons
 const timeIcon = "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-const shiftIcon = "M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-const printerIcon = "M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-const refreshIcon = "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+const shiftIcon =
+	"M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+const printerIcon =
+	"M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+const refreshIcon =
+	"M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
 </script>

@@ -204,10 +204,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue"
-import { Dialog, Input, Button, createResource } from "frappe-ui"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { getCachedPaymentMethods } from "@/utils/offline"
+import { Button, Dialog, Input, createResource } from "frappe-ui"
+import { computed, ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -218,12 +218,12 @@ const props = defineProps({
 	posProfile: String,
 	currency: {
 		type: String,
-		default: 'USD'
+		default: "USD",
 	},
 	isOffline: {
 		type: Boolean,
-		default: false
-	}
+		default: false,
+	},
 })
 
 const emit = defineEmits(["update:modelValue", "payment-completed"])
@@ -260,7 +260,9 @@ const paymentMethodsResource = createResource({
 async function loadPaymentMethods() {
 	// Guard: Don't load if posProfile is not set
 	if (!props.posProfile) {
-		console.warn("PaymentDialog: Cannot load payment methods - posProfile is not set")
+		console.warn(
+			"PaymentDialog: Cannot load payment methods - posProfile is not set",
+		)
 		return
 	}
 
@@ -286,7 +288,10 @@ async function loadPaymentMethods() {
 }
 
 const totalPaid = computed(() => {
-	return paymentEntries.value.reduce((sum, entry) => sum + (entry.amount || 0), 0)
+	return paymentEntries.value.reduce(
+		(sum, entry) => sum + (entry.amount || 0),
+		0,
+	)
 })
 
 const remainingAmount = computed(() => {
@@ -322,12 +327,7 @@ const quickAmounts = computed(() => {
 	}
 	// For medium amounts (20-100), use sensible denominations
 	else if (remaining < 100) {
-		amounts.push(
-			exactAmount,
-			Math.ceil(remaining / 10) * 10,
-			50,
-			100
-		)
+		amounts.push(exactAmount, Math.ceil(remaining / 10) * 10, 50, 100)
 	}
 	// For larger amounts, use bigger increments
 	else {
@@ -335,12 +335,15 @@ const quickAmounts = computed(() => {
 			exactAmount,
 			Math.ceil(remaining / 10) * 10,
 			Math.ceil(remaining / 50) * 50,
-			Math.ceil(remaining / 100) * 100
+			Math.ceil(remaining / 100) * 100,
 		)
 	}
 
 	// Remove duplicates, filter positive, sort, and limit to 4
-	return [...new Set(amounts)].filter((amt) => amt > 0).sort((a, b) => a - b).slice(0, 4)
+	return [...new Set(amounts)]
+		.filter((amt) => amt > 0)
+		.sort((a, b) => a - b)
+		.slice(0, 4)
 })
 
 watch(show, (newVal) => {
@@ -365,7 +368,7 @@ function quickAddPayment(method) {
 
 	paymentEntries.value.push({
 		mode_of_payment: method.mode_of_payment,
-		amount: parseFloat(remainingAmount.value.toFixed(2)),
+		amount: Number.parseFloat(remainingAmount.value.toFixed(2)),
 		type: method.type || "Cash",
 	})
 
@@ -374,7 +377,7 @@ function quickAddPayment(method) {
 
 // Add custom amount for a method
 function addCustomPayment(method, amount) {
-	const amt = parseFloat(amount)
+	const amt = Number.parseFloat(amount)
 	if (!amt || amt <= 0) return
 
 	paymentEntries.value.push({
@@ -391,7 +394,7 @@ function removePaymentEntry(index) {
 }
 
 function updatePaymentEntry(index, value) {
-	const amt = parseFloat(value)
+	const amt = Number.parseFloat(value)
 	if (amt && amt > 0) {
 		paymentEntries.value[index].amount = amt
 	}
@@ -414,30 +417,30 @@ function completePayment() {
 }
 
 function formatCurrency(amount) {
-	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
 // Get total amount for a specific payment method
 function getMethodTotal(methodName) {
 	return paymentEntries.value
-		.filter(entry => entry.mode_of_payment === methodName)
+		.filter((entry) => entry.mode_of_payment === methodName)
 		.reduce((sum, entry) => sum + (entry.amount || 0), 0)
 }
 
 // Get icon based on payment type
 function getPaymentIcon(type) {
 	const iconMap = {
-		'Cash': '💵',
-		'Card': '💳',
-		'Bank': '🏦',
-		'Phone': '📱',
-		'Wallet': '👛',
-		'Credit Card': '💳',
-		'Debit Card': '💳',
-		'Mobile Money': '📱',
-		'Check': '🧾',
-		'Gift Card': '🎁',
+		Cash: "💵",
+		Card: "💳",
+		Bank: "🏦",
+		Phone: "📱",
+		Wallet: "👛",
+		"Credit Card": "💳",
+		"Debit Card": "💳",
+		"Mobile Money": "📱",
+		Check: "🧾",
+		"Gift Card": "🎁",
 	}
-	return iconMap[type] || '💰'
+	return iconMap[type] || "💰"
 }
 </script>

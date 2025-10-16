@@ -181,11 +181,11 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from "vue"
-import { Dialog, Button } from "frappe-ui"
-import CreateCustomerDialog from "./CreateCustomerDialog.vue"
 import { useCustomerSearchStore } from "@/stores/customerSearch"
+import { Button, Dialog } from "frappe-ui"
 import { storeToRefs } from "pinia"
+import { computed, onMounted, ref, watch } from "vue"
+import CreateCustomerDialog from "./CreateCustomerDialog.vue"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -196,7 +196,14 @@ const emit = defineEmits(["update:modelValue", "customer-selected"])
 
 // Use Pinia store
 const customerStore = useCustomerSearchStore()
-const { filteredCustomers, loading, selectedIndex, searchTerm, allCustomers, recommendations } = storeToRefs(customerStore)
+const {
+	filteredCustomers,
+	loading,
+	selectedIndex,
+	searchTerm,
+	allCustomers,
+	recommendations,
+} = storeToRefs(customerStore)
 
 // Local state
 const showCreateDialog = ref(false)
@@ -210,7 +217,9 @@ const show = computed({
 const customers = computed(() => filteredCustomers.value)
 
 // Show recent customers label
-const showingRecent = computed(() => !searchTerm.value && customers.value.length > 0)
+const showingRecent = computed(
+	() => !searchTerm.value && customers.value.length > 0,
+)
 
 // Load customers when dialog opens
 watch(show, (newVal) => {
@@ -225,7 +234,7 @@ watch(show, (newVal) => {
 // Handle search input with instant reactivity
 function handleSearchInput(event) {
 	const value = event.target.value
-	console.log('🔍 Search input:', value) // Debug log
+	console.log("🔍 Search input:", value) // Debug log
 	customerStore.setSearchTerm(value)
 }
 
@@ -233,20 +242,25 @@ function handleSearchInput(event) {
 function handleKeydown(event) {
 	if (customers.value.length === 0) return
 
-	if (event.key === 'ArrowDown') {
+	if (event.key === "ArrowDown") {
 		event.preventDefault()
-		customerStore.setSelectedIndex(Math.min(selectedIndex.value + 1, customers.value.length - 1))
-	} else if (event.key === 'ArrowUp') {
+		customerStore.setSelectedIndex(
+			Math.min(selectedIndex.value + 1, customers.value.length - 1),
+		)
+	} else if (event.key === "ArrowUp") {
 		event.preventDefault()
 		customerStore.setSelectedIndex(Math.max(selectedIndex.value - 1, -1))
-	} else if (event.key === 'Enter') {
+	} else if (event.key === "Enter") {
 		event.preventDefault()
-		if (selectedIndex.value >= 0 && selectedIndex.value < customers.value.length) {
+		if (
+			selectedIndex.value >= 0 &&
+			selectedIndex.value < customers.value.length
+		) {
 			selectCustomer(customers.value[selectedIndex.value])
 		} else if (customers.value.length === 1) {
 			selectCustomer(customers.value[0])
 		}
-	} else if (event.key === 'Escape') {
+	} else if (event.key === "Escape") {
 		show.value = false
 	}
 }

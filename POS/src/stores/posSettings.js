@@ -1,11 +1,11 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { createResource } from 'frappe-ui'
+import { createResource } from "frappe-ui"
+import { defineStore } from "pinia"
+import { computed, ref } from "vue"
 
-export const usePOSSettingsStore = defineStore('posSettings', () => {
+export const usePOSSettingsStore = defineStore("posSettings", () => {
 	// State
 	const settings = ref({
-		pos_profile: '',
+		pos_profile: "",
 		enabled: 0,
 		// General Settings
 		max_discount_allowed: 0,
@@ -29,7 +29,7 @@ export const usePOSSettingsStore = defineStore('posSettings', () => {
 		allow_free_batch_return: 0,
 		allow_print_draft_invoices: 0,
 		// Pricing & Display
-		decimal_precision: '2',
+		decimal_precision: "2",
 		// Customer Settings
 		allow_customer_purchase_order: 0,
 		allow_duplicate_customer_names: 0,
@@ -56,59 +56,117 @@ export const usePOSSettingsStore = defineStore('posSettings', () => {
 
 	// Computed - General Settings
 	const isEnabled = computed(() => Boolean(settings.value.enabled))
-	const maxDiscountAllowed = computed(() => parseFloat(settings.value.max_discount_allowed) || 0)
-	const usePercentageDiscount = computed(() => Boolean(settings.value.use_percentage_discount))
-	const allowAdditionalDiscount = computed(() => Boolean(settings.value.allow_user_to_edit_additional_discount))
-	const allowCreditSale = computed(() => Boolean(settings.value.allow_credit_sale))
+	const maxDiscountAllowed = computed(
+		() => Number.parseFloat(settings.value.max_discount_allowed) || 0,
+	)
+	const usePercentageDiscount = computed(() =>
+		Boolean(settings.value.use_percentage_discount),
+	)
+	const allowAdditionalDiscount = computed(() =>
+		Boolean(settings.value.allow_user_to_edit_additional_discount),
+	)
+	const allowCreditSale = computed(() =>
+		Boolean(settings.value.allow_credit_sale),
+	)
 	const allowReturn = computed(() => Boolean(settings.value.allow_return))
-	const allowWriteOffChange = computed(() => Boolean(settings.value.allow_write_off_change))
+	const allowWriteOffChange = computed(() =>
+		Boolean(settings.value.allow_write_off_change),
+	)
 
 	// Computed - Display Settings
-	const defaultCardView = computed(() => Boolean(settings.value.default_card_view))
-	const displayItemCode = computed(() => Boolean(settings.value.display_item_code))
-	const showCustomerBalance = computed(() => Boolean(settings.value.show_customer_balance))
-	const hideExpectedAmount = computed(() => Boolean(settings.value.hide_expected_amount))
-	const displayDiscountPercentage = computed(() => Boolean(settings.value.display_discount_percentage))
-	const displayDiscountAmount = computed(() => Boolean(settings.value.display_discount_amount))
+	const defaultCardView = computed(() =>
+		Boolean(settings.value.default_card_view),
+	)
+	const displayItemCode = computed(() =>
+		Boolean(settings.value.display_item_code),
+	)
+	const showCustomerBalance = computed(() =>
+		Boolean(settings.value.show_customer_balance),
+	)
+	const hideExpectedAmount = computed(() =>
+		Boolean(settings.value.hide_expected_amount),
+	)
+	const displayDiscountPercentage = computed(() =>
+		Boolean(settings.value.display_discount_percentage),
+	)
+	const displayDiscountAmount = computed(() =>
+		Boolean(settings.value.display_discount_amount),
+	)
 
 	// Computed - Operations
-	const allowSalesOrder = computed(() => Boolean(settings.value.allow_sales_order))
-	const allowSelectSalesOrder = computed(() => Boolean(settings.value.allow_select_sales_order))
-	const createOnlySalesOrder = computed(() => Boolean(settings.value.create_only_sales_order))
-	const allowReturnWithoutInvoice = computed(() => Boolean(settings.value.allow_return_without_invoice))
-	const allowFreeBatchReturn = computed(() => Boolean(settings.value.allow_free_batch_return))
-	const allowPrintDraftInvoices = computed(() => Boolean(settings.value.allow_print_draft_invoices))
+	const allowSalesOrder = computed(() =>
+		Boolean(settings.value.allow_sales_order),
+	)
+	const allowSelectSalesOrder = computed(() =>
+		Boolean(settings.value.allow_select_sales_order),
+	)
+	const createOnlySalesOrder = computed(() =>
+		Boolean(settings.value.create_only_sales_order),
+	)
+	const allowReturnWithoutInvoice = computed(() =>
+		Boolean(settings.value.allow_return_without_invoice),
+	)
+	const allowFreeBatchReturn = computed(() =>
+		Boolean(settings.value.allow_free_batch_return),
+	)
+	const allowPrintDraftInvoices = computed(() =>
+		Boolean(settings.value.allow_print_draft_invoices),
+	)
 
 	// Computed - Pricing & Display
-	const decimalPrecision = computed(() => parseInt(settings.value.decimal_precision) || 2)
+	const decimalPrecision = computed(
+		() => Number.parseInt(settings.value.decimal_precision) || 2,
+	)
 
 	// Computed - Customer Settings
-	const allowCustomerPurchaseOrder = computed(() => Boolean(settings.value.allow_customer_purchase_order))
-	const allowDuplicateCustomerNames = computed(() => Boolean(settings.value.allow_duplicate_customer_names))
+	const allowCustomerPurchaseOrder = computed(() =>
+		Boolean(settings.value.allow_customer_purchase_order),
+	)
+	const allowDuplicateCustomerNames = computed(() =>
+		Boolean(settings.value.allow_duplicate_customer_names),
+	)
 	const fetchCoupon = computed(() => Boolean(settings.value.fetch_coupon))
 
 	// Computed - Printing
-	const allowPrintLastInvoice = computed(() => Boolean(settings.value.allow_print_last_invoice))
+	const allowPrintLastInvoice = computed(() =>
+		Boolean(settings.value.allow_print_last_invoice),
+	)
 	const silentPrint = computed(() => Boolean(settings.value.silent_print))
 
 	// Computed - Delivery
-	const useDeliveryCharges = computed(() => Boolean(settings.value.use_delivery_charges))
-	const autoSetDeliveryCharges = computed(() => Boolean(settings.value.auto_set_delivery_charges))
+	const useDeliveryCharges = computed(() =>
+		Boolean(settings.value.use_delivery_charges),
+	)
+	const autoSetDeliveryCharges = computed(() =>
+		Boolean(settings.value.auto_set_delivery_charges),
+	)
 
 	// Computed - Advanced Settings
-	const useLimitSearch = computed(() => Boolean(settings.value.use_limit_search))
-	const searchLimit = computed(() => parseInt(settings.value.search_limit) || 1000)
-	const allowSubmissionsInBackgroundJob = computed(() => Boolean(settings.value.allow_submissions_in_background_job))
-	const allowDeleteOfflineInvoice = computed(() => Boolean(settings.value.allow_delete_offline_invoice))
-	const allowChangePostingDate = computed(() => Boolean(settings.value.allow_change_posting_date))
+	const useLimitSearch = computed(() =>
+		Boolean(settings.value.use_limit_search),
+	)
+	const searchLimit = computed(
+		() => Number.parseInt(settings.value.search_limit) || 1000,
+	)
+	const allowSubmissionsInBackgroundJob = computed(() =>
+		Boolean(settings.value.allow_submissions_in_background_job),
+	)
+	const allowDeleteOfflineInvoice = computed(() =>
+		Boolean(settings.value.allow_delete_offline_invoice),
+	)
+	const allowChangePostingDate = computed(() =>
+		Boolean(settings.value.allow_change_posting_date),
+	)
 
 	// Computed - Miscellaneous
 	const inputQty = computed(() => Boolean(settings.value.input_qty))
-	const allowNegativeStock = computed(() => Boolean(settings.value.allow_negative_stock))
+	const allowNegativeStock = computed(() =>
+		Boolean(settings.value.allow_negative_stock),
+	)
 
 	// Resource
 	const settingsResource = createResource({
-		url: 'pos_next.pos_next.doctype.pos_settings.pos_settings.get_pos_settings',
+		url: "pos_next.pos_next.doctype.pos_settings.pos_settings.get_pos_settings",
 		onSuccess(data) {
 			if (data) {
 				Object.assign(settings.value, data)
@@ -117,7 +175,7 @@ export const usePOSSettingsStore = defineStore('posSettings', () => {
 			isLoading.value = false
 		},
 		onError(error) {
-			console.error('Failed to load POS Settings:', error)
+			console.error("Failed to load POS Settings:", error)
 			isLoading.value = false
 		},
 	})
@@ -125,7 +183,7 @@ export const usePOSSettingsStore = defineStore('posSettings', () => {
 	// Actions
 	async function loadSettings(posProfile) {
 		if (!posProfile) {
-			console.warn('Cannot load POS Settings: POS Profile not provided')
+			console.warn("Cannot load POS Settings: POS Profile not provided")
 			return false
 		}
 
@@ -136,14 +194,14 @@ export const usePOSSettingsStore = defineStore('posSettings', () => {
 			await settingsResource.submit({ pos_profile: posProfile })
 			return true
 		} catch (error) {
-			console.error('Error loading POS Settings:', error)
+			console.error("Error loading POS Settings:", error)
 			return false
 		}
 	}
 
 	function resetSettings() {
 		settings.value = {
-			pos_profile: '',
+			pos_profile: "",
 			enabled: 0,
 			max_discount_allowed: 0,
 			use_percentage_discount: 0,
@@ -163,7 +221,7 @@ export const usePOSSettingsStore = defineStore('posSettings', () => {
 			allow_return_without_invoice: 0,
 			allow_free_batch_return: 0,
 			allow_print_draft_invoices: 0,
-			decimal_precision: '2',
+			decimal_precision: "2",
 			allow_customer_purchase_order: 0,
 			allow_duplicate_customer_names: 0,
 			fetch_coupon: 0,

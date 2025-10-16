@@ -1,23 +1,23 @@
-import { db, getSetting, setSetting } from './db'
-import { call } from '@/utils/apiWrapper'
+import { call } from "@/utils/apiWrapper"
+import { db, getSetting, setSetting } from "./db"
 
 // Server connectivity state
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
 	window.posNextServerOnline = true // Default to online
 	window.posNextManualOffline = false // Default to auto mode
 }
 
 // Ping server to check connectivity
 export const pingServer = async () => {
-	if (typeof window === 'undefined') return true
+	if (typeof window === "undefined") return true
 
 	try {
 		// Quick ping to check if server is reachable
 		const controller = new AbortController()
 		const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
 
-		const response = await fetch('/api/method/pos_next.api.ping', {
-			method: 'GET',
+		const response = await fetch("/api/method/pos_next.api.ping", {
+			method: "GET",
 			signal: controller.signal,
 		})
 
@@ -34,7 +34,7 @@ export const pingServer = async () => {
 
 // Check if offline
 export const isOffline = () => {
-	if (typeof window === 'undefined') return false
+	if (typeof window === "undefined") return false
 
 	// Check manual offline mode
 	const manualOffline = window.posNextManualOffline || false
@@ -50,7 +50,7 @@ export const isOffline = () => {
 }
 
 // Start periodic server ping
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
 	// Ping server every 30 seconds
 	setInterval(() => {
 		if (navigator.onLine) {
@@ -67,7 +67,7 @@ export const saveOfflineInvoice = async (invoiceData) => {
 	try {
 		// Validate invoice has items
 		if (!invoiceData.items || invoiceData.items.length === 0) {
-			throw new Error('Cannot save empty invoice')
+			throw new Error("Cannot save empty invoice")
 		}
 
 		// Clean data (remove reactive properties)
@@ -84,10 +84,10 @@ export const saveOfflineInvoice = async (invoiceData) => {
 		// Update local stock
 		await updateLocalStock(cleanData.items)
 
-		console.log('Invoice saved to offline queue')
+		console.log("Invoice saved to offline queue")
 		return true
 	} catch (error) {
-		console.error('Error saving offline invoice:', error)
+		console.error("Error saving offline invoice:", error)
 		throw error
 	}
 }
@@ -97,11 +97,11 @@ export const getOfflineInvoices = async () => {
 	try {
 		// Use filter instead of where/equals for boolean values
 		const invoices = await db.invoice_queue
-			.filter(invoice => invoice.synced === false)
+			.filter((invoice) => invoice.synced === false)
 			.toArray()
 		return invoices
 	} catch (error) {
-		console.error('Error getting offline invoices:', error)
+		console.error("Error getting offline invoices:", error)
 		return []
 	}
 }
@@ -111,11 +111,11 @@ export const getOfflineInvoiceCount = async () => {
 	try {
 		// Use filter instead of where/equals for boolean values
 		const count = await db.invoice_queue
-			.filter(invoice => invoice.synced === false)
+			.filter((invoice) => invoice.synced === false)
 			.count()
 		return count
 	} catch (error) {
-		console.error('Error getting offline invoice count:', error)
+		console.error("Error getting offline invoice count:", error)
 		return 0
 	}
 }
@@ -123,7 +123,7 @@ export const getOfflineInvoiceCount = async () => {
 // Sync offline invoices to server
 export const syncOfflineInvoices = async () => {
 	if (isOffline()) {
-		console.log('Cannot sync while offline')
+		console.log("Cannot sync while offline")
 		return { success: 0, failed: 0 }
 	}
 
@@ -140,18 +140,20 @@ export const syncOfflineInvoices = async () => {
 		try {
 			// Submit invoice to server
 			// The API expects 'data' parameter with nested 'invoice' and 'data' keys
-			const response = await call('pos_next.api.invoices.submit_invoice', {
+			const response = await call("pos_next.api.invoices.submit_invoice", {
 				data: JSON.stringify({
 					invoice: invoice.data,
-					data: {}
-				})
+					data: {},
+				}),
 			})
 
 			if (response.message || response.name) {
 				// Mark as synced
 				await db.invoice_queue.update(invoice.id, { synced: true })
 				successCount++
-				console.log(`Invoice ${invoice.id} synced successfully as ${response.name || response.message}`)
+				console.log(
+					`Invoice ${invoice.id} synced successfully as ${response.name || response.message}`,
+				)
 			}
 		} catch (error) {
 			console.error(`Error syncing invoice ${invoice.id}:`, error)
@@ -159,13 +161,13 @@ export const syncOfflineInvoices = async () => {
 			// Store error details
 			errors.push({
 				invoiceId: invoice.id,
-				customer: invoice.data.customer || 'Walk-in Customer',
-				error: error
+				customer: invoice.data.customer || "Walk-in Customer",
+				error: error,
 			})
 
 			// Increment retry count
 			await db.invoice_queue.update(invoice.id, {
-				retry_count: (invoice.retry_count || 0) + 1
+				retry_count: (invoice.retry_count || 0) + 1,
 			})
 
 			failedCount++
@@ -174,16 +176,16 @@ export const syncOfflineInvoices = async () => {
 			if ((invoice.retry_count || 0) >= 3) {
 				await db.invoice_queue.update(invoice.id, {
 					sync_failed: true,
-					error: error.message
+					error: error.message,
 				})
 			}
 		}
 	}
 
 	// Clean up synced invoices older than 7 days
-	const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+	const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
 	await db.invoice_queue
-		.filter(item => item.synced === true && item.timestamp < weekAgo)
+		.filter((item) => item.synced === true && item.timestamp < weekAgo)
 		.delete()
 
 	return { success: successCount, failed: failedCount, errors }
@@ -195,7 +197,7 @@ export const deleteOfflineInvoice = async (id) => {
 		await db.invoice_queue.delete(id)
 		return true
 	} catch (error) {
-		console.error('Error deleting offline invoice:', error)
+		console.error("Error deleting offline invoice:", error)
 		return false
 	}
 }
@@ -207,7 +209,7 @@ export const updateLocalStock = async (items) => {
 			const stockKey = `${item.item_code}_${item.warehouse}`
 			const currentStock = await db.stock.get({
 				item_code: item.item_code,
-				warehouse: item.warehouse
+				warehouse: item.warehouse,
 			})
 
 			const qty = item.quantity || item.qty || 0
@@ -217,11 +219,11 @@ export const updateLocalStock = async (items) => {
 				item_code: item.item_code,
 				warehouse: item.warehouse,
 				qty: newQty,
-				updated_at: Date.now()
+				updated_at: Date.now(),
 			})
 		}
 	} catch (error) {
-		console.error('Error updating local stock:', error)
+		console.error("Error updating local stock:", error)
 	}
 }
 
@@ -230,11 +232,11 @@ export const getLocalStock = async (itemCode, warehouse) => {
 	try {
 		const stock = await db.stock.get({
 			item_code: itemCode,
-			warehouse: warehouse
+			warehouse: warehouse,
 		})
 		return stock?.qty || 0
 	} catch (error) {
-		console.error('Error getting local stock:', error)
+		console.error("Error getting local stock:", error)
 		return 0
 	}
 }
@@ -251,34 +253,42 @@ export const saveOfflinePayment = async (paymentData) => {
 			retry_count: 0,
 		})
 
-		console.log('Payment saved to offline queue')
+		console.log("Payment saved to offline queue")
 		return true
 	} catch (error) {
-		console.error('Error saving offline payment:', error)
+		console.error("Error saving offline payment:", error)
 		throw error
 	}
 }
 
 // Auto-sync when coming back online
-if (typeof window !== 'undefined') {
-	window.addEventListener('online', async () => {
-		console.log('Back online, syncing pending invoices...')
-		window.posNextServerOnline = true
-		const result = await syncOfflineInvoices()
-		if (result.success > 0) {
-			console.log(`Successfully synced ${result.success} invoices`)
-			if (window.frappe?.msgprint) {
-				window.frappe.msgprint({
-					title: 'Sync Complete',
-					message: `Successfully synced ${result.success} offline invoices`,
-					indicator: 'green'
-				})
+if (typeof window !== "undefined") {
+	window.addEventListener(
+		"online",
+		async () => {
+			console.log("Back online, syncing pending invoices...")
+			window.posNextServerOnline = true
+			const result = await syncOfflineInvoices()
+			if (result.success > 0) {
+				console.log(`Successfully synced ${result.success} invoices`)
+				if (window.frappe?.msgprint) {
+					window.frappe.msgprint({
+						title: "Sync Complete",
+						message: `Successfully synced ${result.success} offline invoices`,
+						indicator: "green",
+					})
+				}
 			}
-		}
-	}, { passive: true })
+		},
+		{ passive: true },
+	)
 
-	window.addEventListener('offline', () => {
-		console.log('Gone offline')
-		window.posNextServerOnline = false
-	}, { passive: true })
+	window.addEventListener(
+		"offline",
+		() => {
+			console.log("Gone offline")
+			window.posNextServerOnline = false
+		},
+		{ passive: true },
+	)
 }

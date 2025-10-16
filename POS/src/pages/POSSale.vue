@@ -607,41 +607,41 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from "vue"
-import { Button, Dialog, toast, createResource } from "frappe-ui"
+import ShiftClosingDialog from "@/components/ShiftClosingDialog.vue"
+import ShiftOpeningDialog from "@/components/ShiftOpeningDialog.vue"
+import LoadingSpinner from "@/components/common/LoadingSpinner.vue"
+import ManagementSlider from "@/components/pos/ManagementSlider.vue"
+import POSHeader from "@/components/pos/POSHeader.vue"
+import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
+import CouponDialog from "@/components/sale/CouponDialog.vue"
+import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
+import CustomerDialog from "@/components/sale/CustomerDialog.vue"
+import DraftInvoicesDialog from "@/components/sale/DraftInvoicesDialog.vue"
+import InvoiceCart from "@/components/sale/InvoiceCart.vue"
+import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
+import ItemSelectionDialog from "@/components/sale/ItemSelectionDialog.vue"
+import ItemsSelector from "@/components/sale/ItemsSelector.vue"
+import OffersDialog from "@/components/sale/OffersDialog.vue"
+import OfflineInvoicesDialog from "@/components/sale/OfflineInvoicesDialog.vue"
+import PaymentDialog from "@/components/sale/PaymentDialog.vue"
+import PromotionManagement from "@/components/sale/PromotionManagement.vue"
+import ReturnInvoiceDialog from "@/components/sale/ReturnInvoiceDialog.vue"
+import POSSettings from "@/components/settings/POSSettings.vue"
+import { useRealtimeStock } from "@/composables/useRealtimeStock"
 import { session } from "@/data/session"
 import { parseError } from "@/utils/errorHandler"
-import LoadingSpinner from "@/components/common/LoadingSpinner.vue"
-import POSHeader from "@/components/pos/POSHeader.vue"
-import ManagementSlider from "@/components/pos/ManagementSlider.vue"
-import ItemsSelector from "@/components/sale/ItemsSelector.vue"
-import InvoiceCart from "@/components/sale/InvoiceCart.vue"
-import PaymentDialog from "@/components/sale/PaymentDialog.vue"
-import CustomerDialog from "@/components/sale/CustomerDialog.vue"
-import ShiftOpeningDialog from "@/components/ShiftOpeningDialog.vue"
-import ShiftClosingDialog from "@/components/ShiftClosingDialog.vue"
-import DraftInvoicesDialog from "@/components/sale/DraftInvoicesDialog.vue"
-import ReturnInvoiceDialog from "@/components/sale/ReturnInvoiceDialog.vue"
-import CouponDialog from "@/components/sale/CouponDialog.vue"
-import OffersDialog from "@/components/sale/OffersDialog.vue"
-import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
-import InvoiceHistoryDialog from "@/components/sale/InvoiceHistoryDialog.vue"
-import OfflineInvoicesDialog from "@/components/sale/OfflineInvoicesDialog.vue"
-import CreateCustomerDialog from "@/components/sale/CreateCustomerDialog.vue"
-import ItemSelectionDialog from "@/components/sale/ItemSelectionDialog.vue"
-import PromotionManagement from "@/components/sale/PromotionManagement.vue"
-import POSSettings from "@/components/settings/POSSettings.vue"
-import { printInvoiceByName } from "@/utils/printInvoice"
-import { useRealtimeStock } from "@/composables/useRealtimeStock"
 import { offlineWorker } from "@/utils/offline/workerClient"
+import { printInvoiceByName } from "@/utils/printInvoice"
+import { Button, Dialog, createResource, toast } from "frappe-ui"
+import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 
+import { useItemSearchStore } from "@/stores/itemSearch"
 // Pinia Stores
 import { usePOSCartStore } from "@/stores/posCart"
-import { usePOSShiftStore } from "@/stores/posShift"
-import { usePOSUIStore } from "@/stores/posUI"
-import { usePOSSyncStore } from "@/stores/posSync"
 import { usePOSDraftsStore } from "@/stores/posDrafts"
-import { useItemSearchStore } from "@/stores/itemSearch"
+import { usePOSShiftStore } from "@/stores/posShift"
+import { usePOSSyncStore } from "@/stores/posSync"
+import { usePOSUIStore } from "@/stores/posUI"
 
 // Initialize stores
 const cartStore = usePOSCartStore()
@@ -666,13 +666,16 @@ const logoutAfterClose = ref(false)
 const offerReapplyTimer = ref(null)
 
 // Performance: Cache previous cart state to avoid unnecessary reapplications
-let previousCartHash = ''
+let previousCartHash = ""
 
 // Helper function to compute cart hash
 function computeCartHash() {
-	return cartStore.invoiceItems.map(i =>
-		`${i.item_code}-${i.quantity}-${i.rate}-${i.discount_percentage || 0}-${i.discount_amount || 0}-${i.uom || ''}-${i.warehouse || ''}`
-	).join('|')
+	return cartStore.invoiceItems
+		.map(
+			(i) =>
+				`${i.item_code}-${i.quantity}-${i.rate}-${i.discount_percentage || 0}-${i.discount_amount || 0}-${i.uom || ""}-${i.warehouse || ""}`,
+		)
+		.join("|")
 }
 
 // Promotion dialog
@@ -688,7 +691,7 @@ const warehousesResource = createResource({
 	url: "pos_next.api.pos_profile.get_warehouses",
 	makeParams() {
 		return {
-			pos_profile: shiftStore.profileName
+			pos_profile: shiftStore.profileName,
 		}
 	},
 	auto: false,
@@ -699,27 +702,36 @@ const warehousesResource = createResource({
 	onError(error) {
 		console.error("Error loading warehouses:", error)
 		warehousesList.value = []
-	}
+	},
 })
 
 // Watch for profile changes to load warehouses
-watch(() => shiftStore.profileName, (newProfile) => {
-	if (newProfile) {
-		warehousesResource.reload()
-	}
-}, { immediate: true })
+watch(
+	() => shiftStore.profileName,
+	(newProfile) => {
+		if (newProfile) {
+			warehousesResource.reload()
+		}
+	},
+	{ immediate: true },
+)
 
 // Computed for warehouses - returns all warehouses for the company
 const profileWarehouses = computed(() => {
 	if (warehousesList.value.length > 0) {
-		return warehousesList.value.map(w => ({
+		return warehousesList.value.map((w) => ({
 			name: w.name,
-			warehouse: w.warehouse_name || w.name
+			warehouse: w.warehouse_name || w.name,
 		}))
 	}
 	// Fallback to profile warehouse if API hasn't loaded yet
 	if (shiftStore.profileWarehouse) {
-		return [{ name: shiftStore.profileWarehouse, warehouse: shiftStore.profileWarehouse }]
+		return [
+			{
+				name: shiftStore.profileWarehouse,
+				warehouse: shiftStore.profileWarehouse,
+			},
+		]
 	}
 	return []
 })
@@ -734,17 +746,17 @@ onMounted(async () => {
 		uiStore.setWindowWidth(window.innerWidth)
 		updateLayoutBounds()
 	}
-	window.addEventListener('resize', handleResize, { passive: true })
+	window.addEventListener("resize", handleResize, { passive: true })
 
 	// Set up real-time stock update listener
 	const cleanup = onStockUpdate(async (stockUpdates) => {
 		// Filter updates to only include items from our warehouse(s)
 		const profileWarehouses = shiftStore.profileWarehouse
 			? [shiftStore.profileWarehouse]
-			: warehousesList.value.map(w => w.warehouse_name || w.name)
+			: warehousesList.value.map((w) => w.warehouse_name || w.name)
 
-		const relevantUpdates = stockUpdates.filter(update =>
-			profileWarehouses.includes(update.warehouse)
+		const relevantUpdates = stockUpdates.filter((update) =>
+			profileWarehouses.includes(update.warehouse),
 		)
 
 		if (relevantUpdates.length > 0) {
@@ -793,11 +805,14 @@ onMounted(async () => {
 	}
 })
 
-watch(() => shiftStore.hasOpenShift, value => {
-	if (value && typeof window !== 'undefined') {
-		updateLayoutBounds()
-	}
-})
+watch(
+	() => shiftStore.hasOpenShift,
+	(value) => {
+		if (value && typeof window !== "undefined") {
+			updateLayoutBounds()
+		}
+	},
+)
 
 // Watch for cart changes to re-apply offers
 // Comprehensive watcher that detects all cart changes including:
@@ -830,7 +845,7 @@ watch(
 		offerReapplyTimer.value = setTimeout(async () => {
 			await cartStore.reapplyOffer(shiftStore.currentProfile)
 		}, 500)
-	}
+	},
 )
 
 // Watch for customer changes - customer affects which offers are applicable
@@ -854,7 +869,7 @@ watch(
 			}, 300)
 		}
 	},
-	{ deep: true }
+	{ deep: true },
 )
 
 // Watch for applied offers changes - handle when offers are added/removed
@@ -865,11 +880,11 @@ watch(
 		if (cartStore.invoiceItems.length > 0) {
 			previousCartHash = computeCartHash()
 		}
-	}
+	},
 )
 
 onUnmounted(() => {
-	window.removeEventListener('resize', () => {
+	window.removeEventListener("resize", () => {
 		uiStore.setWindowWidth(window.innerWidth)
 		updateLayoutBounds()
 	})
@@ -920,21 +935,25 @@ function handleItemSelected(item, autoAdd = false) {
 		try {
 			cartStore.addItem(item, 1, true, shiftStore.currentProfile)
 		} catch (error) {
-			uiStore.showError("Insufficient Stock", error.message, `Item: ${item.item_code}`)
+			uiStore.showError(
+				"Insufficient Stock",
+				error.message,
+				`Item: ${item.item_code}`,
+			)
 		}
 		return
 	}
 
 	// Check for variants
 	if (item.has_variants) {
-		cartStore.setPendingItem(item, 1, 'variant')
+		cartStore.setPendingItem(item, 1, "variant")
 		uiStore.showItemSelectionDialog = true
 		return
 	}
 
 	// Check for UOMs
 	if (item.item_uoms && item.item_uoms.length > 0) {
-		cartStore.setPendingItem(item, 1, 'uom')
+		cartStore.setPendingItem(item, 1, "uom")
 		uiStore.showItemSelectionDialog = true
 		return
 	}
@@ -950,7 +969,11 @@ function handleItemSelected(item, autoAdd = false) {
 	try {
 		cartStore.addItem(item, 1, false, shiftStore.currentProfile)
 	} catch (error) {
-		uiStore.showError("Insufficient Stock", error.message, `Item: ${item.item_code}`)
+		uiStore.showError(
+			"Insufficient Stock",
+			error.message,
+			`Item: ${item.item_code}`,
+		)
 	}
 }
 
@@ -1025,11 +1048,11 @@ async function handleDeleteFailedInvoice() {
 
 async function handleErrorRetry() {
 	uiStore.clearError()
-	if (uiStore.errorRetryAction === 'payment') {
+	if (uiStore.errorRetryAction === "payment") {
 		setTimeout(() => {
 			uiStore.showPaymentDialog = true
 		}, 300)
-	} else if (uiStore.errorRetryAction === 'sync') {
+	} else if (uiStore.errorRetryAction === "sync") {
 		await offlineStore.loadPendingInvoices()
 		setTimeout(() => {
 			handleSyncClick()
@@ -1054,11 +1077,11 @@ async function handlePaymentCompleted(paymentData) {
 
 		cartStore.payments = []
 		if (paymentData.payments && Array.isArray(paymentData.payments)) {
-			paymentData.payments.forEach(p => {
+			paymentData.payments.forEach((p) => {
 				cartStore.payments.push({
 					mode_of_payment: p.mode_of_payment,
 					amount: p.amount,
-					type: p.type
+					type: p.type,
 				})
 			})
 		}
@@ -1080,7 +1103,7 @@ async function handlePaymentCompleted(paymentData) {
 			uiStore.showPaymentDialog = false
 			cartStore.clearCart()
 			// Reset cart hash after successful payment
-			previousCartHash = ''
+			previousCartHash = ""
 
 			toast.create({
 				title: "Saved Offline",
@@ -1098,7 +1121,7 @@ async function handlePaymentCompleted(paymentData) {
 				uiStore.showPaymentDialog = false
 				cartStore.clearCart()
 				// Reset cart hash after successful payment
-				previousCartHash = ''
+				previousCartHash = ""
 
 				if (itemsSelectorRef.value) {
 					itemsSelectorRef.value.loadItems()
@@ -1139,16 +1162,18 @@ async function handlePaymentCompleted(paymentData) {
 
 		const errorContext = parseError(error)
 		uiStore.showError(
-			errorContext.title || 'Error',
-			errorContext.message || 'An unexpected error occurred',
+			errorContext.title || "Error",
+			errorContext.message || "An unexpected error occurred",
 			errorContext.technicalDetails || null,
-			errorContext.retryable ? 'payment' : null
+			errorContext.retryable ? "payment" : null,
 		)
 
 		const toastIconClass =
-			errorContext.type === 'error' ? 'text-red-600' :
-			errorContext.type === 'warning' ? 'text-orange-600' :
-			'text-yellow-600'
+			errorContext.type === "error"
+				? "text-red-600"
+				: errorContext.type === "warning"
+					? "text-orange-600"
+					: "text-yellow-600"
 
 		toast.create({
 			title: errorContext.title,
@@ -1168,7 +1193,7 @@ function handleClearCart() {
 function confirmClearCart() {
 	cartStore.clearCart()
 	// Reset cart hash when cart is cleared
-	previousCartHash = ''
+	previousCartHash = ""
 	uiStore.showClearCartDialog = false
 	toast.create({
 		title: "Cart Cleared",
@@ -1182,11 +1207,11 @@ async function handleOptionSelected(option) {
 	if (!cartStore.pendingItem) return
 
 	try {
-		if (option.type === 'variant') {
+		if (option.type === "variant") {
 			const variant = option.data
 
 			if (variant.item_uoms && variant.item_uoms.length > 0) {
-				cartStore.setPendingItem(variant, cartStore.pendingItemQty, 'uom')
+				cartStore.setPendingItem(variant, cartStore.pendingItemQty, "uom")
 				return
 			}
 
@@ -1205,13 +1230,13 @@ async function handleOptionSelected(option) {
 					iconClasses: "text-green-600",
 				})
 			}
-		} else if (option.type === 'uom') {
+		} else if (option.type === "uom") {
 			const itemDetails = await cartStore.getItemDetailsResource.submit({
 				item_code: cartStore.pendingItem.item_code,
 				pos_profile: cartStore.posProfile,
 				customer: cartStore.customer?.name || cartStore.customer,
 				qty: cartStore.pendingItemQty,
-				uom: option.uom
+				uom: option.uom,
 			})
 
 			const itemToAdd = {
@@ -1219,7 +1244,7 @@ async function handleOptionSelected(option) {
 				uom: option.uom,
 				conversion_factor: option.conversion_factor,
 				rate: itemDetails.price_list_rate || itemDetails.rate,
-				price_list_rate: itemDetails.price_list_rate
+				price_list_rate: itemDetails.price_list_rate,
 			}
 
 			if (itemToAdd.has_batch_no || itemToAdd.has_serial_no) {
@@ -1269,12 +1294,16 @@ async function handlePrintInvoice() {
 }
 
 function formatCurrency(amount) {
-	return parseFloat(amount || 0).toFixed(2)
+	return Number.parseFloat(amount || 0).toFixed(2)
 }
 
 function getCurrentUser() {
-	if (typeof window !== 'undefined' && window.frappe?.session) {
-		return window.frappe.session.user_fullname || window.frappe.session.user || "User"
+	if (typeof window !== "undefined" && window.frappe?.session) {
+		return (
+			window.frappe.session.user_fullname ||
+			window.frappe.session.user ||
+			"User"
+		)
 	}
 	return "User"
 }
@@ -1300,12 +1329,12 @@ async function handleSaveDraft() {
 		cartStore.invoiceItems,
 		cartStore.customer,
 		cartStore.posProfile,
-		cartStore.appliedOffers
+		cartStore.appliedOffers,
 	)
 	if (success) {
 		cartStore.clearCart()
 		// Reset cart hash when cart is saved as draft and cleared
-		previousCartHash = ''
+		previousCartHash = ""
 	}
 }
 
@@ -1353,7 +1382,11 @@ function handleDiscountRemoved() {
 }
 
 async function handleApplyOffer(offer) {
-	const success = await cartStore.applyOffer(offer, shiftStore.currentProfile, offersDialogRef.value)
+	const success = await cartStore.applyOffer(
+		offer,
+		shiftStore.currentProfile,
+		offersDialogRef.value,
+	)
 	if (success) {
 		uiStore.showOffersDialog = false
 	}
@@ -1364,7 +1397,7 @@ function handleBatchSerialSelected(batchSerial) {
 		const itemToAdd = {
 			...cartStore.pendingItem,
 			quantity: cartStore.pendingItemQty,
-			...batchSerial
+			...batchSerial,
 		}
 		cartStore.addItem(itemToAdd)
 		cartStore.clearPendingItem()
@@ -1432,7 +1465,7 @@ async function handleEditOfflineInvoice(invoice) {
 			iconClasses: "text-blue-600",
 		})
 	} catch (error) {
-		console.error('Error editing offline invoice:', error)
+		console.error("Error editing offline invoice:", error)
 		// Error handled in store
 	}
 }
@@ -1487,8 +1520,8 @@ async function handleSyncAll() {
 				errorContext.title,
 				`Failed to sync invoice for ${firstError.customer}\n\n${errorContext.message}\n\nYou can delete this invoice from the offline queue if you don't need it.`,
 				errorContext.technicalDetails || `Invoice ID: ${firstError.invoiceId}`,
-				'sync',
-				{ failedInvoiceId: firstError.invoiceId }
+				"sync",
+				{ failedInvoiceId: firstError.invoiceId },
 			)
 		} else if (result.failed > 0) {
 			toast.create({
@@ -1499,9 +1532,14 @@ async function handleSyncAll() {
 			})
 		}
 	} catch (error) {
-		console.error('Sync error:', error)
+		console.error("Sync error:", error)
 		const errorContext = parseError(error)
-		uiStore.showError(errorContext.title, errorContext.message, errorContext.technicalDetails, 'sync')
+		uiStore.showError(
+			errorContext.title,
+			errorContext.message,
+			errorContext.technicalDetails,
+			"sync",
+		)
 	}
 }
 
@@ -1519,7 +1557,11 @@ function startResize(event) {
 	if (event.isPrimary === false) {
 		return
 	}
-	if (event.button !== undefined && event.button !== 0 && event.pointerType !== 'touch') {
+	if (
+		event.button !== undefined &&
+		event.button !== 0 &&
+		event.pointerType !== "touch"
+	) {
 		return
 	}
 
@@ -1529,35 +1571,40 @@ function startResize(event) {
 		pointerId: event.pointerId,
 		startX: event.clientX,
 		startWidth: uiStore.leftPanelWidth,
-		containerWidth: containerRef.value?.offsetWidth ?? 1120
+		containerWidth: containerRef.value?.offsetWidth ?? 1120,
 	}
 
 	uiStore.setResizing(true)
 
 	bodyStyleSnapshot = {
 		cursor: document.body.style.cursor,
-		userSelect: document.body.style.userSelect
+		userSelect: document.body.style.userSelect,
 	}
 
 	// Add document-level event listeners for dragging
-	document.addEventListener('pointermove', handleResize)
-	document.addEventListener('pointerup', stopResize)
-	document.addEventListener('pointercancel', stopResize)
+	document.addEventListener("pointermove", handleResize)
+	document.addEventListener("pointerup", stopResize)
+	document.addEventListener("pointercancel", stopResize)
 
 	dividerRef.value.setPointerCapture?.(event.pointerId)
-	document.body.style.cursor = 'col-resize'
-	document.body.style.userSelect = 'none'
+	document.body.style.cursor = "col-resize"
+	document.body.style.userSelect = "none"
 	event.preventDefault()
 }
 
 function handleResize(event) {
-	if (!uiStore.isResizing || !resizeState || (event.pointerId ?? resizeState.pointerId) !== resizeState.pointerId) {
+	if (
+		!uiStore.isResizing ||
+		!resizeState ||
+		(event.pointerId ?? resizeState.pointerId) !== resizeState.pointerId
+	) {
 		return
 	}
 
 	event.preventDefault()
 
-	const containerWidth = containerRef.value?.offsetWidth ?? resizeState.containerWidth
+	const containerWidth =
+		containerRef.value?.offsetWidth ?? resizeState.containerWidth
 	resizeState.containerWidth = containerWidth
 
 	const deltaX = event.clientX - resizeState.startX
@@ -1571,7 +1618,10 @@ function stopResize(event) {
 		return
 	}
 
-	if (event?.pointerId !== undefined && event.pointerId !== resizeState.pointerId) {
+	if (
+		event?.pointerId !== undefined &&
+		event.pointerId !== resizeState.pointerId
+	) {
 		return
 	}
 
@@ -1580,9 +1630,9 @@ function stopResize(event) {
 	}
 
 	// Remove document-level event listeners
-	document.removeEventListener('pointermove', handleResize)
-	document.removeEventListener('pointerup', stopResize)
-	document.removeEventListener('pointercancel', stopResize)
+	document.removeEventListener("pointermove", handleResize)
+	document.removeEventListener("pointerup", stopResize)
+	document.removeEventListener("pointercancel", stopResize)
 
 	if (dividerRef.value?.hasPointerCapture?.(resizeState.pointerId)) {
 		dividerRef.value.releasePointerCapture(resizeState.pointerId)
@@ -1599,22 +1649,22 @@ function restoreBodyStyles() {
 		return
 	}
 
-	document.body.style.cursor = bodyStyleSnapshot.cursor || ''
-	document.body.style.userSelect = bodyStyleSnapshot.userSelect || ''
+	document.body.style.cursor = bodyStyleSnapshot.cursor || ""
+	document.body.style.userSelect = bodyStyleSnapshot.userSelect || ""
 	bodyStyleSnapshot = null
 }
 
 // Management and Promotion handlers
 function handleManagementMenuClick(menuItem) {
-	if (menuItem === 'promotions') {
+	if (menuItem === "promotions") {
 		showPromotionManagement.value = true
-	} else if (menuItem === 'settings') {
+	} else if (menuItem === "settings") {
 		showPOSSettings.value = true
 	}
 }
 
 async function handleWarehouseChanged(newWarehouse) {
-	console.log('Warehouse changed to:', newWarehouse)
+	console.log("Warehouse changed to:", newWarehouse)
 
 	try {
 		// Update the shift store with new warehouse
@@ -1637,7 +1687,7 @@ async function handleWarehouseChanged(newWarehouse) {
 			iconClasses: "text-green-600",
 		})
 	} catch (error) {
-		console.error('Error handling warehouse change:', error)
+		console.error("Error handling warehouse change:", error)
 		toast.create({
 			title: "Warning",
 			text: `Warehouse updated but failed to reload stock. Please refresh manually.`,

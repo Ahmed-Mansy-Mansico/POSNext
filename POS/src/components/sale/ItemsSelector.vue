@@ -458,11 +458,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue"
-import { toast } from "frappe-ui"
-import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { useItemSearchStore } from "@/stores/itemSearch"
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { toast } from "frappe-ui"
 import { storeToRefs } from "pinia"
+import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 
 const props = defineProps({
 	posProfile: String,
@@ -480,8 +480,19 @@ const emit = defineEmits(["item-selected"])
 
 // Use Pinia store
 const itemStore = useItemSearchStore()
-const { filteredItems, searchTerm, selectedItemGroup, itemGroups, loading, loadingMore, searching, hasMore, cacheReady, cacheSyncing, cacheStats } =
-	storeToRefs(itemStore)
+const {
+	filteredItems,
+	searchTerm,
+	selectedItemGroup,
+	itemGroups,
+	loading,
+	loadingMore,
+	searching,
+	hasMore,
+	cacheReady,
+	cacheSyncing,
+	cacheStats,
+} = storeToRefs(itemStore)
 
 // Local state
 const viewMode = ref("grid")
@@ -495,7 +506,7 @@ const userManuallySetView = ref(false) // Track if user manually changed view mo
 const scannerInputDetected = ref(false) // Track if current input is from scanner
 const autoSearchTimer = ref(null) // Timer for auto-search when typing stops
 const lastAutoSwitchCount = ref(0)
-const lastFilterSignature = ref('')
+const lastFilterSignature = ref("")
 
 // Infinite scroll refs
 const gridScrollContainer = ref(null)
@@ -542,11 +553,12 @@ const searchPlaceholder = computed(() => SEARCH_PLACEHOLDERS[searchMode.value])
 // Watch for cart items and pos profile changes (optimized - uses length + hash instead of deep watch)
 // Tracks: length, item_code, quantity, and amount to detect all cart changes including array replacements
 watch(
-	() => `${props.cartItems.length}-${props.cartItems.map(i => `${i.item_code}:${i.quantity || 0}:${i.amount || 0}`).join('|')}`,
+	() =>
+		`${props.cartItems.length}-${props.cartItems.map((i) => `${i.item_code}:${i.quantity || 0}:${i.amount || 0}`).join("|")}`,
 	() => {
 		itemStore.setCartItems(props.cartItems)
 	},
-	{ immediate: true }
+	{ immediate: true },
 )
 
 watch(
@@ -566,10 +578,12 @@ watch(
 		if (!newItems) return
 
 		const itemCount = newItems.length
-		const firstCode = itemCount > 0 ? newItems[0]?.item_code || '' : ''
-		const lastCode = itemCount > 0 ? newItems[itemCount - 1]?.item_code || '' : ''
+		const firstCode = itemCount > 0 ? newItems[0]?.item_code || "" : ""
+		const lastCode =
+			itemCount > 0 ? newItems[itemCount - 1]?.item_code || "" : ""
 		const middleIndex = itemCount > 2 ? Math.floor(itemCount / 2) : -1
-		const middleCode = middleIndex >= 0 ? newItems[middleIndex]?.item_code || '' : ''
+		const middleCode =
+			middleIndex >= 0 ? newItems[middleIndex]?.item_code || "" : ""
 		const signature = `${itemCount}|${firstCode}|${middleCode}|${lastCode}`
 
 		if (signature !== lastFilterSignature.value) {
@@ -615,7 +629,13 @@ function handleScroll(event) {
 	// Search shows all results immediately from server
 	const isSearching = searchTerm.value && searchTerm.value.trim().length > 0
 
-	if (!isSearching && scrollHeight - scrollPosition < threshold && hasMore.value && !loadingMore.value && !loading.value) {
+	if (
+		!isSearching &&
+		scrollHeight - scrollPosition < threshold &&
+		hasMore.value &&
+		!loadingMore.value &&
+		!loading.value
+	) {
 		itemStore.loadMoreItems()
 	}
 }
@@ -668,7 +688,11 @@ function handleKeyDown(event) {
 
 	// Barcode scanners typically input very fast (< 50ms between characters)
 	// If time between keystrokes is very short, it's likely a barcode scanner
-	if (timeDiff < 50 && event.key.length === 1 && barcodeBuffer.value.length > 0) {
+	if (
+		timeDiff < 50 &&
+		event.key.length === 1 &&
+		barcodeBuffer.value.length > 0
+	) {
 		barcodeBuffer.value += event.key
 		scannerInputDetected.value = true // Mark as scanner input
 	} else if (event.key.length === 1) {
@@ -713,7 +737,8 @@ async function handleBarcodeSearch(forceAutoAdd = false) {
 
 	// Auto-add if explicitly requested (from scanner newline detection)
 	// OR if both scanner and auto-add modes are enabled
-	const shouldAutoAdd = forceAutoAdd || (scannerEnabled.value && autoAddEnabled.value)
+	const shouldAutoAdd =
+		forceAutoAdd || (scannerEnabled.value && autoAddEnabled.value)
 
 	try {
 		// First try exact barcode lookup via API
@@ -867,7 +892,7 @@ function toggleAutoAdd() {
 }
 
 function formatCurrency(amount) {
-	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
 // Expose methods for parent component
@@ -944,24 +969,24 @@ function getStockStatus(qty) {
 
 	if (quantity <= 0) {
 		return {
-			level: 'out',
-			color: 'bg-red-500',
-			textColor: 'text-white',
-			label: 'Out of Stock'
+			level: "out",
+			color: "bg-red-500",
+			textColor: "text-white",
+			label: "Out of Stock",
 		}
 	} else if (quantity <= lowStockThreshold) {
 		return {
-			level: 'low',
-			color: 'bg-amber-500',
-			textColor: 'text-white',
-			label: 'Low Stock'
+			level: "low",
+			color: "bg-amber-500",
+			textColor: "text-white",
+			label: "Low Stock",
 		}
 	} else {
 		return {
-			level: 'safe',
-			color: 'bg-green-500',
-			textColor: 'text-white',
-			label: 'In Stock'
+			level: "safe",
+			color: "bg-green-500",
+			textColor: "text-white",
+			label: "In Stock",
 		}
 	}
 }

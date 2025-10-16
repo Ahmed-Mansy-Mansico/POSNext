@@ -300,38 +300,38 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, reactive } from 'vue'
-import { Dialog, Button, Input, createResource, toast } from 'frappe-ui'
+import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
+import { computed, onMounted, reactive, ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
-	posProfile: String
+	posProfile: String,
 })
 
-const emit = defineEmits(['update:modelValue', 'return-created'])
+const emit = defineEmits(["update:modelValue", "return-created"])
 
 const show = ref(props.modelValue)
 const originalInvoice = ref(null)
 const returnItems = ref([])
-const returnReason = ref('')
-const refundPaymentMethod = ref('')
+const returnReason = ref("")
+const refundPaymentMethod = ref("")
 const paymentMethods = ref([])
 const invoiceList = ref([])
-const invoiceListFilter = ref('')
-const submitError = ref('')
+const invoiceListFilter = ref("")
+const submitError = ref("")
 const isSubmitting = ref(false)
 const errorDialog = reactive({
 	visible: false,
-	title: 'Validation Error',
-	message: ''
+	title: "Validation Error",
+	message: "",
 })
 
 // Resource for loading recent invoices (only those with items available for return)
 const loadInvoicesResource = createResource({
-	url: 'pos_next.api.invoices.get_returnable_invoices',
+	url: "pos_next.api.invoices.get_returnable_invoices",
 	makeParams() {
 		return {
-			limit: 50
+			limit: 50,
 		}
 	},
 	auto: false,
@@ -341,24 +341,24 @@ const loadInvoicesResource = createResource({
 		}
 	},
 	onError(error) {
-		console.error('Error loading invoices:', error)
+		console.error("Error loading invoices:", error)
 		toast.create({
-			title: 'Error',
-			text: 'Failed to load recent invoices',
-			icon: 'alert-circle',
-			iconClasses: 'text-red-600',
+			title: "Error",
+			text: "Failed to load recent invoices",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
 		})
-	}
+	},
 })
 
 // Resource for loading payment methods from POS Profile
 const loadPaymentMethodsResource = createResource({
-	url: 'frappe.client.get',
+	url: "frappe.client.get",
 	makeParams() {
 		return {
-			doctype: 'POS Profile',
+			doctype: "POS Profile",
 			name: props.posProfile,
-			fields: JSON.stringify(['name', 'payments'])
+			fields: JSON.stringify(["name", "payments"]),
 		}
 	},
 	auto: false,
@@ -372,45 +372,45 @@ const loadPaymentMethodsResource = createResource({
 		}
 	},
 	onError(error) {
-		console.error('Error loading payment methods:', error)
-	}
+		console.error("Error loading payment methods:", error)
+	},
 })
 
 // Resource for fetching a specific invoice with return tracking
 const fetchInvoiceResource = createResource({
-	url: 'pos_next.api.invoices.get_invoice_for_return',
+	url: "pos_next.api.invoices.get_invoice_for_return",
 	auto: false,
 	onSuccess(data) {
 		if (data) {
 			// Validate that invoice can be returned
 			if (data.docstatus !== 1) {
 				toast.create({
-					title: 'Invalid Invoice',
-					text: 'Invoice must be submitted to create a return',
-					icon: 'alert-circle',
-					iconClasses: 'text-amber-600',
+					title: "Invalid Invoice",
+					text: "Invoice must be submitted to create a return",
+					icon: "alert-circle",
+					iconClasses: "text-amber-600",
 				})
 				return
 			}
 			if (data.is_return === 1) {
 				toast.create({
-					title: 'Invalid Invoice',
-					text: 'Cannot create return against a return invoice',
-					icon: 'alert-circle',
-					iconClasses: 'text-amber-600',
+					title: "Invalid Invoice",
+					text: "Cannot create return against a return invoice",
+					icon: "alert-circle",
+					iconClasses: "text-amber-600",
 				})
 				return
 			}
 
 			// Check if all items have been fully returned
-			const availableItems = data.items.filter(item => item.qty > 0)
+			const availableItems = data.items.filter((item) => item.qty > 0)
 
 			if (availableItems.length === 0) {
 				toast.create({
-					title: 'Fully Returned',
-					text: 'All items from this invoice have already been returned',
-					icon: 'alert-circle',
-					iconClasses: 'text-amber-600',
+					title: "Fully Returned",
+					text: "All items from this invoice have already been returned",
+					icon: "alert-circle",
+					iconClasses: "text-amber-600",
 				})
 				originalInvoice.value = null
 				returnItems.value = []
@@ -418,13 +418,13 @@ const fetchInvoiceResource = createResource({
 			}
 
 			originalInvoice.value = data
-				returnItems.value = availableItems.map(item => ({
-					...item,
-					selected: false,
-					return_qty: item.qty, // This will be the remaining qty after previous returns
-					original_qty: item.original_qty || item.qty, // Track original quantity
-				}))
-				returnItems.value.forEach(normalizeItemQty)
+			returnItems.value = availableItems.map((item) => ({
+				...item,
+				selected: false,
+				return_qty: item.qty, // This will be the remaining qty after previous returns
+				original_qty: item.original_qty || item.qty, // Track original quantity
+			}))
+			returnItems.value.forEach(normalizeItemQty)
 
 			// Load payment methods if not already loaded
 			if (paymentMethods.value.length === 0 && props.posProfile) {
@@ -433,28 +433,28 @@ const fetchInvoiceResource = createResource({
 		}
 	},
 	onError(error) {
-		console.error('Error fetching invoice:', error)
+		console.error("Error fetching invoice:", error)
 		toast.create({
-			title: 'Error',
-			text: 'Failed to load invoice details',
-			icon: 'alert-circle',
-			iconClasses: 'text-red-600',
+			title: "Error",
+			text: "Failed to load invoice details",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
 		})
-	}
+	},
 })
 
 // Resource for creating return invoice
 const createReturnResource = createResource({
-	url: 'pos_next.api.invoices.submit_invoice',
+	url: "pos_next.api.invoices.submit_invoice",
 	makeParams() {
 		// Get the selected payment method details
 		const selectedPayment = paymentMethods.value.find(
-			p => p.name === refundPaymentMethod.value
+			(p) => p.name === refundPaymentMethod.value,
 		)
 
 		// Build invoice data matching the API's expected format
 		const invoiceData = {
-			doctype: 'Sales Invoice',
+			doctype: "Sales Invoice",
 			pos_profile: props.posProfile,
 			customer: originalInvoice.value.customer,
 			company: originalInvoice.value.company,
@@ -462,7 +462,7 @@ const createReturnResource = createResource({
 			return_against: originalInvoice.value.name,
 			is_pos: 1,
 			update_stock: 1,
-			items: selectedItems.value.map(item => ({
+			items: selectedItems.value.map((item) => ({
 				item_code: item.item_code,
 				item_name: item.item_name,
 				qty: -Math.abs(item.return_qty), // Negative for returns
@@ -473,17 +473,22 @@ const createReturnResource = createResource({
 				// Link to original invoice item for proper return tracking
 				sales_invoice_item: item.name, // Reference to the original Sales Invoice Item
 			})),
-			payments: selectedPayment ? [{
-				mode_of_payment: selectedPayment.mode_of_payment,
-				amount: -Math.abs(returnTotal.value), // Negative for refunds
-			}] : [],
-			remarks: returnReason.value || `Return against ${originalInvoice.value.name}`
+			payments: selectedPayment
+				? [
+						{
+							mode_of_payment: selectedPayment.mode_of_payment,
+							amount: -Math.abs(returnTotal.value), // Negative for refunds
+						},
+					]
+				: [],
+			remarks:
+				returnReason.value || `Return against ${originalInvoice.value.name}`,
 		}
 
 		// Return in the correct format: invoice as JSON string
 		return {
 			invoice: JSON.stringify(invoiceData),
-			data: JSON.stringify({})
+			data: JSON.stringify({}),
 		}
 	},
 	auto: false,
@@ -495,9 +500,9 @@ const createReturnResource = createResource({
 		return data
 	},
 	onSuccess(data) {
-		submitError.value = ''
+		submitError.value = ""
 		isSubmitting.value = false
-		emit('return-created', data)
+		emit("return-created", data)
 
 		// Reload the invoice list to remove fully returned invoices
 		loadInvoicesResource.reload()
@@ -505,19 +510,19 @@ const createReturnResource = createResource({
 		resetForm()
 		show.value = false
 		toast.create({
-			title: 'Success',
+			title: "Success",
 			text: `Return invoice ${data.name} created successfully`,
-			icon: 'check',
-			iconClasses: 'text-green-600',
+			icon: "check",
+			iconClasses: "text-green-600",
 		})
 	},
-		onError(error) {
-			isSubmitting.value = false
-			const errorMsg = extractErrorMessage(error)
-			submitError.value = errorMsg
-			console.error('Error creating return - full error object:', error)
-			openErrorDialog(errorMsg)
-		}
+	onError(error) {
+		isSubmitting.value = false
+		const errorMsg = extractErrorMessage(error)
+		submitError.value = errorMsg
+		console.error("Error creating return - full error object:", error)
+		openErrorDialog(errorMsg)
+	},
 })
 
 // Lifecycle hooks
@@ -528,18 +533,21 @@ onMounted(() => {
 })
 
 // Watchers
-watch(() => props.modelValue, (val) => {
-	show.value = val
-	if (val) {
-		// Auto-load invoices when dialog opens
-		loadInvoicesResource.reload()
-	} else {
-		resetForm()
-	}
-})
+watch(
+	() => props.modelValue,
+	(val) => {
+		show.value = val
+		if (val) {
+			// Auto-load invoices when dialog opens
+			loadInvoicesResource.reload()
+		} else {
+			resetForm()
+		}
+	},
+)
 
 watch(show, (val) => {
-	emit('update:modelValue', val)
+	emit("update:modelValue", val)
 	if (!val) {
 		resetForm()
 	}
@@ -547,35 +555,45 @@ watch(show, (val) => {
 
 // Computed properties
 const selectedItems = computed(() => {
-	return returnItems.value.filter(item => item.selected && item.return_qty > 0)
+	return returnItems.value.filter(
+		(item) => item.selected && item.return_qty > 0,
+	)
 })
 
 const returnTotal = computed(() => {
 	return selectedItems.value.reduce((sum, item) => {
-		return sum + (item.return_qty * item.rate)
+		return sum + item.return_qty * item.rate
 	}, 0)
 })
 
 const canCreateReturn = computed(() => {
-	return selectedItems.value.length > 0 && refundPaymentMethod.value !== ''
+	return selectedItems.value.length > 0 && refundPaymentMethod.value !== ""
 })
 
 const filteredInvoiceList = computed(() => {
 	if (!invoiceListFilter.value) return invoiceList.value
 
 	const filter = invoiceListFilter.value.toLowerCase()
-	return invoiceList.value.filter(invoice =>
-		invoice.name.toLowerCase().includes(filter) ||
-		invoice.customer_name.toLowerCase().includes(filter)
+	return invoiceList.value.filter(
+		(invoice) =>
+			invoice.name.toLowerCase().includes(filter) ||
+			invoice.customer_name.toLowerCase().includes(filter),
 	)
 })
 
 // Methods
-function extractErrorMessage(error, fallback = 'Failed to create return invoice') {
+function extractErrorMessage(
+	error,
+	fallback = "Failed to create return invoice",
+) {
 	if (!error) return fallback
 
-	if (error.messages && Array.isArray(error.messages) && error.messages.length > 0) {
-		return error.messages.join(', ')
+	if (
+		error.messages &&
+		Array.isArray(error.messages) &&
+		error.messages.length > 0
+	) {
+		return error.messages.join(", ")
 	}
 
 	if (error._server_messages) {
@@ -588,29 +606,29 @@ function extractErrorMessage(error, fallback = 'Failed to create return invoice'
 				}
 			}
 		} catch (e) {
-			console.error('Failed to parse server messages:', e)
+			console.error("Failed to parse server messages:", e)
 		}
 	}
 
-	if (typeof error.exc === 'string') {
+	if (typeof error.exc === "string") {
 		const match = error.exc.match(/ValidationError: (.+?)\\n/)
 		if (match) {
 			return match[1]
 		}
 	}
 
-	if (error.httpStatusText && error.httpStatusText !== 'Expectation Failed') {
+	if (error.httpStatusText && error.httpStatusText !== "Expectation Failed") {
 		return error.httpStatusText
 	}
 
-	if (error.message && error.message !== 'ValidationError') {
+	if (error.message && error.message !== "ValidationError") {
 		return error.message
 	}
 
 	return fallback
 }
 
-function openErrorDialog(message, title = 'Validation Error') {
+function openErrorDialog(message, title = "Validation Error") {
 	errorDialog.title = title
 	errorDialog.message = message
 	errorDialog.visible = true
@@ -637,14 +655,16 @@ function normalizeItemQty(item) {
 }
 
 function validateSelectedItems() {
-	const invalidItems = selectedItems.value.filter(item => item.return_qty > item.qty)
+	const invalidItems = selectedItems.value.filter(
+		(item) => item.return_qty > item.qty,
+	)
 	if (invalidItems.length === 0) {
 		return true
 	}
 	invalidItems.forEach(normalizeItemQty)
 	const details = invalidItems
-		.map(item => `${item.item_name || item.item_code}: maximum ${item.qty}`)
-		.join('\n')
+		.map((item) => `${item.item_name || item.item_code}: maximum ${item.qty}`)
+		.join("\n")
 	const message = `Adjust return quantities before submitting.\n\n${details}`
 	submitError.value = message
 	openErrorDialog(message)
@@ -653,20 +673,20 @@ function validateSelectedItems() {
 
 function selectInvoiceFromList(invoice) {
 	// Fetch the full invoice details with return tracking
-	submitError.value = ''
+	submitError.value = ""
 	fetchInvoiceResource.fetch({
-		invoice_name: invoice.name
+		invoice_name: invoice.name,
 	})
 }
 
 function selectAllItems() {
-	returnItems.value.forEach(item => {
+	returnItems.value.forEach((item) => {
 		item.selected = true
 	})
 }
 
 function deselectAllItems() {
-	returnItems.value.forEach(item => {
+	returnItems.value.forEach((item) => {
 		item.selected = false
 	})
 }
@@ -689,10 +709,10 @@ async function handleCreateReturn() {
 	// Validate payment method
 	if (!refundPaymentMethod.value) {
 		toast.create({
-			title: 'Validation Error',
-			text: 'Please select a payment method for the refund',
-			icon: 'alert-circle',
-			iconClasses: 'text-amber-600',
+			title: "Validation Error",
+			text: "Please select a payment method for the refund",
+			icon: "alert-circle",
+			iconClasses: "text-amber-600",
 		})
 		return
 	}
@@ -701,7 +721,7 @@ async function handleCreateReturn() {
 		return
 	}
 
-	submitError.value = ''
+	submitError.value = ""
 	isSubmitting.value = true
 
 	try {
@@ -712,7 +732,7 @@ async function handleCreateReturn() {
 			throw result
 		}
 	} catch (error) {
-		console.error('Caught error in handleCreateReturn:', error)
+		console.error("Caught error in handleCreateReturn:", error)
 		if (!submitError.value) {
 			const errorMsg = extractErrorMessage(error)
 			submitError.value = errorMsg
@@ -731,31 +751,31 @@ function handleCancel() {
 function resetForm() {
 	originalInvoice.value = null
 	returnItems.value = []
-	returnReason.value = ''
-	refundPaymentMethod.value = ''
+	returnReason.value = ""
+	refundPaymentMethod.value = ""
 	invoiceList.value = []
-	invoiceListFilter.value = ''
-	submitError.value = ''
+	invoiceListFilter.value = ""
+	submitError.value = ""
 	isSubmitting.value = false
 	errorDialog.visible = false
-	errorDialog.message = ''
+	errorDialog.message = ""
 }
 
 function formatDate(dateStr) {
-	if (!dateStr) return ''
+	if (!dateStr) return ""
 	const date = new Date(dateStr)
-	return date.toLocaleDateString('en-US', {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric'
+	return date.toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
 	})
 }
 
 function formatCurrency(amount) {
-	return new Intl.NumberFormat('en-US', {
+	return new Intl.NumberFormat("en-US", {
 		minimumFractionDigits: 2,
-		maximumFractionDigits: 2
-	}).format(parseFloat(amount || 0))
+		maximumFractionDigits: 2,
+	}).format(Number.parseFloat(amount || 0))
 }
 </script>
 

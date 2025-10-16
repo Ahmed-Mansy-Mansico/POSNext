@@ -1,5 +1,5 @@
-import { ref, computed } from "vue"
 import { createResource } from "frappe-ui"
+import { computed, ref } from "vue"
 
 export function useInvoice() {
 	// State
@@ -59,21 +59,21 @@ export function useInvoice() {
 		auto: false,
 	})
 
-        const applyOffersResource = createResource({
-                url: "pos_next.api.invoices.apply_offers",
-                makeParams({ invoice_data, selected_offers }) {
-                        const params = {
-                                invoice_data: JSON.stringify(invoice_data),
-                        }
+	const applyOffersResource = createResource({
+		url: "pos_next.api.invoices.apply_offers",
+		makeParams({ invoice_data, selected_offers }) {
+			const params = {
+				invoice_data: JSON.stringify(invoice_data),
+			}
 
-                        if (selected_offers && selected_offers.length) {
-                                params.selected_offers = JSON.stringify(selected_offers)
-                        }
+			if (selected_offers && selected_offers.length) {
+				params.selected_offers = JSON.stringify(selected_offers)
+			}
 
-                        return params
-                },
-                auto: false,
-        })
+			return params
+		},
+		auto: false,
+	})
 
 	const getItemDetailsResource = createResource({
 		url: "pos_next.api.items.get_item_details",
@@ -93,8 +93,15 @@ export function useInvoice() {
 	// Computed - using incrementally maintained aggregates for O(1) performance
 	const subtotal = computed(() => _cachedSubtotal.value)
 	const totalTax = computed(() => _cachedTotalTax.value)
-	const totalDiscount = computed(() => _cachedTotalDiscount.value + (additionalDiscount.value || 0))
-	const grandTotal = computed(() => _cachedSubtotal.value + _cachedTotalTax.value - (_cachedTotalDiscount.value + (additionalDiscount.value || 0)))
+	const totalDiscount = computed(
+		() => _cachedTotalDiscount.value + (additionalDiscount.value || 0),
+	)
+	const grandTotal = computed(
+		() =>
+			_cachedSubtotal.value +
+			_cachedTotalTax.value -
+			(_cachedTotalDiscount.value + (additionalDiscount.value || 0)),
+	)
 	const totalPaid = computed(() => _cachedTotalPaid.value)
 
 	const remainingAmount = computed(() => {
@@ -103,15 +110,14 @@ export function useInvoice() {
 
 	const canSubmit = computed(() => {
 		return (
-			invoiceItems.value.length > 0 &&
-			remainingAmount.value <= 0.01 // Allow small rounding differences
+			invoiceItems.value.length > 0 && remainingAmount.value <= 0.01 // Allow small rounding differences
 		)
 	})
 
 	// Actions
 	function addItem(item, quantity = 1) {
 		const existingItem = invoiceItems.value.find(
-			(i) => i.item_code === item.item_code
+			(i) => i.item_code === item.item_code,
 		)
 
 		if (existingItem) {
@@ -124,9 +130,11 @@ export function useInvoice() {
 			recalculateItem(existingItem)
 
 			// Update cache incrementally (new values - old values)
-			_cachedSubtotal.value += (existingItem.quantity * existingItem.rate) - oldAmount
+			_cachedSubtotal.value +=
+				existingItem.quantity * existingItem.rate - oldAmount
 			_cachedTotalTax.value += (existingItem.tax_amount || 0) - oldTax
-			_cachedTotalDiscount.value += (existingItem.discount_amount || 0) - oldDiscount
+			_cachedTotalDiscount.value +=
+				(existingItem.discount_amount || 0) - oldDiscount
 		} else {
 			const newItem = {
 				item_code: item.item_code,
@@ -149,7 +157,7 @@ export function useInvoice() {
 				has_serial_no: item.has_serial_no || 0,
 				batch_no: item.batch_no,
 				serial_no: item.serial_no,
-				item_uoms: item.item_uoms || [],  // Available UOMs for this item
+				item_uoms: item.item_uoms || [], // Available UOMs for this item
 				// Add item_group and brand for offer eligibility checking
 				item_group: item.item_group,
 				brand: item.brand,
@@ -166,7 +174,9 @@ export function useInvoice() {
 	}
 
 	function removeItem(itemCode) {
-		const itemToRemove = invoiceItems.value.find((i) => i.item_code === itemCode)
+		const itemToRemove = invoiceItems.value.find(
+			(i) => i.item_code === itemCode,
+		)
 
 		if (itemToRemove) {
 			// Update cache incrementally (subtract removed item values)
@@ -176,7 +186,7 @@ export function useInvoice() {
 		}
 
 		invoiceItems.value = invoiceItems.value.filter(
-			(i) => i.item_code !== itemCode
+			(i) => i.item_code !== itemCode,
 		)
 	}
 
@@ -188,11 +198,11 @@ export function useInvoice() {
 			const oldTax = item.tax_amount || 0
 			const oldDiscount = item.discount_amount || 0
 
-			item.quantity = parseFloat(quantity) || 1
+			item.quantity = Number.parseFloat(quantity) || 1
 			recalculateItem(item)
 
 			// Update cache incrementally (new values - old values)
-			_cachedSubtotal.value += (item.quantity * item.rate) - oldAmount
+			_cachedSubtotal.value += item.quantity * item.rate - oldAmount
 			_cachedTotalTax.value += (item.tax_amount || 0) - oldTax
 			_cachedTotalDiscount.value += (item.discount_amount || 0) - oldDiscount
 		}
@@ -206,11 +216,11 @@ export function useInvoice() {
 			const oldTax = item.tax_amount || 0
 			const oldDiscount = item.discount_amount || 0
 
-			item.rate = parseFloat(rate) || 0
+			item.rate = Number.parseFloat(rate) || 0
 			recalculateItem(item)
 
 			// Update cache incrementally (new values - old values)
-			_cachedSubtotal.value += (item.quantity * item.rate) - oldAmount
+			_cachedSubtotal.value += item.quantity * item.rate - oldAmount
 			_cachedTotalTax.value += (item.tax_amount || 0) - oldTax
 			_cachedTotalDiscount.value += (item.discount_amount || 0) - oldDiscount
 		}
@@ -224,12 +234,12 @@ export function useInvoice() {
 			const oldTax = item.tax_amount || 0
 			const oldDiscount = item.discount_amount || 0
 
-			item.discount_percentage = parseFloat(discountPercentage) || 0
+			item.discount_percentage = Number.parseFloat(discountPercentage) || 0
 			item.discount_amount = 0 // Let recalculateItem compute it
 			recalculateItem(item)
 
 			// Update cache incrementally (new values - old values)
-			_cachedSubtotal.value += (item.quantity * item.rate) - oldAmount
+			_cachedSubtotal.value += item.quantity * item.rate - oldAmount
 			_cachedTotalTax.value += (item.tax_amount || 0) - oldTax
 			_cachedTotalDiscount.value += (item.discount_amount || 0) - oldDiscount
 		}
@@ -280,7 +290,7 @@ export function useInvoice() {
 
 		if (discount.percentage > 0) {
 			// Apply percentage discount to all items
-			invoiceItems.value.forEach(item => {
+			invoiceItems.value.forEach((item) => {
 				item.discount_percentage = discount.percentage
 				item.discount_amount = 0
 				recalculateItem(item)
@@ -289,7 +299,7 @@ export function useInvoice() {
 			// Distribute fixed discount amount proportionally across items
 			const total = subtotal.value
 			if (total > 0) {
-				invoiceItems.value.forEach(item => {
+				invoiceItems.value.forEach((item) => {
 					const itemTotal = item.rate * item.quantity
 					const itemDiscount = (itemTotal / total) * discount.amount
 					item.discount_amount = itemDiscount
@@ -307,7 +317,7 @@ export function useInvoice() {
 		/**
 		 * Remove all discounts from cart items
 		 */
-		invoiceItems.value.forEach(item => {
+		invoiceItems.value.forEach((item) => {
 			item.discount_percentage = 0
 			item.discount_amount = 0
 			recalculateItem(item)
@@ -319,7 +329,7 @@ export function useInvoice() {
 
 	// Performance: Cache tax calculation to avoid repeated loops
 	let cachedTaxRate = 0
-	let taxRulesCacheKey = ''
+	let taxRulesCacheKey = ""
 
 	function calculateTotalTaxRate() {
 		// Create cache key from tax rules
@@ -334,8 +344,11 @@ export function useInvoice() {
 		let totalRate = 0
 		if (taxRules.value && taxRules.value.length > 0) {
 			for (const taxRule of taxRules.value) {
-				if (taxRule.charge_type === "On Net Total" || taxRule.charge_type === "On Previous Row Total") {
-					totalRate += (taxRule.rate || 0)
+				if (
+					taxRule.charge_type === "On Net Total" ||
+					taxRule.charge_type === "On Previous Row Total"
+				) {
+					totalRate += taxRule.rate || 0
 				}
 			}
 		}
@@ -380,7 +393,8 @@ export function useInvoice() {
 			// If discount_amount is set directly, use it
 			discountAmount = item.discount_amount
 			// Also calculate the percentage for consistency
-			item.discount_percentage = baseAmount > 0 ? (discountAmount / baseAmount) * 100 : 0
+			item.discount_percentage =
+				baseAmount > 0 ? (discountAmount / baseAmount) * 100 : 0
 		}
 		item.discount_amount = discountAmount
 
@@ -399,7 +413,7 @@ export function useInvoice() {
 	}
 
 	function addPayment(payment) {
-		const amount = parseFloat(payment.amount) || 0
+		const amount = Number.parseFloat(payment.amount) || 0
 		payments.value.push({
 			mode_of_payment: payment.mode_of_payment,
 			amount: amount,
@@ -421,7 +435,7 @@ export function useInvoice() {
 		if (payments.value[index]) {
 			// Store old value before update for incremental cache adjustment
 			const oldAmount = payments.value[index].amount || 0
-			const newAmount = parseFloat(amount) || 0
+			const newAmount = Number.parseFloat(amount) || 0
 
 			payments.value[index].amount = newAmount
 
@@ -503,113 +517,124 @@ export function useInvoice() {
 		try {
 			// Step 1: Create invoice draft
 			const invoiceData = {
-			doctype: "Sales Invoice",
-			pos_profile: posProfile.value,
-			posa_pos_opening_shift: posOpeningShift.value,
-			customer: customer.value?.name || customer.value,
-			items: invoiceItems.value.map((item) => ({
-				item_code: item.item_code,
-				item_name: item.item_name,
-				qty: item.quantity,
-				rate: item.rate,
-				uom: item.uom,
-				warehouse: item.warehouse,
-				batch_no: item.batch_no,
-				serial_no: item.serial_no,
-				conversion_factor: item.conversion_factor || 1,
-				discount_percentage: item.discount_percentage || 0,
-				discount_amount: item.discount_amount || 0,
-			})),
-			payments: payments.value.map((p) => ({
-				mode_of_payment: p.mode_of_payment,
-				amount: p.amount,
-				type: p.type,
-			})),
-			discount_amount: additionalDiscount.value || 0,
-			coupon_code: couponCode.value,
-			is_pos: 1,
-			update_stock: 1, // Critical: Ensures stock is updated
-		}
+				doctype: "Sales Invoice",
+				pos_profile: posProfile.value,
+				posa_pos_opening_shift: posOpeningShift.value,
+				customer: customer.value?.name || customer.value,
+				items: invoiceItems.value.map((item) => ({
+					item_code: item.item_code,
+					item_name: item.item_name,
+					qty: item.quantity,
+					rate: item.rate,
+					uom: item.uom,
+					warehouse: item.warehouse,
+					batch_no: item.batch_no,
+					serial_no: item.serial_no,
+					conversion_factor: item.conversion_factor || 1,
+					discount_percentage: item.discount_percentage || 0,
+					discount_amount: item.discount_amount || 0,
+				})),
+				payments: payments.value.map((p) => ({
+					mode_of_payment: p.mode_of_payment,
+					amount: p.amount,
+					type: p.type,
+				})),
+				discount_amount: additionalDiscount.value || 0,
+				coupon_code: couponCode.value,
+				is_pos: 1,
+				update_stock: 1, // Critical: Ensures stock is updated
+			}
 
-		const draftInvoice = await updateInvoiceResource.submit({ data: invoiceData })
-
-		let invoiceDoc = draftInvoice
-		if (draftInvoice && typeof draftInvoice === 'object' && 'data' in draftInvoice) {
-			invoiceDoc = draftInvoice.data
-		}
-
-		if (!invoiceDoc || !invoiceDoc.name) {
-			throw new Error("Failed to create draft invoice - no invoice name returned")
-		}
-
-		const submitData = {
-			change_amount: remainingAmount.value < 0 ? Math.abs(remainingAmount.value) : 0,
-		}
-
-		try {
-			const result = await submitInvoiceResource.submit({
-				invoice: invoiceDoc,
-				data: submitData,
+			const draftInvoice = await updateInvoiceResource.submit({
+				data: invoiceData,
 			})
 
-			// Check if resource has error (frappe-ui pattern)
-			if (submitInvoiceResource.error) {
-				const resourceError = submitInvoiceResource.error
-				console.error("Submit invoice resource error:", resourceError)
-
-				// Create a detailed error object
-				const detailedError = new Error(resourceError.message || "Invoice submission failed")
-				detailedError.exc_type = resourceError.exc_type
-				detailedError._server_messages = resourceError._server_messages
-				detailedError.httpStatus = resourceError.httpStatus
-				detailedError.messages = resourceError.messages
-
-				throw detailedError
+			let invoiceDoc = draftInvoice
+			if (
+				draftInvoice &&
+				typeof draftInvoice === "object" &&
+				"data" in draftInvoice
+			) {
+				invoiceDoc = draftInvoice.data
 			}
 
-			resetInvoice()
-			return result
-		} catch (error) {
-			// Preserve original error object with all its properties
-			console.error("Submit invoice error:", error)
-			console.log("submitInvoiceResource.error:", submitInvoiceResource.error)
+			if (!invoiceDoc || !invoiceDoc.name) {
+				throw new Error(
+					"Failed to create draft invoice - no invoice name returned",
+				)
+			}
 
-			// If resource has error data, extract and attach it
-			if (submitInvoiceResource.error) {
-				const resourceError = submitInvoiceResource.error
-				console.log("Resource error details:", {
-					exc_type: resourceError.exc_type,
-					_server_messages: resourceError._server_messages,
-					httpStatus: resourceError.httpStatus,
-					messages: resourceError.messages,
-					messagesContent: JSON.stringify(resourceError.messages),
-					data: resourceError.data,
-					exception: resourceError.exception,
-					keys: Object.keys(resourceError)
+			const submitData = {
+				change_amount:
+					remainingAmount.value < 0 ? Math.abs(remainingAmount.value) : 0,
+			}
+
+			try {
+				const result = await submitInvoiceResource.submit({
+					invoice: invoiceDoc,
+					data: submitData,
 				})
 
-				// The messages array likely contains the detailed error info
-				if (resourceError.messages && resourceError.messages.length > 0) {
-					console.log("First message:", resourceError.messages[0])
+				// Check if resource has error (frappe-ui pattern)
+				if (submitInvoiceResource.error) {
+					const resourceError = submitInvoiceResource.error
+					console.error("Submit invoice resource error:", resourceError)
+
+					// Create a detailed error object
+					const detailedError = new Error(
+						resourceError.message || "Invoice submission failed",
+					)
+					detailedError.exc_type = resourceError.exc_type
+					detailedError._server_messages = resourceError._server_messages
+					detailedError.httpStatus = resourceError.httpStatus
+					detailedError.messages = resourceError.messages
+
+					throw detailedError
 				}
 
-				// Attach all resource error properties to the error
-				error.exc_type = resourceError.exc_type || error.exc_type
-				error._server_messages = resourceError._server_messages
-				error.httpStatus = resourceError.httpStatus
-				error.messages = resourceError.messages
-				error.exception = resourceError.exception
-				error.data = resourceError.data
+				resetInvoice()
+				return result
+			} catch (error) {
+				// Preserve original error object with all its properties
+				console.error("Submit invoice error:", error)
+				console.log("submitInvoiceResource.error:", submitInvoiceResource.error)
 
-				console.log("After attaching, error.messages:", error.messages)
+				// If resource has error data, extract and attach it
+				if (submitInvoiceResource.error) {
+					const resourceError = submitInvoiceResource.error
+					console.log("Resource error details:", {
+						exc_type: resourceError.exc_type,
+						_server_messages: resourceError._server_messages,
+						httpStatus: resourceError.httpStatus,
+						messages: resourceError.messages,
+						messagesContent: JSON.stringify(resourceError.messages),
+						data: resourceError.data,
+						exception: resourceError.exception,
+						keys: Object.keys(resourceError),
+					})
+
+					// The messages array likely contains the detailed error info
+					if (resourceError.messages && resourceError.messages.length > 0) {
+						console.log("First message:", resourceError.messages[0])
+					}
+
+					// Attach all resource error properties to the error
+					error.exc_type = resourceError.exc_type || error.exc_type
+					error._server_messages = resourceError._server_messages
+					error.httpStatus = resourceError.httpStatus
+					error.messages = resourceError.messages
+					error.exception = resourceError.exception
+					error.data = resourceError.data
+
+					console.log("After attaching, error.messages:", error.messages)
+				}
+
+				throw error
 			}
-
+		} catch (error) {
+			// Outer catch to ensure error propagates
+			console.error("Submit invoice outer error:", error)
 			throw error
-		}
-	} catch (error) {
-		// Outer catch to ensure error propagates
-		console.error("Submit invoice outer error:", error)
-		throw error
 		}
 	}
 
@@ -644,7 +669,7 @@ export function useInvoice() {
 		try {
 			await cleanupDraftsResource.submit({
 				pos_profile: posProfile.value,
-				max_age_hours: 1
+				max_age_hours: 1,
 			})
 		} catch (error) {
 			// Silent fail - don't block cart clearing
@@ -661,7 +686,7 @@ export function useInvoice() {
 			taxRules.value = result?.data || result || []
 
 			// Recalculate all items with new tax rules
-			invoiceItems.value.forEach(item => recalculateItem(item))
+			invoiceItems.value.forEach((item) => recalculateItem(item))
 
 			// Rebuild cache after bulk operation
 			rebuildIncrementalCache()

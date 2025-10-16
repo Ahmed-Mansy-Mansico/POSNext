@@ -11,15 +11,15 @@
 function getCurrencySymbolOnly(currency) {
 	// Manual mapping for currencies that don't have good symbols in en-US
 	const symbolMap = {
-		'EGP': 'E£',
-		'SAR': '\u00EA',
-		'AED': 'د.إ',
-		'INR': '₹',
-		'EUR': '€',
-		'GBP': '£',
-		'JPY': '¥',
-		'CNY': '¥',
-		'USD': '$',
+		EGP: "E£",
+		SAR: "\u00EA",
+		AED: "د.إ",
+		INR: "₹",
+		EUR: "€",
+		GBP: "£",
+		JPY: "¥",
+		CNY: "¥",
+		USD: "$",
 	}
 
 	// Return mapped symbol or try to get from Intl
@@ -29,12 +29,12 @@ function getCurrencySymbolOnly(currency) {
 
 	// Fallback to Intl with narrowSymbol
 	try {
-		const parts = new Intl.NumberFormat('en-US', {
-			style: 'currency',
+		const parts = new Intl.NumberFormat("en-US", {
+			style: "currency",
 			currency: currency,
-			currencyDisplay: 'narrowSymbol',
+			currencyDisplay: "narrowSymbol",
 		}).formatToParts(0)
-		const symbolPart = parts.find(part => part.type === 'currency')
+		const symbolPart = parts.find((part) => part.type === "currency")
 		return symbolPart ? symbolPart.value : currency
 	} catch {
 		return currency
@@ -48,9 +48,9 @@ function getCurrencySymbolOnly(currency) {
  * @param {string} locale - The locale for formatting (default: 'en-US' for English numbers)
  * @returns {string} Formatted currency string
  */
-export function formatCurrency(value, currency = 'USD', locale = 'en-US') {
-	if (typeof value !== 'number' || isNaN(value)) {
-		return ''
+export function formatCurrency(value, currency = "USD", locale = "en-US") {
+	if (typeof value !== "number" || isNaN(value)) {
+		return ""
 	}
 
 	const absValue = Math.abs(value)
@@ -74,7 +74,7 @@ export function formatCurrency(value, currency = 'USD', locale = 'en-US') {
  * @param {string} currency - The currency code (e.g., 'USD', 'EUR')
  * @returns {string} Currency symbol
  */
-export function getCurrencySymbol(currency = 'USD') {
+export function getCurrencySymbol(currency = "USD") {
 	return getCurrencySymbolOnly(currency)
 }
 
@@ -84,9 +84,9 @@ export function getCurrencySymbol(currency = 'USD') {
  * @param {string} locale - The locale for formatting
  * @returns {string} Formatted number string
  */
-export function formatCurrencyNumber(value, locale = 'en-US') {
-	if (typeof value !== 'number' || isNaN(value)) {
-		return '0.00'
+export function formatCurrencyNumber(value, locale = "en-US") {
+	if (typeof value !== "number" || isNaN(value)) {
+		return "0.00"
 	}
 
 	return new Intl.NumberFormat(locale, {
@@ -101,5 +101,5 @@ export function formatCurrencyNumber(value, locale = 'en-US') {
  * @returns {string} CSS class string
  */
 export function getCurrencyClass(value) {
-	return value < 0 ? 'text-red-600' : 'text-gray-900'
+	return value < 0 ? "text-red-600" : "text-gray-900"
 }

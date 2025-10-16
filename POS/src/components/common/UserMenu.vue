@@ -57,28 +57,28 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 
 const props = defineProps({
 	userName: {
 		type: String,
-		required: true
+		required: true,
 	},
 	profileName: {
 		type: String,
-		default: null
+		default: null,
 	},
 	showLogout: {
 		type: Boolean,
-		default: true
+		default: true,
 	},
 	showDivider: {
 		type: Boolean,
-		default: true
-	}
+		default: true,
+	},
 })
 
-const emit = defineEmits(['logout', 'menu-opened', 'menu-closed'])
+const emit = defineEmits(["logout", "menu-opened", "menu-closed"])
 
 const isOpen = ref(false)
 
@@ -93,9 +93,9 @@ const userInitials = computed(() => {
 // Watch isOpen and emit events
 watch(isOpen, (newValue) => {
 	if (newValue) {
-		emit('menu-opened')
+		emit("menu-opened")
 	} else {
-		emit('menu-closed')
+		emit("menu-closed")
 	}
 })
 
@@ -105,12 +105,12 @@ function handleMenuItemClick() {
 
 function handleLogout() {
 	isOpen.value = false
-	emit('logout')
+	emit("logout")
 }
 
 function handleClickOutside(event) {
-	const userMenuButton = event.target.closest('button')
-	const userMenu = event.target.closest('.absolute.right-0.mt-2')
+	const userMenuButton = event.target.closest("button")
+	const userMenu = event.target.closest(".absolute.right-0.mt-2")
 
 	if (isOpen.value && !userMenuButton && !userMenu) {
 		isOpen.value = false
@@ -118,10 +118,10 @@ function handleClickOutside(event) {
 }
 
 onMounted(() => {
-	document.addEventListener('click', handleClickOutside)
+	document.addEventListener("click", handleClickOutside)
 })
 
 onUnmounted(() => {
-	document.removeEventListener('click', handleClickOutside)
+	document.removeEventListener("click", handleClickOutside)
 })
 </script>

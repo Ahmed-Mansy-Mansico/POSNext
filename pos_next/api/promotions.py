@@ -323,9 +323,7 @@ def create_promotion(data):
 				slab.priority = cstr(data["priority"])
 
 		# Save the scheme (this will auto-generate pricing rules)
-		scheme.flags.ignore_permissions = True
 		scheme.insert()
-		frappe.db.commit()
 
 		return {
 			"success": True,
@@ -405,9 +403,7 @@ def update_promotion(scheme_name, data):
 					slab.max_amount = flt(data["max_amt"])
 
 		# Save
-		scheme.flags.ignore_permissions = True
 		scheme.save()
-		frappe.db.commit()
 
 		return {
 			"success": True,
@@ -439,9 +435,7 @@ def toggle_promotion(scheme_name, disable=None):
 		else:
 			scheme.disable = 0 if scheme.disable else 1
 
-		scheme.flags.ignore_permissions = True
 		scheme.save()
-		frappe.db.commit()
 
 		status = "disabled" if scheme.disable else "enabled"
 		return {
@@ -469,8 +463,7 @@ def delete_promotion(scheme_name):
 
 	try:
 		# This will automatically delete associated pricing rules via on_trash
-		frappe.delete_doc("Promotional Scheme", scheme_name, ignore_permissions=True)
-		frappe.db.commit()
+		frappe.delete_doc("Promotional Scheme", scheme_name)
 
 		return {
 			"success": True,

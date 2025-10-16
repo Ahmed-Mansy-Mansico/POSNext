@@ -1,11 +1,15 @@
-import { createApp } from "vue"
 import { createPinia } from "pinia"
+import { createApp } from "vue"
 
 import App from "./App.vue"
+import { userResource } from "./data/user"
 import router from "./router"
 import { initSocket } from "./socket"
-import { userResource } from "./data/user"
-import { createCSRFAwareRequest, ensureCSRFToken, getCSRFTokenFromCookie } from "./utils/csrf"
+import {
+	createCSRFAwareRequest,
+	ensureCSRFToken,
+	getCSRFTokenFromCookie,
+} from "./utils/csrf"
 
 import {
 	Alert,
@@ -25,26 +29,30 @@ import {
 import "./index.css"
 
 // Register service worker for PWA
-if ('serviceWorker' in navigator) {
-	window.addEventListener('load', () => {
-		import('virtual:pwa-register').then(({ registerSW }) => {
-			registerSW({
-				immediate: true,
-				onNeedRefresh() {
-					console.log('New content available, reloading...')
-				},
-				onOfflineReady() {
-					console.log('App ready to work offline')
-				},
-				onRegistered(registration) {
-					console.log('Service Worker registered:', registration)
-				},
-				onRegisterError(error) {
-					console.error('Service Worker registration error:', error)
-				}
+if ("serviceWorker" in navigator) {
+	window.addEventListener(
+		"load",
+		() => {
+			import("virtual:pwa-register").then(({ registerSW }) => {
+				registerSW({
+					immediate: true,
+					onNeedRefresh() {
+						console.log("New content available, reloading...")
+					},
+					onOfflineReady() {
+						console.log("App ready to work offline")
+					},
+					onRegistered(registration) {
+						console.log("Service Worker registered:", registration)
+					},
+					onRegisterError(error) {
+						console.error("Service Worker registration error:", error)
+					},
+				})
 			})
-		})
-	}, { passive: true })
+		},
+		{ passive: true },
+	)
 }
 
 const globalComponents = {
@@ -81,10 +89,10 @@ async function initializeApp() {
 	}
 
 	// Add touch-action directive for mobile optimization
-	app.directive('touch-action', {
+	app.directive("touch-action", {
 		mounted(el) {
-			el.style.touchAction = 'manipulation'
-		}
+			el.style.touchAction = "manipulation"
+		},
 	})
 
 	// Mount app with CSRF token initialized
@@ -98,27 +106,32 @@ async function initializeApp() {
 		// User is logged in, ensure CSRF token is ready
 		const hadToken = !!getCSRFTokenFromCookie()
 		if (!hadToken) {
-			console.log('User already logged in, initializing CSRF token...')
+			console.log("User already logged in, initializing CSRF token...")
 		}
 
 		const tokenReady = await ensureCSRFToken()
 		if (!tokenReady) {
-			console.warn('CSRF token unavailable after user fetch; will retry automatically')
+			console.warn(
+				"CSRF token unavailable after user fetch; will retry automatically",
+			)
 		}
 	} catch (error) {
 		// User not logged in - that's okay, they'll login and get the token then
 		console.log("User not logged in, will get CSRF token after login")
 		// Check if it's an auth error - redirect to login
-		if (error?.exc_type === 'AuthenticationError') {
-			router.push({ name: 'Login' })
+		if (error?.exc_type === "AuthenticationError") {
+			router.push({ name: "Login" })
 		}
 	}
 
 	// Set up periodic token refresh (every 30 minutes)
-	setInterval(async () => {
-		console.log('Performing scheduled CSRF token refresh...')
-		await ensureCSRFToken({ forceRefresh: true, silent: true })
-	}, 30 * 60 * 1000) // 30 minutes
+	setInterval(
+		async () => {
+			console.log("Performing scheduled CSRF token refresh...")
+			await ensureCSRFToken({ forceRefresh: true, silent: true })
+		},
+		30 * 60 * 1000,
+	) // 30 minutes
 }
 
 initializeApp()

@@ -235,12 +235,12 @@
 <script setup>
 import { Dialog } from "frappe-ui"
 import { createResource } from "frappe-ui"
-import { ref, onMounted } from "vue"
+import { onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
-import { session } from "../data/session"
-import { useShift } from "../composables/useShift"
-import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
 import ShiftClosingDialog from "../components/ShiftClosingDialog.vue"
+import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
+import { useShift } from "../composables/useShift"
+import { session } from "../data/session"
 
 const router = useRouter()
 
@@ -273,7 +273,7 @@ function getUserInitials(username) {
 	return username
 		.split("@")[0] // Remove domain if email
 		.split(" ")
-		.map(name => name[0])
+		.map((name) => name[0])
 		.join("")
 		.toUpperCase()
 		.slice(0, 2)

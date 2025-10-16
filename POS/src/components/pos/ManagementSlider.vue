@@ -92,15 +92,15 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { FeatherIcon } from 'frappe-ui'
+import { FeatherIcon } from "frappe-ui"
+import { ref } from "vue"
 
-const emit = defineEmits(['menu-clicked'])
+const emit = defineEmits(["menu-clicked"])
 
-const activeMenu = ref('')
+const activeMenu = ref("")
 
 function handleMenuClick(menuItem) {
 	activeMenu.value = menuItem
-	emit('menu-clicked', menuItem)
+	emit("menu-clicked", menuItem)
 }
 </script>

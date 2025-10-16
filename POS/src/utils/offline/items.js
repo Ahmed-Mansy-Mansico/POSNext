@@ -1,4 +1,4 @@
-import { db, getSetting, setSetting } from './db'
+import { db, getSetting, setSetting } from "./db"
 
 // Cache items in IndexedDB
 export const cacheItems = async (items, priceList = null) => {
@@ -6,13 +6,13 @@ export const cacheItems = async (items, priceList = null) => {
 		if (!items || items.length === 0) return
 
 		// Process items with barcodes
-		const processedItems = items.map(item => ({
+		const processedItems = items.map((item) => ({
 			...item,
 			barcodes: item.item_barcode
 				? Array.isArray(item.item_barcode)
-					? item.item_barcode.map(b => b.barcode).filter(Boolean)
+					? item.item_barcode.map((b) => b.barcode).filter(Boolean)
 					: [item.item_barcode]
-				: []
+				: [],
 		}))
 
 		// Save to items table
@@ -20,22 +20,22 @@ export const cacheItems = async (items, priceList = null) => {
 
 		// Save prices if price list is provided
 		if (priceList) {
-			const prices = items.map(item => ({
+			const prices = items.map((item) => ({
 				price_list: priceList,
 				item_code: item.item_code,
 				rate: item.rate || item.price_list_rate || 0,
-				timestamp: Date.now()
+				timestamp: Date.now(),
 			}))
 			await db.item_prices.bulkPut(prices)
 		}
 
 		// Update last sync time
-		await setSetting('items_last_sync', Date.now())
+		await setSetting("items_last_sync", Date.now())
 
 		console.log(`Cached ${items.length} items`)
 		return true
 	} catch (error) {
-		console.error('Error caching items:', error)
+		console.error("Error caching items:", error)
 		return false
 	}
 }
@@ -46,7 +46,7 @@ export const getCachedItems = async (limit = 100) => {
 		const items = await db.items.limit(limit).toArray()
 		return items
 	} catch (error) {
-		console.error('Error getting cached items:', error)
+		console.error("Error getting cached items:", error)
 		return []
 	}
 }
@@ -62,15 +62,18 @@ export const searchCachedItems = async (searchTerm, limit = 50) => {
 
 		// Search by item code, name, or barcode
 		const results = await db.items
-			.where('item_code').startsWithIgnoreCase(term)
-			.or('item_name').startsWithIgnoreCase(term)
-			.or('barcodes').equals(term)
+			.where("item_code")
+			.startsWithIgnoreCase(term)
+			.or("item_name")
+			.startsWithIgnoreCase(term)
+			.or("barcodes")
+			.equals(term)
 			.limit(limit)
 			.toArray()
 
 		return results
 	} catch (error) {
-		console.error('Error searching cached items:', error)
+		console.error("Error searching cached items:", error)
 		return []
 	}
 }
@@ -78,13 +81,10 @@ export const searchCachedItems = async (searchTerm, limit = 50) => {
 // Get item by barcode
 export const getItemByBarcode = async (barcode) => {
 	try {
-		const item = await db.items
-			.where('barcodes')
-			.equals(barcode)
-			.first()
+		const item = await db.items.where("barcodes").equals(barcode).first()
 		return item
 	} catch (error) {
-		console.error('Error getting item by barcode:', error)
+		console.error("Error getting item by barcode:", error)
 		return null
 	}
 }
@@ -98,7 +98,7 @@ export const getItemWithPrice = async (itemCode, priceList) => {
 		if (priceList) {
 			const price = await db.item_prices.get({
 				price_list: priceList,
-				item_code: itemCode
+				item_code: itemCode,
 			})
 			if (price) {
 				item.rate = price.rate
@@ -108,7 +108,7 @@ export const getItemWithPrice = async (itemCode, priceList) => {
 
 		return item
 	} catch (error) {
-		console.error('Error getting item with price:', error)
+		console.error("Error getting item with price:", error)
 		return null
 	}
 }
@@ -119,12 +119,12 @@ export const cacheCustomers = async (customers) => {
 		if (!customers || customers.length === 0) return
 
 		await db.customers.bulkPut(customers)
-		await setSetting('customers_last_sync', Date.now())
+		await setSetting("customers_last_sync", Date.now())
 
 		console.log(`Cached ${customers.length} customers`)
 		return true
 	} catch (error) {
-		console.error('Error caching customers:', error)
+		console.error("Error caching customers:", error)
 		return false
 	}
 }
@@ -139,34 +139,36 @@ export const searchCachedCustomers = async (searchTerm, limit = 20) => {
 		const term = searchTerm.toLowerCase()
 
 		const results = await db.customers
-			.where('customer_name').startsWithIgnoreCase(term)
-			.or('mobile_no').startsWithIgnoreCase(term)
-			.or('email_id').startsWithIgnoreCase(term)
+			.where("customer_name")
+			.startsWithIgnoreCase(term)
+			.or("mobile_no")
+			.startsWithIgnoreCase(term)
+			.or("email_id")
+			.startsWithIgnoreCase(term)
 			.limit(limit)
 			.toArray()
 
 		return results
 	} catch (error) {
-		console.error('Error searching cached customers:', error)
+		console.error("Error searching cached customers:", error)
 		return []
 	}
 }
 
 // Get items last sync time
 export const getItemsLastSync = async () => {
-	return await getSetting('items_last_sync', null)
+	return await getSetting("items_last_sync", null)
 }
 
 // Get customers last sync time
 export const getCustomersLastSync = async () => {
-	return await getSetting('customers_last_sync', null)
+	return await getSetting("customers_last_sync", null)
 }
 
 // Check if cache is fresh (less than 24 hours old)
-export const isCacheFresh = async (type = 'items') => {
-	const lastSync = type === 'items'
-		? await getItemsLastSync()
-		: await getCustomersLastSync()
+export const isCacheFresh = async (type = "items") => {
+	const lastSync =
+		type === "items" ? await getItemsLastSync() : await getCustomersLastSync()
 
 	if (!lastSync) return false
 
@@ -179,11 +181,11 @@ export const clearItemsCache = async () => {
 	try {
 		await db.items.clear()
 		await db.item_prices.clear()
-		await setSetting('items_last_sync', null)
-		console.log('Items cache cleared')
+		await setSetting("items_last_sync", null)
+		console.log("Items cache cleared")
 		return true
 	} catch (error) {
-		console.error('Error clearing items cache:', error)
+		console.error("Error clearing items cache:", error)
 		return false
 	}
 }
@@ -191,11 +193,11 @@ export const clearItemsCache = async () => {
 export const clearCustomersCache = async () => {
 	try {
 		await db.customers.clear()
-		await setSetting('customers_last_sync', null)
-		console.log('Customers cache cleared')
+		await setSetting("customers_last_sync", null)
+		console.log("Customers cache cleared")
 		return true
 	} catch (error) {
-		console.error('Error clearing customers cache:', error)
+		console.error("Error clearing customers cache:", error)
 		return false
 	}
 }

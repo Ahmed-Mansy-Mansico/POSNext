@@ -1,4 +1,4 @@
-import { ref, computed, readonly, watch } from 'vue'
+import { computed, readonly, ref, watch } from "vue"
 
 /**
  * Global Dialog State Manager
@@ -40,7 +40,7 @@ const dialogCounter = ref(0)
  */
 export function useDialog(dialogId) {
 	if (!dialogId) {
-		throw new Error('useDialog requires a unique dialogId')
+		throw new Error("useDialog requires a unique dialogId")
 	}
 
 	const isOpen = ref(false)
@@ -71,14 +71,14 @@ export function useDialog(dialogId) {
 	return {
 		isOpen: computed({
 			get: () => isOpen.value,
-			set: setOpen
+			set: setOpen,
 		}),
 		isAnyDialogOpen: readonly(isAnyDialogOpen),
 		cleanup,
 		// Helper methods
 		open: () => setOpen(true),
 		close: () => setOpen(false),
-		toggle: () => setOpen(!isOpen.value)
+		toggle: () => setOpen(!isOpen.value),
 	}
 }
 
@@ -93,7 +93,7 @@ export function useDialogState() {
 	return {
 		isAnyDialogOpen: readonly(isAnyDialogOpen),
 		activeCount: readonly(activeCount),
-		activeDialogIds: readonly(computed(() => Array.from(activeDialogs.value)))
+		activeDialogIds: readonly(computed(() => Array.from(activeDialogs.value))),
 	}
 }
 
@@ -106,7 +106,7 @@ export function useDialogState() {
  */
 export function registerDialog(dialogRef, dialogId) {
 	if (!dialogId) {
-		throw new Error('registerDialog requires a unique dialogId')
+		throw new Error("registerDialog requires a unique dialogId")
 	}
 
 	// Watch the ref and update global state
@@ -121,7 +121,7 @@ export function registerDialog(dialogRef, dialogId) {
 				dialogCounter.value--
 			}
 		},
-		{ immediate: false }
+		{ immediate: false },
 	)
 
 	// Return the original ref with cleanup

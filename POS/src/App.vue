@@ -6,5 +6,5 @@
 </template>
 
 <script setup>
-import Toast from '@/components/common/Toast.vue'
+import Toast from "@/components/common/Toast.vue"
 </script>

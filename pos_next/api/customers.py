@@ -66,6 +66,10 @@ def create_customer(customer_name, mobile_no=None, email_id=None, customer_group
 	Returns:
 		dict: Created customer document
 	"""
+	# Check if user has permission to create customers
+	if not frappe.has_permission("Customer", "create"):
+		frappe.throw(_("You don't have permission to create customers"), frappe.PermissionError)
+
 	if not customer_name:
 		frappe.throw(_("Customer name is required"))
 
@@ -79,8 +83,7 @@ def create_customer(customer_name, mobile_no=None, email_id=None, customer_group
 		"email_id": email_id or "",
 	})
 
-	customer.insert(ignore_permissions=True)
-	frappe.db.commit()
+	customer.insert()
 
 	return customer.as_dict()
 

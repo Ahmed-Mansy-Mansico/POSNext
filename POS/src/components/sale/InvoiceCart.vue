@@ -519,12 +519,12 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
-import { createResource } from "frappe-ui"
-import { offlineWorker } from "@/utils/offline/workerClient"
-import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSOffersStore } from "@/stores/posOffers"
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { offlineWorker } from "@/utils/offline/workerClient"
+import { createResource } from "frappe-ui"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import EditItemDialog from "./EditItemDialog.vue"
 
 // Use Pinia store
@@ -564,7 +564,7 @@ const props = defineProps({
 	},
 	warehouses: {
 		type: Array,
-		default: () => []
+		default: () => [],
 	},
 })
 
@@ -672,7 +672,7 @@ watch(
 
 // Use eligible offers from store (limited to 3 for display)
 const availableOffers = computed(() =>
-	offersStore.autoEligibleOffers.slice(0, 3)
+	offersStore.autoEligibleOffers.slice(0, 3),
 )
 
 const appliedOfferCount = computed(() => (props.appliedOffers || []).length)
@@ -770,7 +770,7 @@ function getInitials(name) {
 }
 
 function formatCurrency(amount) {
-	return formatCurrencyUtil(parseFloat(amount || 0), props.currency)
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
 function incrementQuantity(item) {
@@ -787,7 +787,7 @@ function decrementQuantity(item) {
 }
 
 function updateQuantity(item, value) {
-	const qty = parseInt(value) || 1
+	const qty = Number.parseInt(value) || 1
 	if (qty > 0) {
 		emit("update-quantity", item.item_code, qty)
 	}
@@ -835,8 +835,8 @@ function handleOutsideClick(event) {
 	// Close UOM dropdown if clicking outside
 	if (openUomDropdown.value !== null) {
 		// Check if click is outside all UOM dropdowns
-		const clickedInsideUomDropdown = target instanceof Element &&
-			target.closest('.group\\/uom')
+		const clickedInsideUomDropdown =
+			target instanceof Element && target.closest(".group\\/uom")
 		if (!clickedInsideUomDropdown) {
 			openUomDropdown.value = null
 		}

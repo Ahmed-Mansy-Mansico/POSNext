@@ -96,14 +96,14 @@
 </template>
 
 <script setup>
-import { reactive, watch, ref, onMounted } from "vue"
-import { useRouter } from "vue-router"
-import { session } from "../data/session"
-import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
-import { FeatherIcon } from "frappe-ui"
-import { useShift } from "../composables/useShift"
 import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSUIStore } from "@/stores/posUI"
+import { FeatherIcon } from "frappe-ui"
+import { onMounted, reactive, ref, watch } from "vue"
+import { useRouter } from "vue-router"
+import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
+import { useShift } from "../composables/useShift"
+import { session } from "../data/session"
 
 const router = useRouter()
 const { shiftState } = useShift()
@@ -157,12 +157,15 @@ function submit() {
 }
 
 // Watch for successful login
-watch(() => session.isLoggedIn, (isLoggedIn) => {
-	if (isLoggedIn) {
-		// Show shift opening dialog after successful login
-		showShiftDialog.value = true
-	}
-})
+watch(
+	() => session.isLoggedIn,
+	(isLoggedIn) => {
+		if (isLoggedIn) {
+			// Show shift opening dialog after successful login
+			showShiftDialog.value = true
+		}
+	},
+)
 
 function handleShiftOpened() {
 	// Navigate to POS sale after shift is opened

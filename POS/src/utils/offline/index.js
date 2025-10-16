@@ -1,6 +1,6 @@
 // Main offline module - exports all offline functionality
 
-export { db, initDB, checkDBHealth, getSetting, setSetting } from './db'
+export { db, initDB, checkDBHealth, getSetting, setSetting } from "./db"
 
 export {
 	isOffline,
@@ -13,7 +13,7 @@ export {
 	updateLocalStock,
 	getLocalStock,
 	saveOfflinePayment,
-} from './sync'
+} from "./sync"
 
 export {
 	cacheItems,
@@ -28,7 +28,7 @@ export {
 	isCacheFresh,
 	clearItemsCache,
 	clearCustomersCache,
-} from './items'
+} from "./items"
 
 // New cache system exports
 export {
@@ -50,4 +50,4 @@ export {
 	needsCacheRefresh,
 	clearAllCache,
 	getCacheStats,
-} from './cache'
+} from "./cache"

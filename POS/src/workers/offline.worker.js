@@ -18,26 +18,26 @@ async function initDB() {
 
 	try {
 		// Dynamic import for worker context (Vite handles this)
-		const dexieModule = await import('dexie')
+		const dexieModule = await import("dexie")
 		Dexie = dexieModule.default || dexieModule
 
-		db = new Dexie('pos_next_offline')
+		db = new Dexie("pos_next_offline")
 
 		db.version(1).stores({
-			settings: 'key',
-			invoice_queue: '++id, synced, timestamp',
-			payment_queue: '++id, synced, timestamp',
-			items: '&item_code, item_group, *item_name, *barcodes',
-			customers: '&name, *customer_name, customer_group',
-			stock: '[item_code+warehouse]',
+			settings: "key",
+			invoice_queue: "++id, synced, timestamp",
+			payment_queue: "++id, synced, timestamp",
+			items: "&item_code, item_group, *item_name, *barcodes",
+			customers: "&name, *customer_name, customer_group",
+			stock: "[item_code+warehouse]",
 		})
 
 		await db.open()
 		dbInitialized = true
-		console.log('Worker: Database initialized successfully')
+		console.log("Worker: Database initialized successfully")
 		return db
 	} catch (error) {
-		console.error('Worker: Failed to initialize database:', error)
+		console.error("Worker: Failed to initialize database:", error)
 		throw error
 	}
 }
@@ -52,8 +52,8 @@ async function pingServer() {
 		const controller = new AbortController()
 		const timeoutId = setTimeout(() => controller.abort(), 3000)
 
-		const response = await fetch('/api/method/pos_next.api.ping', {
-			method: 'GET',
+		const response = await fetch("/api/method/pos_next.api.ping", {
+			method: "GET",
 			signal: controller.signal,
 		})
 
@@ -77,11 +77,11 @@ async function getOfflineInvoiceCount() {
 	try {
 		const db = await initDB()
 		const count = await db.invoice_queue
-			.filter(invoice => invoice.synced === false)
+			.filter((invoice) => invoice.synced === false)
 			.count()
 		return count
 	} catch (error) {
-		console.error('Worker: Error getting offline invoice count:', error)
+		console.error("Worker: Error getting offline invoice count:", error)
 		return 0
 	}
 }
@@ -91,11 +91,11 @@ async function getOfflineInvoices() {
 	try {
 		const db = await initDB()
 		const invoices = await db.invoice_queue
-			.filter(invoice => invoice.synced === false)
+			.filter((invoice) => invoice.synced === false)
 			.toArray()
 		return invoices
 	} catch (error) {
-		console.error('Worker: Error getting offline invoices:', error)
+		console.error("Worker: Error getting offline invoices:", error)
 		return []
 	}
 }
@@ -106,7 +106,7 @@ async function saveOfflineInvoice(invoiceData) {
 		const db = await initDB()
 
 		if (!invoiceData.items || invoiceData.items.length === 0) {
-			throw new Error('Cannot save empty invoice')
+			throw new Error("Cannot save empty invoice")
 		}
 
 		const id = await db.invoice_queue.add({
@@ -123,7 +123,7 @@ async function saveOfflineInvoice(invoiceData) {
 
 		return { success: true, id }
 	} catch (error) {
-		console.error('Worker: Error saving offline invoice:', error)
+		console.error("Worker: Error saving offline invoice:", error)
 		throw error
 	}
 }
@@ -141,7 +141,7 @@ async function updateLocalStock(items) {
 
 			const currentStock = await db.stock.get({
 				item_code: item.item_code,
-				warehouse: item.warehouse
+				warehouse: item.warehouse,
 			})
 
 			const qty = item.quantity || item.qty || 0
@@ -151,16 +151,16 @@ async function updateLocalStock(items) {
 				item_code: item.item_code,
 				warehouse: item.warehouse,
 				qty: newQty,
-				updated_at: Date.now()
+				updated_at: Date.now(),
 			})
 		}
 	} catch (error) {
-		console.error('Worker: Error updating local stock:', error)
+		console.error("Worker: Error updating local stock:", error)
 	}
 }
 
 // Search cached items
-async function searchCachedItems(searchTerm = '', limit = 50) {
+async function searchCachedItems(searchTerm = "", limit = 50) {
 	try {
 		const db = await initDB()
 		const term = searchTerm.toLowerCase()
@@ -172,7 +172,7 @@ async function searchCachedItems(searchTerm = '', limit = 50) {
 		// Performance: Use IndexedDB queries with multi-entry barcode index
 		// Try exact barcode match first (fastest)
 		const barcodeResults = await db.items
-			.where('barcodes')
+			.where("barcodes")
 			.equals(term)
 			.limit(limit)
 			.toArray()
@@ -183,20 +183,22 @@ async function searchCachedItems(searchTerm = '', limit = 50) {
 
 		// Fall back to prefix searches on indexed fields
 		const results = await db.items
-			.where('item_code').startsWithIgnoreCase(term)
-			.or('item_name').startsWithIgnoreCase(term)
+			.where("item_code")
+			.startsWithIgnoreCase(term)
+			.or("item_name")
+			.startsWithIgnoreCase(term)
 			.limit(limit)
 			.toArray()
 
 		return results
 	} catch (error) {
-		console.error('Worker: Error searching cached items:', error)
+		console.error("Worker: Error searching cached items:", error)
 		return []
 	}
 }
 
 // Search cached customers
-async function searchCachedCustomers(searchTerm = '', limit = 20) {
+async function searchCachedCustomers(searchTerm = "", limit = 20) {
 	try {
 		const db = await initDB()
 		const term = searchTerm.toLowerCase()
@@ -209,19 +211,19 @@ async function searchCachedCustomers(searchTerm = '', limit = 20) {
 		// This is fast because IndexedDB is already in-memory for small datasets
 		const allCustomers = await db.customers.toArray()
 
-		const results = allCustomers.filter(cust => {
-			const name = (cust.customer_name || '').toLowerCase()
-			const mobile = (cust.mobile_no || '').toLowerCase()
-			const id = (cust.name || '').toLowerCase()
+		const results = allCustomers
+			.filter((cust) => {
+				const name = (cust.customer_name || "").toLowerCase()
+				const mobile = (cust.mobile_no || "").toLowerCase()
+				const id = (cust.name || "").toLowerCase()
 
-			return name.includes(term) ||
-			       mobile.includes(term) ||
-			       id.includes(term)
-		}).slice(0, limit)
+				return name.includes(term) || mobile.includes(term) || id.includes(term)
+			})
+			.slice(0, limit)
 
 		return results
 	} catch (error) {
-		console.error('Worker: Error searching cached customers:', error)
+		console.error("Worker: Error searching cached customers:", error)
 		return []
 	}
 }
@@ -232,7 +234,7 @@ async function cacheItemsFromServer(items) {
 		const db = await initDB()
 
 		// Performance: Process items to extract barcodes for multi-entry index
-		const processedItems = items.map(item => {
+		const processedItems = items.map((item) => {
 			// Extract barcodes array from various possible formats
 			let barcodes = []
 			if (item.barcode) {
@@ -241,7 +243,9 @@ async function cacheItemsFromServer(items) {
 			} else if (item.item_barcode) {
 				// item_barcode can be array or single value
 				barcodes = Array.isArray(item.item_barcode)
-					? item.item_barcode.map(b => typeof b === 'object' ? b.barcode : b).filter(Boolean)
+					? item.item_barcode
+							.map((b) => (typeof b === "object" ? b.barcode : b))
+							.filter(Boolean)
 					: [item.item_barcode]
 			} else if (item.barcodes && Array.isArray(item.barcodes)) {
 				// Already processed barcodes array
@@ -250,7 +254,7 @@ async function cacheItemsFromServer(items) {
 
 			return {
 				...item,
-				barcodes
+				barcodes,
 			}
 		})
 
@@ -258,13 +262,13 @@ async function cacheItemsFromServer(items) {
 
 		// Update settings
 		await db.settings.put({
-			key: 'items_last_sync',
-			value: Date.now()
+			key: "items_last_sync",
+			value: Date.now(),
 		})
 
 		return { success: true, count: items.length }
 	} catch (error) {
-		console.error('Worker: Error caching items:', error)
+		console.error("Worker: Error caching items:", error)
 		throw error
 	}
 }
@@ -277,13 +281,13 @@ async function cacheCustomersFromServer(customers) {
 
 		// Update settings
 		await db.settings.put({
-			key: 'customers_last_sync',
-			value: Date.now()
+			key: "customers_last_sync",
+			value: Date.now(),
 		})
 
 		return { success: true, count: customers.length }
 	} catch (error) {
-		console.error('Worker: Error caching customers:', error)
+		console.error("Worker: Error caching customers:", error)
 		throw error
 	}
 }
@@ -304,28 +308,29 @@ async function getCacheStats() {
 	try {
 		const db = await initDB()
 
-		const [itemCount, customerCount, queuedInvoices, lastSyncSetting] = await Promise.all([
-			db.items.count(),
-			db.customers.count(),
-			getOfflineInvoiceCount(),
-			db.settings.get('items_last_sync')
-		])
+		const [itemCount, customerCount, queuedInvoices, lastSyncSetting] =
+			await Promise.all([
+				db.items.count(),
+				db.customers.count(),
+				getOfflineInvoiceCount(),
+				db.settings.get("items_last_sync"),
+			])
 
 		return {
 			items: itemCount,
 			customers: customerCount,
 			queuedInvoices,
 			cacheReady: itemCount > 0,
-			lastSync: lastSyncSetting?.value || null
+			lastSync: lastSyncSetting?.value || null,
 		}
 	} catch (error) {
-		console.error('Worker: Error getting cache stats:', error)
+		console.error("Worker: Error getting cache stats:", error)
 		return {
 			items: 0,
 			customers: 0,
 			queuedInvoices: 0,
 			cacheReady: false,
-			lastSync: null
+			lastSync: null,
 		}
 	}
 }
@@ -337,7 +342,7 @@ async function deleteOfflineInvoice(id) {
 		await db.invoice_queue.delete(id)
 		return { success: true }
 	} catch (error) {
-		console.error('Worker: Error deleting offline invoice:', error)
+		console.error("Worker: Error deleting offline invoice:", error)
 		throw error
 	}
 }
@@ -380,7 +385,7 @@ async function updateStockQuantities(stockUpdates) {
 
 		return { success: true, updated: updatedCount }
 	} catch (error) {
-		console.error('Worker: Error updating stock quantities:', error)
+		console.error("Worker: Error updating stock quantities:", error)
 		throw error
 	}
 }
@@ -393,60 +398,60 @@ self.onmessage = async (event) => {
 		let result
 
 		switch (type) {
-			case 'PING_SERVER':
+			case "PING_SERVER":
 				result = await pingServer()
 				break
 
-			case 'CHECK_OFFLINE':
+			case "CHECK_OFFLINE":
 				result = isOffline(payload.browserOnline)
 				break
 
-			case 'GET_INVOICE_COUNT':
+			case "GET_INVOICE_COUNT":
 				result = await getOfflineInvoiceCount()
 				break
 
-			case 'GET_INVOICES':
+			case "GET_INVOICES":
 				result = await getOfflineInvoices()
 				break
 
-			case 'SAVE_INVOICE':
+			case "SAVE_INVOICE":
 				result = await saveOfflineInvoice(payload.invoiceData)
 				break
 
-			case 'SEARCH_ITEMS':
+			case "SEARCH_ITEMS":
 				result = await searchCachedItems(payload.searchTerm, payload.limit)
 				break
 
-			case 'SEARCH_CUSTOMERS':
+			case "SEARCH_CUSTOMERS":
 				result = await searchCachedCustomers(payload.searchTerm, payload.limit)
 				break
 
-			case 'CACHE_ITEMS':
+			case "CACHE_ITEMS":
 				result = await cacheItemsFromServer(payload.items)
 				break
 
-			case 'CACHE_CUSTOMERS':
+			case "CACHE_CUSTOMERS":
 				result = await cacheCustomersFromServer(payload.customers)
 				break
 
-			case 'IS_CACHE_READY':
+			case "IS_CACHE_READY":
 				result = await isCacheReady()
 				break
 
-			case 'GET_CACHE_STATS':
+			case "GET_CACHE_STATS":
 				result = await getCacheStats()
 				break
 
-			case 'DELETE_INVOICE':
+			case "DELETE_INVOICE":
 				result = await deleteOfflineInvoice(payload.id)
 				break
 
-			case 'SET_MANUAL_OFFLINE':
+			case "SET_MANUAL_OFFLINE":
 				manualOffline = payload.value
 				result = { success: true, manualOffline }
 				break
 
-			case 'UPDATE_STOCK_QUANTITIES':
+			case "UPDATE_STOCK_QUANTITIES":
 				result = await updateStockQuantities(payload.stockUpdates)
 				break
 
@@ -455,18 +460,18 @@ self.onmessage = async (event) => {
 		}
 
 		self.postMessage({
-			type: 'SUCCESS',
+			type: "SUCCESS",
 			id,
-			payload: result
+			payload: result,
 		})
 	} catch (error) {
 		self.postMessage({
-			type: 'ERROR',
+			type: "ERROR",
 			id,
 			payload: {
 				message: error.message,
-				stack: error.stack
-			}
+				stack: error.stack,
+			},
 		})
 	}
 }
@@ -476,14 +481,14 @@ async function initialize() {
 	try {
 		// Initialize database first
 		await initDB()
-		console.log('Offline worker: Database ready')
+		console.log("Offline worker: Database ready")
 
 		// Start periodic server ping (every 30 seconds)
 		setInterval(async () => {
 			const isOnline = await pingServer()
 			self.postMessage({
-				type: 'SERVER_STATUS_CHANGE',
-				payload: { serverOnline: isOnline }
+				type: "SERVER_STATUS_CHANGE",
+				payload: { serverOnline: isOnline },
 			})
 		}, 30000)
 
@@ -491,19 +496,19 @@ async function initialize() {
 		const isOnline = await pingServer()
 
 		self.postMessage({
-			type: 'WORKER_READY',
-			payload: { serverOnline: isOnline }
+			type: "WORKER_READY",
+			payload: { serverOnline: isOnline },
 		})
 
-		console.log('Offline worker initialized and ready')
+		console.log("Offline worker initialized and ready")
 	} catch (error) {
-		console.error('Offline worker initialization failed:', error)
+		console.error("Offline worker initialization failed:", error)
 		self.postMessage({
-			type: 'ERROR',
+			type: "ERROR",
 			payload: {
 				message: `Worker initialization failed: ${error.message}`,
-				stack: error.stack
-			}
+				stack: error.stack,
+			},
 		})
 	}
 }

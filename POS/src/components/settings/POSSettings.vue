@@ -259,12 +259,16 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { Button, createResource, toast, call } from 'frappe-ui'
-import CheckboxField from '@/components/settings/CheckboxField.vue'
-import SelectField from '@/components/settings/SelectField.vue'
-import NumberField from '@/components/settings/NumberField.vue'
-import { icons, getSectionHeaderClasses, getSubsectionClasses } from './settingsConfig'
+import CheckboxField from "@/components/settings/CheckboxField.vue"
+import NumberField from "@/components/settings/NumberField.vue"
+import SelectField from "@/components/settings/SelectField.vue"
+import { Button, call, createResource, toast } from "frappe-ui"
+import { computed, ref, watch } from "vue"
+import {
+	getSectionHeaderClasses,
+	getSubsectionClasses,
+	icons,
+} from "./settingsConfig"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -272,7 +276,7 @@ const props = defineProps({
 	currentWarehouse: String,
 })
 
-const emit = defineEmits(['update:modelValue', 'warehouse-changed'])
+const emit = defineEmits(["update:modelValue", "warehouse-changed"])
 
 const show = ref(props.modelValue)
 
@@ -280,9 +284,9 @@ const show = ref(props.modelValue)
 const loading = ref(true)
 const saving = ref(false)
 const warehousesList = ref([])
-const selectedWarehouse = ref(props.currentWarehouse || '')
+const selectedWarehouse = ref(props.currentWarehouse || "")
 const settings = ref({
-	pos_profile: props.posProfile || '',
+	pos_profile: props.posProfile || "",
 	enabled: 1,
 	// Core Settings
 	max_discount_allowed: 0,
@@ -298,23 +302,25 @@ const settings = ref({
 // Warehouse options
 const warehouseOptions = computed(() => {
 	if (warehousesList.value.length === 0) return []
-	return warehousesList.value.map(w => ({
+	return warehousesList.value.map((w) => ({
 		label: w.warehouse_name || w.name,
-		value: w.name
+		value: w.name,
 	}))
 })
 
 // Dynamic classes using configuration helpers (DRY principle)
-const stockSectionClasses = computed(() => getSectionHeaderClasses('purple'))
-const salesSectionClasses = computed(() => getSectionHeaderClasses('green'))
-const warehouseSubsectionClasses = computed(() => getSubsectionClasses('gray'))
-const stockPolicySubsectionClasses = computed(() => getSubsectionClasses('blue'))
-const pricingSubsectionClasses = computed(() => getSubsectionClasses('emerald'))
-const operationsSubsectionClasses = computed(() => getSubsectionClasses('teal'))
+const stockSectionClasses = computed(() => getSectionHeaderClasses("purple"))
+const salesSectionClasses = computed(() => getSectionHeaderClasses("green"))
+const warehouseSubsectionClasses = computed(() => getSubsectionClasses("gray"))
+const stockPolicySubsectionClasses = computed(() =>
+	getSubsectionClasses("blue"),
+)
+const pricingSubsectionClasses = computed(() => getSubsectionClasses("emerald"))
+const operationsSubsectionClasses = computed(() => getSubsectionClasses("teal"))
 
 // Resources
 const warehousesResource = createResource({
-	url: 'pos_next.api.pos_profile.get_warehouses',
+	url: "pos_next.api.pos_profile.get_warehouses",
 	makeParams() {
 		return {
 			pos_profile: props.posProfile,
@@ -331,7 +337,7 @@ const warehousesResource = createResource({
 })
 
 const settingsResource = createResource({
-	url: 'pos_next.pos_next.doctype.pos_settings.pos_settings.get_pos_settings',
+	url: "pos_next.pos_next.doctype.pos_settings.pos_settings.get_pos_settings",
 	makeParams() {
 		return {
 			pos_profile: props.posProfile,
@@ -347,32 +353,39 @@ const settingsResource = createResource({
 	onError(error) {
 		loading.value = false
 		toast.create({
-			title: 'Error',
-			text: 'Failed to load settings',
-			icon: 'alert-circle',
-			iconClasses: 'text-red-600',
+			title: "Error",
+			text: "Failed to load settings",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
 		})
 	},
 })
 
 // Watchers
-watch(() => props.modelValue, (val) => {
-	show.value = val
-	if (val) {
-		loadSettings()
-	}
-})
+watch(
+	() => props.modelValue,
+	(val) => {
+		show.value = val
+		if (val) {
+			loadSettings()
+		}
+	},
+)
 
 watch(show, (val) => {
-	emit('update:modelValue', val)
+	emit("update:modelValue", val)
 })
 
 // Watch for currentWarehouse prop changes and always sync
-watch(() => props.currentWarehouse, (newWarehouse) => {
-	if (newWarehouse) {
-		selectedWarehouse.value = newWarehouse
-	}
-}, { immediate: true })
+watch(
+	() => props.currentWarehouse,
+	(newWarehouse) => {
+		if (newWarehouse) {
+			selectedWarehouse.value = newWarehouse
+		}
+	},
+	{ immediate: true },
+)
 
 // Methods
 function handleClose() {
@@ -385,13 +398,16 @@ async function loadSettings() {
 	settings.value.pos_profile = props.posProfile
 
 	// Always set the current warehouse from props (from current shift/profile)
-	selectedWarehouse.value = props.currentWarehouse || ''
+	selectedWarehouse.value = props.currentWarehouse || ""
 
 	try {
 		// Load warehouses first using call API directly
-		const warehousesData = await call('pos_next.api.pos_profile.get_warehouses', {
-			pos_profile: props.posProfile
-		})
+		const warehousesData = await call(
+			"pos_next.api.pos_profile.get_warehouses",
+			{
+				pos_profile: props.posProfile,
+			},
+		)
 
 		// Handle frappe-ui call response format { message: [...] }
 		warehousesList.value = warehousesData?.message || warehousesData || []
@@ -399,7 +415,7 @@ async function loadSettings() {
 		// Load settings
 		settingsResource.reload()
 	} catch (error) {
-		console.error('Error loading warehouses:', error)
+		console.error("Error loading warehouses:", error)
 		warehousesList.value = []
 		// Still load settings even if warehouses fail
 		settingsResource.reload()
@@ -409,10 +425,10 @@ async function loadSettings() {
 async function saveSettings() {
 	if (!props.posProfile) {
 		toast.create({
-			title: 'Error',
-			text: 'POS Profile not found',
-			icon: 'alert-circle',
-			iconClasses: 'text-red-600',
+			title: "Error",
+			text: "POS Profile not found",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
 		})
 		return
 	}
@@ -423,10 +439,13 @@ async function saveSettings() {
 
 	try {
 		// Save POS Settings (without warehouse)
-		const result = await call('pos_next.pos_next.doctype.pos_settings.pos_settings.update_pos_settings', {
-			pos_profile: props.posProfile,
-			settings: settings.value,
-		})
+		const result = await call(
+			"pos_next.pos_next.doctype.pos_settings.pos_settings.update_pos_settings",
+			{
+				pos_profile: props.posProfile,
+				settings: settings.value,
+			},
+		)
 
 		if (result) {
 			Object.assign(settings.value, result)
@@ -435,32 +454,35 @@ async function saveSettings() {
 
 		// Update warehouse in POS Profile if changed
 		if (warehouseChanged && selectedWarehouse.value) {
-			const warehouseResult = await call('pos_next.api.pos_profile.update_warehouse', {
-				pos_profile: props.posProfile,
-				warehouse: selectedWarehouse.value,
-			})
+			const warehouseResult = await call(
+				"pos_next.api.pos_profile.update_warehouse",
+				{
+					pos_profile: props.posProfile,
+					warehouse: selectedWarehouse.value,
+				},
+			)
 
 			if (warehouseResult && warehouseResult.success) {
 				// Emit event to parent to reload stock with new warehouse
-				emit('warehouse-changed', selectedWarehouse.value)
+				emit("warehouse-changed", selectedWarehouse.value)
 			}
 		}
 
 		toast.create({
-			title: 'Success',
+			title: "Success",
 			text: warehouseChanged
-				? 'Settings saved and warehouse updated. Reloading stock...'
-				: 'Settings saved successfully',
-			icon: 'check',
-			iconClasses: 'text-green-600',
+				? "Settings saved and warehouse updated. Reloading stock..."
+				: "Settings saved successfully",
+			icon: "check",
+			iconClasses: "text-green-600",
 		})
 	} catch (error) {
-		console.error('Error saving settings:', error)
+		console.error("Error saving settings:", error)
 		toast.create({
-			title: 'Error',
-			text: error.message || 'Failed to save settings',
-			icon: 'alert-circle',
-			iconClasses: 'text-red-600',
+			title: "Error",
+			text: error.message || "Failed to save settings",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
 		})
 	} finally {
 		saving.value = false

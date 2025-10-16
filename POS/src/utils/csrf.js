@@ -80,10 +80,17 @@ function extractTokenFromResponse(data) {
 	return normalizeToken(data?.message?.csrf_token)
 }
 
-export async function ensureCSRFToken({ forceRefresh = false, silent = false } = {}) {
+export async function ensureCSRFToken({
+	forceRefresh = false,
+	silent = false,
+} = {}) {
 	if (!forceRefresh) {
 		// Check if we already have a valid token in window.csrf_token
-		if (window.csrf_token && typeof window.csrf_token === "string" && window.csrf_token !== CSRF_PLACEHOLDER) {
+		if (
+			window.csrf_token &&
+			typeof window.csrf_token === "string" &&
+			window.csrf_token !== CSRF_PLACEHOLDER
+		) {
 			return true
 		}
 
@@ -172,27 +179,36 @@ export function isCSRFApiError(error) {
 		return true
 	}
 
-	if (typeof error.message === "string" && error.message.toLowerCase().includes("csrf")) {
+	if (
+		typeof error.message === "string" &&
+		error.message.toLowerCase().includes("csrf")
+	) {
 		return true
 	}
 
 	if (Array.isArray(error.messages)) {
 		return error.messages.some(
-			(message) => typeof message === "string" && message.toLowerCase().includes("csrf"),
+			(message) =>
+				typeof message === "string" && message.toLowerCase().includes("csrf"),
 		)
 	}
 
 	return false
 }
 
-export function createCSRFAwareRequest(originalRequest, { silent = false } = {}) {
+export function createCSRFAwareRequest(
+	originalRequest,
+	{ silent = false } = {},
+) {
 	return async function csrfAwareRequest(...args) {
 		try {
 			return await originalRequest.apply(this, args)
 		} catch (error) {
 			if (isCSRFApiError(error)) {
 				if (!silent) {
-					console.warn("CSRF token error detected, refreshing token and retrying...")
+					console.warn(
+						"CSRF token error detected, refreshing token and retrying...",
+					)
 				}
 
 				const refreshed = await forceRefreshCSRFToken({ silent })
@@ -204,7 +220,9 @@ export function createCSRFAwareRequest(originalRequest, { silent = false } = {})
 				}
 
 				if (!silent) {
-					console.warn("CSRF token refresh failed; request will reject with original error")
+					console.warn(
+						"CSRF token refresh failed; request will reject with original error",
+					)
 				}
 			}
 

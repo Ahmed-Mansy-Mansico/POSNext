@@ -1,54 +1,56 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { useDialog, useDialogState } from '@/composables/useDialogState'
+import { useDialog, useDialogState } from "@/composables/useDialogState"
+import { defineStore } from "pinia"
+import { computed, ref } from "vue"
 
 const LEFT_PANEL_MIN = 320
 const RIGHT_PANEL_MIN = 360
 
-export const usePOSUIStore = defineStore('posUI', () => {
+export const usePOSUIStore = defineStore("posUI", () => {
 	// Loading state
 	const isLoading = ref(true)
 
 	// Dialog states using the dialog composable
-	const { isOpen: showPaymentDialog } = useDialog('payment')
-	const { isOpen: showCustomerDialog } = useDialog('customer')
-	const { isOpen: showSuccessDialog } = useDialog('success')
-	const { isOpen: showOpenShiftDialog } = useDialog('openShift')
-	const { isOpen: showCloseShiftDialog } = useDialog('closeShift')
-	const { isOpen: showDraftDialog } = useDialog('draft')
-	const { isOpen: showReturnDialog } = useDialog('return')
-	const { isOpen: showCouponDialog } = useDialog('coupon')
-	const { isOpen: showOffersDialog } = useDialog('offers')
-	const { isOpen: showBatchSerialDialog } = useDialog('batchSerial')
-	const { isOpen: showHistoryDialog } = useDialog('history')
-	const { isOpen: showOfflineInvoicesDialog } = useDialog('offlineInvoices')
-	const { isOpen: showCreateCustomerDialog } = useDialog('createCustomer')
-	const { isOpen: showClearCartDialog } = useDialog('clearCart')
-	const { isOpen: showLogoutDialog } = useDialog('logout')
-	const { isOpen: showItemSelectionDialog } = useDialog('itemSelection')
-	const { isOpen: showErrorDialog } = useDialog('invoiceError')
+	const { isOpen: showPaymentDialog } = useDialog("payment")
+	const { isOpen: showCustomerDialog } = useDialog("customer")
+	const { isOpen: showSuccessDialog } = useDialog("success")
+	const { isOpen: showOpenShiftDialog } = useDialog("openShift")
+	const { isOpen: showCloseShiftDialog } = useDialog("closeShift")
+	const { isOpen: showDraftDialog } = useDialog("draft")
+	const { isOpen: showReturnDialog } = useDialog("return")
+	const { isOpen: showCouponDialog } = useDialog("coupon")
+	const { isOpen: showOffersDialog } = useDialog("offers")
+	const { isOpen: showBatchSerialDialog } = useDialog("batchSerial")
+	const { isOpen: showHistoryDialog } = useDialog("history")
+	const { isOpen: showOfflineInvoicesDialog } = useDialog("offlineInvoices")
+	const { isOpen: showCreateCustomerDialog } = useDialog("createCustomer")
+	const { isOpen: showClearCartDialog } = useDialog("clearCart")
+	const { isOpen: showLogoutDialog } = useDialog("logout")
+	const { isOpen: showItemSelectionDialog } = useDialog("itemSelection")
+	const { isOpen: showErrorDialog } = useDialog("invoiceError")
 
 	// Global dialog state
 	const { isAnyDialogOpen } = useDialogState()
 
 	// Error dialog state
-	const errorDialogTitle = ref('')
-	const errorDialogMessage = ref('')
-	const errorDetails = ref('')
-	const errorType = ref('error') // 'error', 'warning', 'validation'
+	const errorDialogTitle = ref("")
+	const errorDialogMessage = ref("")
+	const errorDetails = ref("")
+	const errorType = ref("error") // 'error', 'warning', 'validation'
 	const errorRetryAction = ref(null)
 	const errorRetryActionData = ref(null)
 
 	// Success dialog state
-	const lastInvoiceName = ref('')
+	const lastInvoiceName = ref("")
 	const lastInvoiceTotal = ref(0)
 
 	// Customer dialog state
-	const initialCustomerName = ref('')
+	const initialCustomerName = ref("")
 
 	// Mobile responsiveness
-	const mobileActiveTab = ref('items') // 'items' or 'cart'
-	const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
+	const mobileActiveTab = ref("items") // 'items' or 'cart'
+	const windowWidth = ref(
+		typeof window !== "undefined" ? window.innerWidth : 1024,
+	)
 
 	// Layout state
 	const leftPanelWidth = ref(800)
@@ -70,7 +72,13 @@ export const usePOSUIStore = defineStore('posUI', () => {
 		mobileActiveTab.value = tab
 	}
 
-	function showError(title, message, details = '', retryAction = null, retryData = null) {
+	function showError(
+		title,
+		message,
+		details = "",
+		retryAction = null,
+		retryData = null,
+	) {
 		errorDialogTitle.value = title
 		errorDialogMessage.value = message
 		errorDetails.value = details
@@ -80,9 +88,9 @@ export const usePOSUIStore = defineStore('posUI', () => {
 	}
 
 	function clearError() {
-		errorDialogTitle.value = ''
-		errorDialogMessage.value = ''
-		errorDetails.value = ''
+		errorDialogTitle.value = ""
+		errorDialogMessage.value = ""
+		errorDetails.value = ""
 		errorRetryAction.value = null
 		errorRetryActionData.value = null
 		showErrorDialog.value = false
@@ -100,10 +108,14 @@ export const usePOSUIStore = defineStore('posUI', () => {
 
 	// Layout actions
 	function clampLeftPanelWidth(width, containerWidth) {
-		const safeContainerWidth = Number.isFinite(containerWidth) && containerWidth > 0
-			? containerWidth
-			: LEFT_PANEL_MIN + RIGHT_PANEL_MIN
-		const maxWidth = Math.max(LEFT_PANEL_MIN, safeContainerWidth - RIGHT_PANEL_MIN)
+		const safeContainerWidth =
+			Number.isFinite(containerWidth) && containerWidth > 0
+				? containerWidth
+				: LEFT_PANEL_MIN + RIGHT_PANEL_MIN
+		const maxWidth = Math.max(
+			LEFT_PANEL_MIN,
+			safeContainerWidth - RIGHT_PANEL_MIN,
+		)
 		const clampedWidth = Math.min(Math.max(width, LEFT_PANEL_MIN), maxWidth)
 		return Number.isFinite(clampedWidth) ? clampedWidth : LEFT_PANEL_MIN
 	}
@@ -123,7 +135,10 @@ export const usePOSUIStore = defineStore('posUI', () => {
 
 	function updateLayoutBounds(containerWidth) {
 		if (containerWidth) {
-			leftPanelWidth.value = clampLeftPanelWidth(leftPanelWidth.value, containerWidth)
+			leftPanelWidth.value = clampLeftPanelWidth(
+				leftPanelWidth.value,
+				containerWidth,
+			)
 		}
 	}
 

@@ -1,14 +1,17 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from "vue"
 
-const DISMISS_KEY = 'pwa-install-dismissed'
+const DISMISS_KEY = "pwa-install-dismissed"
 const DISMISS_WINDOW_DAYS = 7
 const DISMISS_WINDOW_MS = DISMISS_WINDOW_DAYS * 24 * 60 * 60 * 1000
 
-const isClient = () => typeof window !== 'undefined'
+const isClient = () => typeof window !== "undefined"
 
 const isStandaloneDisplay = () => {
 	if (!isClient()) return false
-	return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+	return (
+		window.matchMedia("(display-mode: standalone)").matches ||
+		window.navigator.standalone === true
+	)
 }
 
 const hasActiveDismissal = () => {
@@ -29,7 +32,7 @@ const hasActiveDismissal = () => {
 		localStorage.removeItem(DISMISS_KEY)
 		return false
 	} catch (error) {
-		console.warn('[PWA] Failed to read dismissal state', error)
+		console.warn("[PWA] Failed to read dismissal state", error)
 		return false
 	}
 }
@@ -50,7 +53,7 @@ export function usePWAInstall() {
 				try {
 					localStorage.removeItem(DISMISS_KEY)
 				} catch (error) {
-					console.warn('[PWA] Failed to clear dismissal state', error)
+					console.warn("[PWA] Failed to clear dismissal state", error)
 				}
 			}
 		}
@@ -72,7 +75,7 @@ export function usePWAInstall() {
 	}
 
 	const handleVisibilityChange = () => {
-		if (document.visibilityState === 'visible') {
+		if (document.visibilityState === "visible") {
 			updateInstalledState()
 		}
 	}
@@ -82,18 +85,18 @@ export function usePWAInstall() {
 			return
 		}
 
-		window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-		window.addEventListener('appinstalled', handleAppInstalled)
-		if (typeof document !== 'undefined') {
-			document.addEventListener('visibilitychange', handleVisibilityChange)
+		window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+		window.addEventListener("appinstalled", handleAppInstalled)
+		if (typeof document !== "undefined") {
+			document.addEventListener("visibilitychange", handleVisibilityChange)
 		}
 	})
 
 	onUnmounted(() => {
-		window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-		window.removeEventListener('appinstalled', handleAppInstalled)
-		if (typeof document !== 'undefined') {
-			document.removeEventListener('visibilitychange', handleVisibilityChange)
+		window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+		window.removeEventListener("appinstalled", handleAppInstalled)
+		if (typeof document !== "undefined") {
+			document.removeEventListener("visibilitychange", handleVisibilityChange)
 		}
 	})
 
@@ -106,7 +109,7 @@ export function usePWAInstall() {
 		const { outcome } = await deferredPrompt.value.userChoice
 		deferredPrompt.value = null
 		isInstallable.value = false
-		if (outcome === 'accepted') {
+		if (outcome === "accepted") {
 			showInstallBadge.value = false
 			updateInstalledState()
 			return true
@@ -126,7 +129,7 @@ export function usePWAInstall() {
 		try {
 			localStorage.setItem(DISMISS_KEY, new Date().toISOString())
 		} catch (error) {
-			console.warn('[PWA] Failed to snooze install badge', error)
+			console.warn("[PWA] Failed to snooze install badge", error)
 		}
 	}
 
@@ -136,6 +139,6 @@ export function usePWAInstall() {
 		showInstallBadge,
 		promptInstall,
 		dismissBadge,
-		snoozeBadge
+		snoozeBadge,
 	}
 }

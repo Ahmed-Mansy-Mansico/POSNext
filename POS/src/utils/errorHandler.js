@@ -23,28 +23,30 @@
  * Clean HTML and extra whitespace from error messages
  */
 function cleanErrorMessage(rawMessage) {
-	if (!rawMessage) return ''
+	if (!rawMessage) return ""
 
 	if (Array.isArray(rawMessage)) {
 		return cleanErrorMessage(rawMessage[0])
 	}
 
-	if (typeof rawMessage === 'object' && rawMessage !== null) {
-		return cleanErrorMessage(rawMessage.message || rawMessage.title || rawMessage.value)
+	if (typeof rawMessage === "object" && rawMessage !== null) {
+		return cleanErrorMessage(
+			rawMessage.message || rawMessage.title || rawMessage.value,
+		)
 	}
 
-	let text = typeof rawMessage === 'string' ? rawMessage : String(rawMessage)
+	let text = typeof rawMessage === "string" ? rawMessage : String(rawMessage)
 
 	// Remove HTML tags
-	if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-		const container = document.createElement('div')
+	if (typeof window !== "undefined" && typeof document !== "undefined") {
+		const container = document.createElement("div")
 		container.innerHTML = text
-		text = container.textContent || container.innerText || ''
+		text = container.textContent || container.innerText || ""
 	} else {
-		text = text.replace(/<[^>]*>/g, ' ')
+		text = text.replace(/<[^>]*>/g, " ")
 	}
 
-	return text.replace(/\s+/g, ' ').trim()
+	return text.replace(/\s+/g, " ").trim()
 }
 
 /**
@@ -58,15 +60,17 @@ export function parseError(error) {
 		message: "An unexpected error occurred",
 		type: "error", // error, warning, validation
 		retryable: false,
-		technicalDetails: null
+		technicalDetails: null,
 	}
 
 	// Build technical details
 	const detailsParts = []
 	if (error.exc_type) detailsParts.push(`Type: ${error.exc_type}`)
-	if (error.httpStatus || error.status) detailsParts.push(`Status: ${error.httpStatus || error.status}`)
+	if (error.httpStatus || error.status)
+		detailsParts.push(`Status: ${error.httpStatus || error.status}`)
 	if (error.exception) detailsParts.push(`Exception: ${error.exception}`)
-	context.technicalDetails = detailsParts.length > 0 ? detailsParts.join(' | ') : null
+	context.technicalDetails =
+		detailsParts.length > 0 ? detailsParts.join(" | ") : null
 
 	// Detect error type from status code
 	if (error.httpStatus === 417 || error.status === 417) {
@@ -84,14 +88,20 @@ export function parseError(error) {
 	}
 
 	// Extract primary message
-	if (error.messages && Array.isArray(error.messages) && error.messages.length > 0) {
+	if (
+		error.messages &&
+		Array.isArray(error.messages) &&
+		error.messages.length > 0
+	) {
 		context.message = cleanErrorMessage(error.messages[0])
 	} else if (error._server_messages) {
 		try {
 			const serverMessages = JSON.parse(error._server_messages)
 			if (serverMessages && serverMessages.length > 0) {
 				const firstMessage = JSON.parse(serverMessages[0])
-				context.message = cleanErrorMessage(firstMessage.message || firstMessage.title)
+				context.message = cleanErrorMessage(
+					firstMessage.message || firstMessage.title,
+				)
 				if (firstMessage.title) context.title = firstMessage.title
 			}
 		} catch (parseError) {
@@ -102,29 +112,36 @@ export function parseError(error) {
 	}
 
 	// Categorize by exception type and message content
-	const normalizedMessage = (context.message || '').toLowerCase()
-	const excType = (error.exc_type || '').toLowerCase()
+	const normalizedMessage = (context.message || "").toLowerCase()
+	const excType = (error.exc_type || "").toLowerCase()
 
 	// Insufficient Stock
-	if (excType === "negativestockerror" ||
+	if (
+		excType === "negativestockerror" ||
 		normalizedMessage.includes("needed in") ||
 		normalizedMessage.includes("insufficient stock") ||
-		normalizedMessage.includes("negative stock")) {
-
+		normalizedMessage.includes("negative stock")
+	) {
 		context.type = "warning"
 		context.title = "Insufficient Stock"
 
 		// Parse the message to extract item and quantity information
 		// Example: "1.0 units of Item IPhone 17-WHI needed in Warehouse Goods In Transit - BrD"
-		const match = context.message.match(/(\d+\.?\d*)\s+units?\s+of\s+(?:Item\s+)?(.+?)\s+needed\s+in\s+(?:Warehouse\s+)?(.+?)(?:\s+to complete|$)/i)
+		const match = context.message.match(
+			/(\d+\.?\d*)\s+units?\s+of\s+(?:Item\s+)?(.+?)\s+needed\s+in\s+(?:Warehouse\s+)?(.+?)(?:\s+to complete|$)/i,
+		)
 
 		if (match) {
 			const [, quantity, itemName, warehouse] = match
-			const qty = parseFloat(quantity)
-			const unit = qty === 1 ? 'unit' : 'units'
+			const qty = Number.parseFloat(quantity)
+			const unit = qty === 1 ? "unit" : "units"
 			context.message = `Not enough stock for "${itemName}".\n\nYou need ${qty} ${unit} but the warehouse "${warehouse}" doesn't have enough available.\n\nPlease reduce the quantity or check another warehouse.`
-		} else if (!context.message || context.message === "An unexpected error occurred") {
-			context.message = "Not enough stock available in the warehouse.\n\nPlease reduce the quantity or check stock availability."
+		} else if (
+			!context.message ||
+			context.message === "An unexpected error occurred"
+		) {
+			context.message =
+				"Not enough stock available in the warehouse.\n\nPlease reduce the quantity or check stock availability."
 		}
 
 		context.retryable = true
@@ -136,53 +153,77 @@ export function parseError(error) {
 		context.retryable = true
 	}
 	// Price List Errors
-	else if (normalizedMessage.includes("price list") || normalizedMessage.includes("price not found")) {
+	else if (
+		normalizedMessage.includes("price list") ||
+		normalizedMessage.includes("price not found")
+	) {
 		context.type = "warning"
 		context.title = "Pricing Error"
 		context.retryable = true
 	}
 	// Customer/Party Errors
-	else if (normalizedMessage.includes("customer") || normalizedMessage.includes("party")) {
+	else if (
+		normalizedMessage.includes("customer") ||
+		normalizedMessage.includes("party")
+	) {
 		context.type = "validation"
 		context.title = "Customer Error"
 		context.retryable = true
 	}
 	// Tax Errors
-	else if (normalizedMessage.includes("tax") || normalizedMessage.includes("account")) {
+	else if (
+		normalizedMessage.includes("tax") ||
+		normalizedMessage.includes("account")
+	) {
 		context.type = "warning"
 		context.title = "Tax Configuration Error"
 		context.retryable = false
 	}
 	// Payment Errors
-	else if (normalizedMessage.includes("payment") || normalizedMessage.includes("mode of payment")) {
+	else if (
+		normalizedMessage.includes("payment") ||
+		normalizedMessage.includes("mode of payment")
+	) {
 		context.type = "validation"
 		context.title = "Payment Error"
 		context.retryable = true
 	}
 	// Series/Naming Errors
-	else if (normalizedMessage.includes("series") || normalizedMessage.includes("naming")) {
+	else if (
+		normalizedMessage.includes("series") ||
+		normalizedMessage.includes("naming")
+	) {
 		context.type = "error"
 		context.title = "Naming Series Error"
 		context.retryable = false
 	}
 	// Permission Errors
-	else if (normalizedMessage.includes("permission") || normalizedMessage.includes("not allowed")) {
+	else if (
+		normalizedMessage.includes("permission") ||
+		normalizedMessage.includes("not allowed")
+	) {
 		context.type = "error"
 		context.title = "Permission Denied"
 		context.retryable = false
 	}
 	// Network/Connection Errors
-	else if (normalizedMessage.includes("network") ||
-			 normalizedMessage.includes("timeout") ||
-			 normalizedMessage.includes("connection") ||
-			 normalizedMessage.includes("fetch")) {
+	else if (
+		normalizedMessage.includes("network") ||
+		normalizedMessage.includes("timeout") ||
+		normalizedMessage.includes("connection") ||
+		normalizedMessage.includes("fetch")
+	) {
 		context.type = "warning"
 		context.title = "Connection Error"
-		context.message = "Unable to connect to server. Check your internet connection."
+		context.message =
+			"Unable to connect to server. Check your internet connection."
 		context.retryable = true
 	}
 	// Duplicate Errors
-	else if (normalizedMessage.includes("duplicate") || normalizedMessage.includes("already exists")) {
+	else if (
+		normalizedMessage.includes("duplicate") ||
+		normalizedMessage.includes("already exists")
+	) {
 		context.type = "validation"
 		context.title = "Duplicate Entry"
 		context.retryable = false
@@ -199,17 +240,17 @@ export function parseError(error) {
  */
 export function formatErrorReport(errorContext, additionalInfo = {}) {
 	const lines = [
-		'Error Report - POS Next',
-		'='.repeat(40),
+		"Error Report - POS Next",
+		"=".repeat(40),
 		`Title: ${errorContext.title}`,
 		`Type: ${errorContext.type}`,
 		`Message: ${errorContext.message}`,
-		''
+		"",
 	]
 
 	if (errorContext.technicalDetails) {
 		lines.push(`Technical: ${errorContext.technicalDetails}`)
-		lines.push('')
+		lines.push("")
 	}
 
 	if (additionalInfo.timestamp) {
@@ -222,7 +263,7 @@ export function formatErrorReport(errorContext, additionalInfo = {}) {
 		lines.push(`POS Profile: ${additionalInfo.posProfile}`)
 	}
 
-	return lines.join('\n')
+	return lines.join("\n")
 }
 
 /**
@@ -232,14 +273,14 @@ export function formatErrorReport(errorContext, additionalInfo = {}) {
  */
 export function getErrorIconClass(errorType) {
 	switch (errorType) {
-		case 'error':
-			return 'text-red-600'
-		case 'warning':
-			return 'text-orange-600'
-		case 'validation':
-			return 'text-yellow-600'
+		case "error":
+			return "text-red-600"
+		case "warning":
+			return "text-orange-600"
+		case "validation":
+			return "text-yellow-600"
 		default:
-			return 'text-red-600'
+			return "text-red-600"
 	}
 }
 

@@ -1,7 +1,7 @@
-import { ref, computed, watch, toValue } from "vue"
-import { createResource } from "frappe-ui"
-import { offlineWorker } from "@/utils/offline/workerClient"
 import { isOffline } from "@/utils/offline"
+import { offlineWorker } from "@/utils/offline/workerClient"
+import { createResource } from "frappe-ui"
+import { computed, ref, toValue, watch } from "vue"
 
 export function useItems(posProfile, cartItems = ref([])) {
 	const items = ref([])
@@ -67,13 +67,15 @@ export function useItems(posProfile, cartItems = ref([])) {
 				(item) =>
 					item.item_name?.toLowerCase().includes(term) ||
 					item.item_code?.toLowerCase().includes(term) ||
-					item.barcode?.toLowerCase().includes(term)
+					item.barcode?.toLowerCase().includes(term),
 			)
 		}
 
 		// Adjust stock quantities based on cart items
-		return filtered.map(item => {
-			const cartItem = toValue(cartItems).find(ci => ci.item_code === item.item_code)
+		return filtered.map((item) => {
+			const cartItem = toValue(cartItems).find(
+				(ci) => ci.item_code === item.item_code,
+			)
 			if (cartItem) {
 				const originalStock = item.actual_qty || item.stock_qty || 0
 				const availableStock = originalStock - cartItem.quantity
@@ -81,7 +83,7 @@ export function useItems(posProfile, cartItems = ref([])) {
 					...item,
 					actual_qty: availableStock,
 					stock_qty: availableStock,
-					original_stock: originalStock
+					original_stock: originalStock,
 				}
 			}
 			return item
@@ -148,10 +150,13 @@ export function useItems(posProfile, cartItems = ref([])) {
 		if (isOffline() || cacheReady) {
 			loading.value = true
 			try {
-				const cached = await offlineWorker.searchCachedItems(searchTerm.value, 100)
+				const cached = await offlineWorker.searchCachedItems(
+					searchTerm.value,
+					100,
+				)
 				items.value = cached || []
 			} catch (error) {
-				console.error('Error loading from cache:', error)
+				console.error("Error loading from cache:", error)
 				items.value = []
 			} finally {
 				loading.value = false
@@ -174,7 +179,7 @@ export function useItems(posProfile, cartItems = ref([])) {
 				return null
 			}
 		} catch (error) {
-			console.error('Error getting item:', error)
+			console.error("Error getting item:", error)
 			return null
 		}
 	}

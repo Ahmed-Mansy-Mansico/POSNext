@@ -1,7 +1,7 @@
+import { shiftState } from "@/composables/useShift"
 import { userResource } from "@/data/user"
 import { createRouter, createWebHistory } from "vue-router"
 import { session } from "./data/session"
-import { shiftState } from "@/composables/useShift"
 
 const routes = [
 	{

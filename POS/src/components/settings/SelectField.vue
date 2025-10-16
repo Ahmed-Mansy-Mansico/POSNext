@@ -25,12 +25,12 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed } from "vue"
 
 const props = defineProps({
 	modelValue: {
 		type: [String, Number],
-		default: '',
+		default: "",
 	},
 	label: {
 		type: String,
@@ -38,7 +38,7 @@ const props = defineProps({
 	},
 	description: {
 		type: String,
-		default: '',
+		default: "",
 	},
 	options: {
 		type: Array,
@@ -46,7 +46,9 @@ const props = defineProps({
 	},
 })
 
-defineEmits(['update:modelValue'])
+defineEmits(["update:modelValue"])
 
-const fieldId = computed(() => `select-${Math.random().toString(36).substr(2, 9)}`)
+const fieldId = computed(
+	() => `select-${Math.random().toString(36).substr(2, 9)}`,
+)
 </script>

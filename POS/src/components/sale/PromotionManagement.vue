@@ -20,7 +20,7 @@
 						</div>
 						<div class="flex items-center space-x-2">
 							<Button
-								v-if="!isCreating && !selectedPromotion"
+								v-if="!isCreating && !selectedPromotion && permissions.create"
 								@click="handleCreateNew"
 								icon-left="plus"
 							>
@@ -73,6 +73,7 @@
 							<!-- Create New Button -->
 							<div class="p-4 bg-white border-b space-y-2">
 								<Button
+									v-if="permissions.create"
 									@click="handleCreateNew"
 									variant="solid"
 									class="w-full"
@@ -82,6 +83,17 @@
 									</template>
 									Create New Promotion
 								</Button>
+								<!-- Permission Warning -->
+								<div v-else class="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+									<div class="flex items-start space-x-2">
+										<svg class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+										</svg>
+										<div class="flex-1">
+											<p class="text-xs font-medium text-amber-900">Create permission required</p>
+										</div>
+									</div>
+								</div>
 								<Button
 									@click="loadPromotions"
 									variant="outline"
@@ -186,6 +198,7 @@
 									<h3 class="text-xl font-semibold text-gray-900 mb-2">Select a Promotion</h3>
 									<p class="text-sm text-gray-600 mb-6">Choose a promotion from the list to view and edit, or create a new one to get started</p>
 									<Button
+										v-if="permissions.create"
 										@click="handleCreateNew"
 										variant="solid"
 									>
@@ -194,6 +207,9 @@
 										</template>
 										Create New Promotion
 									</Button>
+									<p v-else class="text-sm text-amber-600">
+										You don't have permission to create promotions
+									</p>
 								</div>
 							</div>
 
@@ -236,7 +252,7 @@
 											</div>
 
 											<Button
-												v-if="!isCreating && !isPricingRule"
+												v-if="!isCreating && !isPricingRule && permissions.delete"
 												@click="handleDelete(selectedPromotion)"
 												variant="ghost"
 												theme="red"
@@ -247,7 +263,7 @@
 												Delete
 											</Button>
 											<Button
-												v-if="!isCreating && !isPricingRule"
+												v-if="!isCreating && !isPricingRule && permissions.write"
 												@click="handleToggle(selectedPromotion)"
 												variant="outline"
 												:theme="selectedPromotion.disable ? 'green' : 'orange'"
@@ -257,7 +273,7 @@
 												</template>
 												{{ selectedPromotion.disable ? 'Enable' : 'Disable' }}
 											</Button>
-											<div v-if="!isPricingRule" class="w-px h-6 bg-gray-200"></div>
+											<div v-if="!isPricingRule && (permissions.write || permissions.delete)" class="w-px h-6 bg-gray-200"></div>
 											<Button
 												@click="handleCancel"
 												variant="ghost"
@@ -265,7 +281,7 @@
 												{{ isPricingRule ? 'Close' : 'Cancel' }}
 											</Button>
 											<Button
-												v-if="!isPricingRule"
+												v-if="!isPricingRule && (isCreating ? permissions.create : permissions.write)"
 												@click="handleSubmit"
 												:loading="loading"
 												variant="solid"
@@ -648,14 +664,31 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { Button, FormControl, Badge, Card, LoadingIndicator, createResource } from 'frappe-ui'
-import { FeatherIcon } from 'frappe-ui'
-import { useItemSearchStore } from '@/stores/itemSearch'
-import { useToast } from '@/composables/useToast'
+import { usePOSPermissions } from "@/composables/usePermissions"
+import { useToast } from "@/composables/useToast"
+import { useItemSearchStore } from "@/stores/itemSearch"
+import {
+	Badge,
+	Button,
+	Card,
+	FormControl,
+	LoadingIndicator,
+	createResource,
+} from "frappe-ui"
+import { FeatherIcon } from "frappe-ui"
+import { computed, onMounted, ref, watch } from "vue"
 
 // Use shared toast
 const { showSuccess, showError, showWarning } = useToast()
+
+// Permission checks
+const { canCreatePromotion, canEditPromotion, canDeletePromotion } =
+	usePOSPermissions()
+const permissions = ref({
+	create: true,
+	write: true,
+	delete: true,
+})
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -663,11 +696,11 @@ const props = defineProps({
 	company: String,
 	currency: {
 		type: String,
-		default: 'USD'
-	}
+		default: "USD",
+	},
 })
 
-const emit = defineEmits(['update:modelValue', 'promotion-saved'])
+const emit = defineEmits(["update:modelValue", "promotion-saved"])
 
 // Access cached items from the store
 const itemSearchStore = useItemSearchStore()
@@ -681,45 +714,45 @@ const promotionToDelete = ref(null)
 
 // List view state
 const promotions = ref([])
-const searchQuery = ref('')
-const filterStatus = ref('all')
+const searchQuery = ref("")
+const filterStatus = ref("all")
 
 // Form state
 const form = ref({
-	name: '',
+	name: "",
 	company: props.company,
-	apply_on: 'Item Group',
-	discount_type: 'percentage',
+	apply_on: "Item Group",
+	discount_type: "percentage",
 	discount_value: 0,
-	free_item: '',
+	free_item: "",
 	free_qty: 1,
 	items: [],
 	min_qty: 0,
 	max_qty: 0,
 	min_amt: 0,
 	max_amt: 0,
-	valid_from: '',
-	valid_upto: ''
+	valid_from: "",
+	valid_upto: "",
 })
 
 // Dropdown data
 const itemGroups = ref([])
 const brands = ref([])
-const itemSearch = ref('')
-const freeItemSearch = ref('')
-const selectedItemGroup = ref('')
-const selectedBrand = ref('')
+const itemSearch = ref("")
+const freeItemSearch = ref("")
+const selectedItemGroup = ref("")
+const selectedBrand = ref("")
 
 // Discount types
 const discountTypes = [
-	{ value: 'percentage', label: 'Percentage', icon: 'percent' },
-	{ value: 'amount', label: 'Fixed Amount', icon: 'dollar-sign' },
-	{ value: 'free_item', label: 'Free Item', icon: 'gift' }
+	{ value: "percentage", label: "Percentage", icon: "percent" },
+	{ value: "amount", label: "Fixed Amount", icon: "dollar-sign" },
+	{ value: "free_item", label: "Free Item", icon: "gift" },
 ]
 
 // Computed
 const isPricingRule = computed(() => {
-	return !isCreating.value && selectedPromotion.value?.source === 'Pricing Rule'
+	return !isCreating.value && selectedPromotion.value?.source === "Pricing Rule"
 })
 
 const filteredPromotions = computed(() => {
@@ -727,20 +760,20 @@ const filteredPromotions = computed(() => {
 
 	// Filter by search query
 	if (searchQuery.value) {
-		filtered = filtered.filter(p =>
-			p.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+		filtered = filtered.filter((p) =>
+			p.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
 		)
 	}
 
 	// Filter by status
-	if (filterStatus.value === 'active') {
-		filtered = filtered.filter(p => p.status === 'Active')
-	} else if (filterStatus.value === 'expired') {
-		filtered = filtered.filter(p => p.status === 'Expired')
-	} else if (filterStatus.value === 'not_started') {
-		filtered = filtered.filter(p => p.status === 'Not Started')
-	} else if (filterStatus.value === 'disabled') {
-		filtered = filtered.filter(p => p.status === 'Disabled')
+	if (filterStatus.value === "active") {
+		filtered = filtered.filter((p) => p.status === "Active")
+	} else if (filterStatus.value === "expired") {
+		filtered = filtered.filter((p) => p.status === "Expired")
+	} else if (filterStatus.value === "not_started") {
+		filtered = filtered.filter((p) => p.status === "Not Started")
+	} else if (filterStatus.value === "disabled") {
+		filtered = filtered.filter((p) => p.status === "Disabled")
 	}
 
 	return filtered
@@ -756,10 +789,11 @@ const searchResults = computed(() => {
 	const allItems = itemSearchStore.allItems || []
 
 	// Filter items by search term
-	const filtered = allItems.filter(item =>
-		item.item_code?.toLowerCase().includes(term) ||
-		item.item_name?.toLowerCase().includes(term) ||
-		item.barcode?.toLowerCase().includes(term)
+	const filtered = allItems.filter(
+		(item) =>
+			item.item_code?.toLowerCase().includes(term) ||
+			item.item_name?.toLowerCase().includes(term) ||
+			item.barcode?.toLowerCase().includes(term),
 	)
 
 	// Limit to 20 results for performance
@@ -776,10 +810,11 @@ const freeItemSearchResults = computed(() => {
 	const allItems = itemSearchStore.allItems || []
 
 	// Filter items by search term
-	const filtered = allItems.filter(item =>
-		item.item_code?.toLowerCase().includes(term) ||
-		item.item_name?.toLowerCase().includes(term) ||
-		item.barcode?.toLowerCase().includes(term)
+	const filtered = allItems.filter(
+		(item) =>
+			item.item_code?.toLowerCase().includes(term) ||
+			item.item_name?.toLowerCase().includes(term) ||
+			item.barcode?.toLowerCase().includes(term),
 	)
 
 	// Limit to 20 results for performance
@@ -788,23 +823,23 @@ const freeItemSearchResults = computed(() => {
 
 // Resources
 const promotionsResource = createResource({
-	url: 'pos_next.api.promotions.get_promotions',
+	url: "pos_next.api.promotions.get_promotions",
 	makeParams() {
 		return {
 			pos_profile: props.posProfile,
 			company: props.company,
-			include_disabled: true
+			include_disabled: true,
 		}
 	},
 	auto: false,
 	onSuccess(data) {
 		promotions.value = data || []
 		loading.value = false
-	}
+	},
 })
 
 const itemGroupsResource = createResource({
-	url: 'pos_next.api.promotions.get_item_groups',
+	url: "pos_next.api.promotions.get_item_groups",
 	makeParams() {
 		return { company: props.company }
 	},
@@ -813,25 +848,25 @@ const itemGroupsResource = createResource({
 		itemGroups.value = data || []
 	},
 	onError(error) {
-		console.error('Error loading item groups:', error)
-		handleError(error, 'Failed to load item groups')
-	}
+		console.error("Error loading item groups:", error)
+		handleError(error, "Failed to load item groups")
+	},
 })
 
 const brandsResource = createResource({
-	url: 'pos_next.api.promotions.get_brands',
+	url: "pos_next.api.promotions.get_brands",
 	auto: false,
 	onSuccess(data) {
 		brands.value = data || []
 	},
 	onError(error) {
-		console.error('Error loading brands:', error)
-		handleError(error, 'Failed to load brands')
-	}
+		console.error("Error loading brands:", error)
+		handleError(error, "Failed to load brands")
+	},
 })
 
 const savePromotionResource = createResource({
-	url: 'pos_next.api.promotions.create_promotion',
+	url: "pos_next.api.promotions.create_promotion",
 	makeParams() {
 		return { data: JSON.stringify(form.value) }
 	},
@@ -839,21 +874,22 @@ const savePromotionResource = createResource({
 	onSuccess(data) {
 		loading.value = false
 		const responseData = data?.message || data
-		const successMessage = responseData?.message || 'Promotion created successfully'
+		const successMessage =
+			responseData?.message || "Promotion created successfully"
 
 		showSuccess(successMessage)
-		emit('promotion-saved', responseData)
+		emit("promotion-saved", responseData)
 		loadPromotions()
 		returnToList()
 	},
 	onError(error) {
 		loading.value = false
-		handleError(error, 'Failed to create promotion')
-	}
+		handleError(error, "Failed to create promotion")
+	},
 })
 
 const updatePromotionResource = createResource({
-	url: 'pos_next.api.promotions.update_promotion',
+	url: "pos_next.api.promotions.update_promotion",
 	makeParams() {
 		return {
 			scheme_name: form.value.name,
@@ -866,15 +902,16 @@ const updatePromotionResource = createResource({
 				max_amt: form.value.max_amt,
 				discount_value: form.value.discount_value,
 				free_item: form.value.free_item,
-				free_qty: form.value.free_qty
-			})
+				free_qty: form.value.free_qty,
+			}),
 		}
 	},
 	auto: false,
 	onSuccess(data) {
 		loading.value = false
 		const responseData = data?.message || data
-		const successMessage = responseData?.message || 'Promotion updated successfully'
+		const successMessage =
+			responseData?.message || "Promotion updated successfully"
 
 		showSuccess(successMessage)
 		loadPromotions()
@@ -882,28 +919,29 @@ const updatePromotionResource = createResource({
 	},
 	onError(error) {
 		loading.value = false
-		handleError(error, 'Failed to update promotion')
-	}
+		handleError(error, "Failed to update promotion")
+	},
 })
 
 const toggleResource = createResource({
-	url: 'pos_next.api.promotions.toggle_promotion',
+	url: "pos_next.api.promotions.toggle_promotion",
 	auto: false,
 	onSuccess() {
-		showSuccess('Promotion status updated successfully')
+		showSuccess("Promotion status updated successfully")
 		loadPromotions()
 	},
 	onError(error) {
-		handleError(error, 'Failed to update promotion status')
-	}
+		handleError(error, "Failed to update promotion status")
+	},
 })
 
 const deleteResource = createResource({
-	url: 'pos_next.api.promotions.delete_promotion',
+	url: "pos_next.api.promotions.delete_promotion",
 	auto: false,
 	onSuccess(data) {
 		const responseData = data?.message || data
-		const successMessage = responseData?.message || 'Promotion deleted successfully'
+		const successMessage =
+			responseData?.message || "Promotion deleted successfully"
 
 		showSuccess(successMessage)
 
@@ -919,15 +957,15 @@ const deleteResource = createResource({
 		loading.value = false
 		showDeleteConfirm.value = false
 		promotionToDelete.value = null
-		handleError(error, 'Failed to delete promotion')
-	}
+		handleError(error, "Failed to delete promotion")
+	},
 })
 
 const promotionDetailsResource = createResource({
-	url: 'pos_next.api.promotions.get_promotion_details',
+	url: "pos_next.api.promotions.get_promotion_details",
 	makeParams() {
 		return {
-			scheme_name: selectedPromotion.value?.name
+			scheme_name: selectedPromotion.value?.name,
 		}
 	},
 	auto: false,
@@ -937,26 +975,57 @@ const promotionDetailsResource = createResource({
 	},
 	onError(error) {
 		loading.value = false
-		handleError(error, 'Failed to load promotion details')
-	}
+		handleError(error, "Failed to load promotion details")
+	},
 })
 
-watch(() => props.modelValue, (val) => {
-	show.value = val
-	if (val) {
-		loadPromotions()
-		loadData()
-	}
-})
+watch(
+	() => props.modelValue,
+	(val) => {
+		show.value = val
+		if (val) {
+			loadPromotions()
+			loadData()
+			checkPermissions()
+		}
+	},
+)
 
 watch(show, (val) => {
-	emit('update:modelValue', val)
+	emit("update:modelValue", val)
 	if (!val) {
 		resetForm()
 		selectedPromotion.value = null
 		isCreating.value = false
 	}
 })
+
+onMounted(() => {
+	checkPermissions()
+})
+
+// Check user permissions
+async function checkPermissions() {
+	try {
+		const [create, write, del] = await Promise.all([
+			canCreatePromotion(),
+			canEditPromotion(),
+			canDeletePromotion(),
+		])
+		permissions.value = {
+			create,
+			write,
+			delete: del,
+		}
+	} catch (error) {
+		console.error("Error checking promotion permissions:", error)
+		permissions.value = {
+			create: false,
+			write: false,
+			delete: false,
+		}
+	}
+}
 
 // Utility: Parse error messages from server response
 function parseErrorMessage(error) {
@@ -965,19 +1034,22 @@ function parseErrorMessage(error) {
 		if (error._server_messages) {
 			const messages = JSON.parse(error._server_messages)
 			if (Array.isArray(messages) && messages.length > 0) {
-				const firstMessage = typeof messages[0] === 'string' ? JSON.parse(messages[0]) : messages[0]
-				return firstMessage.message || error.message || 'An error occurred'
+				const firstMessage =
+					typeof messages[0] === "string"
+						? JSON.parse(messages[0])
+						: messages[0]
+				return firstMessage.message || error.message || "An error occurred"
 			}
 		}
 		// Fallback to error.message
-		return error.message || 'An error occurred'
+		return error.message || "An error occurred"
 	} catch (e) {
-		return error.message || 'An error occurred'
+		return error.message || "An error occurred"
 	}
 }
 
 // Utility: Show error with proper parsing
-function handleError(error, defaultMessage = 'An error occurred') {
+function handleError(error, defaultMessage = "An error occurred") {
 	const errorMessage = parseErrorMessage(error)
 	showError(errorMessage || defaultMessage)
 }
@@ -1046,22 +1118,24 @@ function cancelDelete() {
 function handleSubmit() {
 	// Validate
 	if (!form.value.name) {
-		showWarning('Please enter a promotion name')
+		showWarning("Please enter a promotion name")
 		return
 	}
 
 	// Check for duplicate name when creating
 	if (isCreating.value) {
-		const duplicate = promotions.value.find(p =>
-			p.name.toLowerCase() === form.value.name.toLowerCase()
+		const duplicate = promotions.value.find(
+			(p) => p.name.toLowerCase() === form.value.name.toLowerCase(),
 		)
 		if (duplicate) {
-			showWarning(`Promotion "${form.value.name}" already exists. Please use a different name.`)
+			showWarning(
+				`Promotion "${form.value.name}" already exists. Please use a different name.`,
+			)
 			return
 		}
 	}
 
-	if (form.value.apply_on !== 'Transaction' && form.value.items.length === 0) {
+	if (form.value.apply_on !== "Transaction" && form.value.items.length === 0) {
 		showWarning(`Please select at least one ${form.value.apply_on}`)
 		return
 	}
@@ -1076,25 +1150,31 @@ function handleSubmit() {
 }
 
 function addItem(item) {
-	if (!form.value.items.some(i => i.item_code === item.item_code)) {
+	if (!form.value.items.some((i) => i.item_code === item.item_code)) {
 		form.value.items.push({ item_code: item.item_code })
 	}
 	// Clear search term (searchResults will automatically update via computed)
-	itemSearch.value = ''
+	itemSearch.value = ""
 }
 
 function addItemGroup() {
-	if (selectedItemGroup.value && !form.value.items.some(i => i.item_group === selectedItemGroup.value)) {
+	if (
+		selectedItemGroup.value &&
+		!form.value.items.some((i) => i.item_group === selectedItemGroup.value)
+	) {
 		form.value.items.push({ item_group: selectedItemGroup.value })
 	}
-	selectedItemGroup.value = ''
+	selectedItemGroup.value = ""
 }
 
 function addBrand() {
-	if (selectedBrand.value && !form.value.items.some(i => i.brand === selectedBrand.value)) {
+	if (
+		selectedBrand.value &&
+		!form.value.items.some((i) => i.brand === selectedBrand.value)
+	) {
 		form.value.items.push({ brand: selectedBrand.value })
 	}
-	selectedBrand.value = ''
+	selectedBrand.value = ""
 }
 
 function removeItem(index) {
@@ -1103,30 +1183,30 @@ function removeItem(index) {
 
 function selectFreeItem(item) {
 	form.value.free_item = item.item_code
-	freeItemSearch.value = ''
+	freeItemSearch.value = ""
 }
 
 function resetForm() {
 	form.value = {
-		name: '',
+		name: "",
 		company: props.company,
-		apply_on: 'Item Group',
-		discount_type: 'percentage',
+		apply_on: "Item Group",
+		discount_type: "percentage",
 		discount_value: 0,
-		free_item: '',
+		free_item: "",
 		free_qty: 1,
 		items: [],
 		min_qty: 0,
 		max_qty: 0,
 		min_amt: 0,
 		max_amt: 0,
-		valid_from: '',
-		valid_upto: ''
+		valid_from: "",
+		valid_upto: "",
 	}
-	itemSearch.value = ''
-	freeItemSearch.value = ''
-	selectedItemGroup.value = ''
-	selectedBrand.value = ''
+	itemSearch.value = ""
+	freeItemSearch.value = ""
+	selectedItemGroup.value = ""
+	selectedBrand.value = ""
 }
 
 function populateFormFromPromotion(promotion) {
@@ -1137,46 +1217,52 @@ function populateFormFromPromotion(promotion) {
 	form.value.name = promotion.name
 	form.value.company = promotion.company
 	form.value.apply_on = promotion.apply_on
-	form.value.valid_from = promotion.valid_from || ''
-	form.value.valid_upto = promotion.valid_upto || ''
+	form.value.valid_from = promotion.valid_from || ""
+	form.value.valid_upto = promotion.valid_upto || ""
 
 	// Populate items/item_groups/brands based on apply_on
-	if (promotion.apply_on === 'Item Code' && promotion.items) {
-		form.value.items = promotion.items.map(item => ({
+	if (promotion.apply_on === "Item Code" && promotion.items) {
+		form.value.items = promotion.items.map((item) => ({
 			item_code: item.item_code,
-			uom: item.uom
+			uom: item.uom,
 		}))
-	} else if (promotion.apply_on === 'Item Group' && promotion.item_groups) {
-		form.value.items = promotion.item_groups.map(group => ({
+	} else if (promotion.apply_on === "Item Group" && promotion.item_groups) {
+		form.value.items = promotion.item_groups.map((group) => ({
 			item_group: group.item_group,
-			uom: group.uom
+			uom: group.uom,
 		}))
-	} else if (promotion.apply_on === 'Brand' && promotion.brands) {
-		form.value.items = promotion.brands.map(brand => ({
+	} else if (promotion.apply_on === "Brand" && promotion.brands) {
+		form.value.items = promotion.brands.map((brand) => ({
 			brand: brand.brand,
-			uom: brand.uom
+			uom: brand.uom,
 		}))
 	}
 
 	// Populate discount details from slabs
-	if (promotion.price_discount_slabs && promotion.price_discount_slabs.length > 0) {
+	if (
+		promotion.price_discount_slabs &&
+		promotion.price_discount_slabs.length > 0
+	) {
 		const slab = promotion.price_discount_slabs[0]
 		form.value.min_qty = slab.min_qty || 0
 		form.value.max_qty = slab.max_qty || 0
 		form.value.min_amt = slab.min_amount || 0
 		form.value.max_amt = slab.max_amount || 0
 
-		if (slab.rate_or_discount === 'Discount Percentage') {
-			form.value.discount_type = 'percentage'
+		if (slab.rate_or_discount === "Discount Percentage") {
+			form.value.discount_type = "percentage"
 			form.value.discount_value = slab.discount_percentage || 0
-		} else if (slab.rate_or_discount === 'Discount Amount') {
-			form.value.discount_type = 'amount'
+		} else if (slab.rate_or_discount === "Discount Amount") {
+			form.value.discount_type = "amount"
 			form.value.discount_value = slab.discount_amount || 0
 		}
-	} else if (promotion.product_discount_slabs && promotion.product_discount_slabs.length > 0) {
+	} else if (
+		promotion.product_discount_slabs &&
+		promotion.product_discount_slabs.length > 0
+	) {
 		const slab = promotion.product_discount_slabs[0]
-		form.value.discount_type = 'free_item'
-		form.value.free_item = slab.free_item || ''
+		form.value.discount_type = "free_item"
+		form.value.free_item = slab.free_item || ""
 		form.value.free_qty = slab.free_qty || 1
 		form.value.min_qty = slab.min_qty || 0
 		form.value.max_qty = slab.max_qty || 0
@@ -1186,23 +1272,27 @@ function populateFormFromPromotion(promotion) {
 }
 
 function formatDate(dateStr) {
-	if (!dateStr) return ''
+	if (!dateStr) return ""
 	const date = new Date(dateStr)
-	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+	return date.toLocaleDateString("en-US", {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	})
 }
 
 function getStatusTheme(status) {
 	switch (status) {
-		case 'Active':
-			return 'green'
-		case 'Expired':
-			return 'red'
-		case 'Not Started':
-			return 'orange'
-		case 'Disabled':
-			return 'gray'
+		case "Active":
+			return "green"
+		case "Expired":
+			return "red"
+		case "Not Started":
+			return "orange"
+		case "Disabled":
+			return "gray"
 		default:
-			return 'gray'
+			return "gray"
 	}
 }
 </script>

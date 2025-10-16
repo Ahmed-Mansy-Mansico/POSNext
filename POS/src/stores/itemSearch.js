@@ -1,26 +1,26 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { offlineWorker } from '@/utils/offline/workerClient'
-import { isOffline } from '@/utils/offline'
-import { call } from '@/utils/apiWrapper'
-import { createResource } from 'frappe-ui'
+import { call } from "@/utils/apiWrapper"
+import { isOffline } from "@/utils/offline"
+import { offlineWorker } from "@/utils/offline/workerClient"
+import { createResource } from "frappe-ui"
+import { defineStore } from "pinia"
+import { computed, ref } from "vue"
 
-export const useItemSearchStore = defineStore('itemSearch', () => {
+export const useItemSearchStore = defineStore("itemSearch", () => {
 	// State
-	const allItems = ref([])  // For browsing (lazy loaded)
-	const searchResults = ref([])  // For search results (cache + server)
-	const searchTerm = ref('')
+	const allItems = ref([]) // For browsing (lazy loaded)
+	const searchResults = ref([]) // For search results (cache + server)
+	const searchTerm = ref("")
 	const selectedItemGroup = ref(null)
 	const itemGroups = ref([])
 	const loading = ref(false)
 	const loadingMore = ref(false)
-	const searching = ref(false)  // Separate loading state for search
+	const searching = ref(false) // Separate loading state for search
 	const posProfile = ref(null)
 	const cartItems = ref([])
 
 	// Lazy loading state - start small!
 	const currentOffset = ref(0)
-	const itemsPerPage = ref(50)  // Load only 50 items initially (was 1000!)
+	const itemsPerPage = ref(50) // Load only 50 items initially (was 1000!)
 	const hasMore = ref(true)
 	const totalItemsLoaded = ref(0)
 
@@ -46,7 +46,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 
 	// Resources (for server-side operations)
 	const itemGroupsResource = createResource({
-		url: 'pos_next.api.items.get_item_groups',
+		url: "pos_next.api.items.get_item_groups",
 		makeParams() {
 			return {
 				pos_profile: posProfile.value,
@@ -57,13 +57,13 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			itemGroups.value = data?.message || data || []
 		},
 		onError(error) {
-			console.error('Error fetching item groups:', error)
+			console.error("Error fetching item groups:", error)
 			itemGroups.value = []
 		},
 	})
 
 	const searchByBarcodeResource = createResource({
-		url: 'pos_next.api.items.search_by_barcode',
+		url: "pos_next.api.items.search_by_barcode",
 		auto: false,
 	})
 
@@ -85,9 +85,8 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	function ensureOriginalStock(item) {
 		if (!item) return 0
 		if (item.original_stock === undefined) {
-			const fallback = item.actual_qty !== undefined
-				? item.actual_qty
-				: (item.stock_qty || 0)
+			const fallback =
+				item.actual_qty !== undefined ? item.actual_qty : item.stock_qty || 0
 			item.original_stock = fallback
 		}
 		return item.original_stock ?? 0
@@ -96,7 +95,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	function removeRegisteredItems(registrySet) {
 		if (!registrySet || registrySet.size === 0) return
 
-		registrySet.forEach(item => {
+		registrySet.forEach((item) => {
 			const code = item?.item_code
 			if (!code) return
 			const bucket = itemRegistry.get(code)
@@ -114,7 +113,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	function registerItems(items, registrySet) {
 		if (!Array.isArray(items) || items.length === 0) return
 
-		items.forEach(item => {
+		items.forEach((item) => {
 			if (!item || !item.item_code) return
 
 			ensureOriginalStock(item)
@@ -152,14 +151,14 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 		clearBaseCache()
 
 		const impactedCodes = new Set()
-		items.forEach(item => {
+		items.forEach((item) => {
 			if (!item || !item.item_code) return
 			if (cartReservedLookup.has(item.item_code)) {
 				impactedCodes.add(item.item_code)
 			}
 		})
 
-		impactedCodes.forEach(code => {
+		impactedCodes.forEach((code) => {
 			const qty = cartReservedLookup.get(code) || 0
 			updateReservedStock(code, qty)
 		})
@@ -175,14 +174,14 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 		clearBaseCache()
 
 		const impactedCodes = new Set()
-		next.forEach(item => {
+		next.forEach((item) => {
 			if (!item || !item.item_code) return
 			if (cartReservedLookup.has(item.item_code)) {
 				impactedCodes.add(item.item_code)
 			}
 		})
 
-		impactedCodes.forEach(code => {
+		impactedCodes.forEach((code) => {
 			const qty = cartReservedLookup.get(code) || 0
 			updateReservedStock(code, qty)
 		})
@@ -194,9 +193,9 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			return
 		}
 
-		const reservation = Math.max(parseFloat(reservedQty) || 0, 0)
+		const reservation = Math.max(Number.parseFloat(reservedQty) || 0, 0)
 
-		bucket.forEach(item => {
+		bucket.forEach((item) => {
 			const original = ensureOriginalStock(item)
 			const updated = Math.max(original - reservation, 0)
 			item.actual_qty = updated
@@ -207,20 +206,24 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	const filteredItems = computed(() => {
 		// When searching, use search results from server
 		// When browsing, use loaded items with client-side filtering
-		const term = (searchTerm.value || '').trim()
+		const term = (searchTerm.value || "").trim()
 		const usingSearch = term.length > 0
 		const sourceItems = usingSearch ? searchResults.value : allItems.value
 
 		if (!sourceItems || sourceItems.length === 0) return []
 
-		const sourceVersion = usingSearch ? searchResultsVersion.value : allItemsVersion.value
-		const selectionKey = selectedItemGroup.value || ''
-		const cacheKey = `${usingSearch ? 'search' : 'browse'}|${term}|${selectionKey}|${sourceVersion}`
+		const sourceVersion = usingSearch
+			? searchResultsVersion.value
+			: allItemsVersion.value
+		const selectionKey = selectedItemGroup.value || ""
+		const cacheKey = `${usingSearch ? "search" : "browse"}|${term}|${selectionKey}|${sourceVersion}`
 
 		let list = baseResultCache.get(cacheKey)
 		if (!list) {
 			list = selectedItemGroup.value
-				? sourceItems.filter(item => item.item_group === selectedItemGroup.value)
+				? sourceItems.filter(
+						(item) => item.item_group === selectedItemGroup.value,
+					)
 				: sourceItems
 			setCache(baseResultCache, cacheKey, list)
 		}
@@ -254,29 +257,34 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			cacheStats.value = stats
 			cacheReady.value = stats.cacheReady
 
-			console.log(`Cache status: ${stats.items} items cached, ready: ${stats.cacheReady}`)
+			console.log(
+				`Cache status: ${stats.items} items cached, ready: ${stats.cacheReady}`,
+			)
 
 			// Load from cache first if available (instant load)
 			if (stats.cacheReady && stats.items > 0) {
-				console.log('Loading initial items from cache (instant)...')
-				const cached = await offlineWorker.searchCachedItems('', itemsPerPage.value)
+				console.log("Loading initial items from cache (instant)...")
+				const cached = await offlineWorker.searchCachedItems(
+					"",
+					itemsPerPage.value,
+				)
 				if (cached && cached.length > 0) {
 					replaceAllItems(cached)
 					totalItemsLoaded.value = cached.length
 					currentOffset.value = cached.length
-					loading.value = false  // Show UI immediately with cached data
+					loading.value = false // Show UI immediately with cached data
 					console.log(`Loaded ${cached.length} items from cache`)
 				}
 			}
 
 			// Now fetch fresh data from server (small batch only!)
 			console.log(`Fetching ${itemsPerPage.value} items from server...`)
-			const response = await call('pos_next.api.items.get_items', {
+			const response = await call("pos_next.api.items.get_items", {
 				pos_profile: profile,
-				search_term: '',
+				search_term: "",
 				item_group: null,
 				start: 0,
-				limit: itemsPerPage.value,  // Only 50 items!
+				limit: itemsPerPage.value, // Only 50 items!
 			})
 			const list = response?.message || response || []
 
@@ -285,7 +293,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 				replaceAllItems(list)
 				totalItemsLoaded.value = list.length
 				currentOffset.value = list.length
-				hasMore.value = true  // There's likely more on server
+				hasMore.value = true // There's likely more on server
 
 				// Cache the fresh data
 				await offlineWorker.cacheItems(list)
@@ -296,20 +304,22 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			if (!stats.cacheReady || stats.items < 100) {
 				startBackgroundCacheSync(profile)
 			}
-
 		} catch (error) {
-			console.error('Error loading items:', error)
+			console.error("Error loading items:", error)
 
 			// Fallback to cached items if server fails (offline support)
 			try {
-				const cached = await offlineWorker.searchCachedItems('', itemsPerPage.value)
+				const cached = await offlineWorker.searchCachedItems(
+					"",
+					itemsPerPage.value,
+				)
 				replaceAllItems(cached || [])
 				totalItemsLoaded.value = cached?.length || 0
 				currentOffset.value = cached?.length || 0
 				hasMore.value = (cached?.length || 0) >= itemsPerPage.value
 				console.log(`Loaded ${cached?.length || 0} items from cache (fallback)`)
 			} catch (cacheError) {
-				console.error('Cache also failed:', cacheError)
+				console.error("Cache also failed:", cacheError)
 				replaceAllItems([])
 				totalItemsLoaded.value = 0
 				currentOffset.value = 0
@@ -335,35 +345,37 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 
 		try {
 			// Load next small batch (50 items)
-			const response = await call('pos_next.api.items.get_items', {
+			const response = await call("pos_next.api.items.get_items", {
 				pos_profile: posProfile.value,
-				search_term: '',
+				search_term: "",
 				item_group: null,
 				start: currentOffset.value,
-				limit: itemsPerPage.value,  // 50 items per batch
+				limit: itemsPerPage.value, // 50 items per batch
 			})
-		const list = response?.message || response || []
+			const list = response?.message || response || []
 
-		if (list.length > 0) {
-			// Append new items to existing list without breaking reactivity
-			appendAllItems(list)
-			totalItemsLoaded.value += list.length
+			if (list.length > 0) {
+				// Append new items to existing list without breaking reactivity
+				appendAllItems(list)
+				totalItemsLoaded.value += list.length
 
-			// Update pagination state
-			currentOffset.value += list.length
-			hasMore.value = list.length === itemsPerPage.value
+				// Update pagination state
+				currentOffset.value += list.length
+				hasMore.value = list.length === itemsPerPage.value
 
-			// Cache new items for offline support
-			await offlineWorker.cacheItems(list)
+				// Cache new items for offline support
+				await offlineWorker.cacheItems(list)
 
-			console.log(`Loaded ${list.length} more items, total: ${totalItemsLoaded.value}`)
-		} else {
-			// No more items to load
-			hasMore.value = false
-			console.log('All items loaded from server')
-		}
+				console.log(
+					`Loaded ${list.length} more items, total: ${totalItemsLoaded.value}`,
+				)
+			} else {
+				// No more items to load
+				hasMore.value = false
+				console.log("All items loaded from server")
+			}
 		} catch (error) {
-			console.error('Error loading more items:', error)
+			console.error("Error loading more items:", error)
 			hasMore.value = false
 		} finally {
 			loadingMore.value = false
@@ -376,20 +388,20 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			return
 		}
 
-		console.log('Starting background cache sync...')
+		console.log("Starting background cache sync...")
 		cacheSyncing.value = true
 
 		// Start from current offset to avoid re-fetching already loaded items
 		let offset = currentOffset.value || 0
-		const batchSize = 200  // Fetch 200 items per batch in background
+		const batchSize = 200 // Fetch 200 items per batch in background
 
 		// Function to fetch one batch
 		const fetchBatch = async () => {
 			try {
 				console.log(`Background sync: fetching batch at offset ${offset}`)
-				const response = await call('pos_next.api.items.get_items', {
+				const response = await call("pos_next.api.items.get_items", {
 					pos_profile: profile,
-					search_term: '',
+					search_term: "",
 					item_group: null,
 					start: offset,
 					limit: batchSize,
@@ -406,23 +418,25 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 					cacheStats.value = stats
 					cacheReady.value = stats.cacheReady
 
-					console.log(`Background sync: cached ${list.length} items, total cached: ${stats.items}`)
+					console.log(
+						`Background sync: cached ${list.length} items, total cached: ${stats.items}`,
+					)
 
 					// Stop if we got less than requested (reached end)
 					if (list.length < batchSize) {
-						console.log('Background sync complete - all items cached')
+						console.log("Background sync complete - all items cached")
 						clearInterval(backgroundSyncInterval)
 						backgroundSyncInterval = null
 						cacheSyncing.value = false
 					}
 				} else {
-					console.log('Background sync complete - no more items')
+					console.log("Background sync complete - no more items")
 					clearInterval(backgroundSyncInterval)
 					backgroundSyncInterval = null
 					cacheSyncing.value = false
 				}
 			} catch (error) {
-				console.error('Background sync error:', error)
+				console.error("Background sync error:", error)
 				// Don't stop on error, will retry on next interval
 			}
 		}
@@ -441,7 +455,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			clearInterval(backgroundSyncInterval)
 			backgroundSyncInterval = null
 			cacheSyncing.value = false
-			console.log('Background cache sync stopped')
+			console.log("Background cache sync stopped")
 		}
 	}
 
@@ -469,50 +483,49 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 					// 2. If cache has results, show them immediately
 					// 3. Then search server for fresh results in background
 
-				console.log(`Searching cache for: "${term}"`)
-				const cached = await offlineWorker.searchCachedItems(term, 500)
+					console.log(`Searching cache for: "${term}"`)
+					const cached = await offlineWorker.searchCachedItems(term, 500)
 
-				if (cached && cached.length > 0) {
-					// Show cached results immediately (instant!)
-					setSearchResults(cached)
-					searching.value = false
-					console.log(`Found ${cached.length} items in cache`)
+					if (cached && cached.length > 0) {
+						// Show cached results immediately (instant!)
+						setSearchResults(cached)
+						searching.value = false
+						console.log(`Found ${cached.length} items in cache`)
 
-					// Resolve with cached results
-					resolve(cached)
-				}
-
-				// Now search server in background for fresh results
-				console.log(`Searching server for: "${term}"`)
-				const response = await call('pos_next.api.items.get_items', {
-					pos_profile: posProfile.value,
-					search_term: term,
-					item_group: selectedItemGroup.value,
-					start: 0,
-					limit: 500,  // Reasonable limit for search results
-				})
-				const serverResults = response?.message || response || []
-
-				if (serverResults.length > 0) {
-					// Update with fresh server results
-					setSearchResults(serverResults)
-					console.log(`Found ${serverResults.length} items on server`)
-
-					// Cache server results for future searches
-					await offlineWorker.cacheItems(serverResults)
-
-					// If we didn't resolve with cache, resolve with server results
-					if (!cached || cached.length === 0) {
-						resolve(serverResults)
+						// Resolve with cached results
+						resolve(cached)
 					}
-				} else if (!cached || cached.length === 0) {
-					// No results from either cache or server
-					setSearchResults([])
-					resolve([])
-				}
 
+					// Now search server in background for fresh results
+					console.log(`Searching server for: "${term}"`)
+					const response = await call("pos_next.api.items.get_items", {
+						pos_profile: posProfile.value,
+						search_term: term,
+						item_group: selectedItemGroup.value,
+						start: 0,
+						limit: 500, // Reasonable limit for search results
+					})
+					const serverResults = response?.message || response || []
+
+					if (serverResults.length > 0) {
+						// Update with fresh server results
+						setSearchResults(serverResults)
+						console.log(`Found ${serverResults.length} items on server`)
+
+						// Cache server results for future searches
+						await offlineWorker.cacheItems(serverResults)
+
+						// If we didn't resolve with cache, resolve with server results
+						if (!cached || cached.length === 0) {
+							resolve(serverResults)
+						}
+					} else if (!cached || cached.length === 0) {
+						// No results from either cache or server
+						setSearchResults([])
+						resolve([])
+					}
 				} catch (error) {
-					console.error('Error searching items:', error)
+					console.error("Error searching items:", error)
 
 					// If we haven't shown cache results yet, try cache as fallback
 					if (!searchResults.value || searchResults.value.length === 0) {
@@ -520,9 +533,11 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 							const cached = await offlineWorker.searchCachedItems(term, 500)
 							setSearchResults(cached || [])
 							resolve(cached || [])
-							console.log(`Fallback: found ${cached?.length || 0} items in cache`)
+							console.log(
+								`Fallback: found ${cached?.length || 0} items in cache`,
+							)
 						} catch (cacheError) {
-							console.error('Cache search also failed:', cacheError)
+							console.error("Cache search also failed:", cacheError)
 							setSearchResults([])
 							resolve([])
 						}
@@ -543,11 +558,14 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	async function searchByBarcode(barcode) {
 		try {
 			if (!posProfile.value) {
-				console.error('No POS Profile set in store')
-				throw new Error('POS Profile not set')
+				console.error("No POS Profile set in store")
+				throw new Error("POS Profile not set")
 			}
 
-			console.log('Calling searchByBarcode API with posProfile:', posProfile.value)
+			console.log(
+				"Calling searchByBarcode API with posProfile:",
+				posProfile.value,
+			)
 
 			const result = await searchByBarcodeResource.submit({
 				barcode: barcode,
@@ -557,7 +575,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			const item = result?.message || result
 			return item
 		} catch (error) {
-			console.error('Store searchByBarcode error:', error)
+			console.error("Store searchByBarcode error:", error)
 			throw error
 		}
 	}
@@ -573,7 +591,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 				return null
 			}
 		} catch (error) {
-			console.error('Error getting item:', error)
+			console.error("Error getting item:", error)
 			return null
 		}
 	}
@@ -592,7 +610,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 	}
 
 	function clearSearch() {
-		searchTerm.value = ''
+		searchTerm.value = ""
 		setSearchResults([])
 		searching.value = false
 
@@ -625,7 +643,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 
 		const nextLookup = new Map()
 		if (Array.isArray(items) && items.length > 0) {
-			items.forEach(item => {
+			items.forEach((item) => {
 				const code = item?.item_code
 				if (!code) return
 				const qty = Number(item.quantity) || 0
@@ -636,12 +654,9 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 		const previousLookup = cartReservedLookup
 		cartReservedLookup = nextLookup
 
-		const touched = new Set([
-			...previousLookup.keys(),
-			...nextLookup.keys(),
-		])
+		const touched = new Set([...previousLookup.keys(), ...nextLookup.keys()])
 
-		touched.forEach(code => {
+		touched.forEach((code) => {
 			const reserved = nextLookup.get(code) || 0
 			updateReservedStock(code, reserved)
 		})
@@ -662,7 +677,7 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			return
 		}
 
-		stockUpdates.forEach(update => {
+		stockUpdates.forEach((update) => {
 			if (!update || !update.item_code) return
 
 			const bucket = itemRegistry.get(update.item_code)
@@ -673,10 +688,11 @@ export const useItemSearchStore = defineStore('itemSearch', () => {
 			const reserved = cartReservedLookup.get(update.item_code) || 0
 			const baseline = update.actual_qty ?? update.stock_qty
 
-			bucket.forEach(item => {
-				const baseStock = (baseline !== undefined && baseline !== null)
-					? baseline
-					: ensureOriginalStock(item)
+			bucket.forEach((item) => {
+				const baseStock =
+					baseline !== undefined && baseline !== null
+						? baseline
+						: ensureOriginalStock(item)
 				item.original_stock = baseStock
 				const available = Math.max(baseStock - reserved, 0)
 				item.actual_qty = available
