@@ -57,7 +57,8 @@
 						<!-- Source Badge (Pricing Rule vs Promotional Scheme) -->
 						<div
 							:class="[
-								'absolute top-2 right-12 text-[10px] font-bold px-2 py-1 rounded-full',
+								'absolute top-2 text-[10px] font-bold px-2 py-1 rounded-full',
+								isOfferApplied(offer) ? 'right-24' : 'right-2',
 								offer.source === 'Pricing Rule'
 									? 'bg-blue-600 text-white'
 									: 'bg-purple-600 text-white'
@@ -67,25 +68,29 @@
 						</div>
 
 						<!-- Offer Header -->
-						<div class="flex items-start justify-between mb-3">
-							<div class="flex-1 pr-4">
-								<h4 class="text-base font-bold text-gray-900">
-									{{ offer.title || offer.name }}
-								</h4>
-								<p v-if="offer.description" class="text-xs text-gray-600 mt-1">
-									{{ offer.description }}
-								</p>
-							</div>
-							<div class="flex-shrink-0">
-								<svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-								</svg>
-							</div>
+						<div class="mb-3">
+							<h4 class="text-base font-bold text-gray-900">
+								{{ offer.title || offer.name }}
+							</h4>
+							<p v-if="offer.description" class="text-xs text-gray-600 mt-1">
+								{{ offer.description }}
+							</p>
 						</div>
 
 						<!-- Discount Display -->
 						<div class="flex items-center space-x-3 mb-3">
-							<div class="bg-green-600 text-white px-4 py-2 rounded-lg">
+							<div
+								:class="[
+									'text-white px-4 py-2 rounded-lg transition-all',
+									isOfferApplied(offer)
+										? 'bg-green-700 ring-2 ring-green-600'
+										: offer.offer === 'Give Product'
+											? 'bg-purple-600'
+											: offer.discount_percentage
+												? 'bg-orange-600'
+												: 'bg-green-600'
+								]"
+							>
 								<div class="text-lg font-bold">
 									<span v-if="offer.discount_percentage">{{ offer.discount_percentage }}% OFF</span>
 									<span v-else-if="offer.discount_amount">{{ formatCurrency(offer.discount_amount) }} OFF</span>
