@@ -2,9 +2,9 @@ import { createPinia } from "pinia"
 import { createApp } from "vue"
 
 import App from "./App.vue"
+import { session, sessionUser } from "./data/session"
 import { userResource } from "./data/user"
 import router from "./router"
-import { initSocket } from "./socket"
 import {
 	createCSRFAwareRequest,
 	ensureCSRFToken,
@@ -37,13 +37,19 @@ if ("serviceWorker" in navigator) {
 				registerSW({
 					immediate: true,
 					onNeedRefresh() {
-						console.log("New content available, reloading...")
+						if (import.meta.env.DEV) {
+							console.log("New content available, reloading...")
+						}
 					},
 					onOfflineReady() {
-						console.log("App ready to work offline")
+						if (import.meta.env.DEV) {
+							console.log("App ready to work offline")
+						}
 					},
 					onRegistered(registration) {
-						console.log("Service Worker registered:", registration)
+						if (import.meta.env.DEV) {
+							console.log("Service Worker registered:", registration)
+						}
 					},
 					onRegisterError(error) {
 						console.error("Service Worker registration error:", error)
@@ -77,12 +83,8 @@ async function initializeApp() {
 	setConfig("resourceFetcher", csrfAwareFrappeRequest)
 
 	app.use(pinia)
-	app.use(router)
 	app.use(resourcesPlugin)
 	app.use(pageMetaPlugin)
-
-	const socket = initSocket()
-	app.config.globalProperties.$socket = socket
 
 	for (const key in globalComponents) {
 		app.component(key, globalComponents[key])
@@ -95,39 +97,67 @@ async function initializeApp() {
 		},
 	})
 
-	// Mount app with CSRF token initialized
-	app.mount("#app")
+	// Check authentication BEFORE registering router
+	// This ensures session.user is set before router initializes
 
-	// After mounting, try to load user data (non-blocking)
-	// If user is already logged in, get CSRF token
-	try {
-		await userResource.fetch()
-
-		// User is logged in, ensure CSRF token is ready
-		const hadToken = !!getCSRFTokenFromCookie()
-		if (!hadToken) {
-			console.log("User already logged in, initializing CSRF token...")
+	// Initialize CSRF token if available
+	const existingToken = getCSRFTokenFromCookie()
+	if (existingToken) {
+		if (import.meta.env.DEV) {
+			console.log("CSRF token found in cookie, using it")
 		}
+	} else {
+		// No token in cookie, try to fetch one (this is a GET request, doesn't need CSRF)
+		if (import.meta.env.DEV) {
+			console.log("No CSRF token found, fetching...")
+		}
+		try {
+			await ensureCSRFToken({ silent: true })
+		} catch (error) {
+			if (import.meta.env.DEV) {
+				console.log("CSRF token fetch failed, will retry on first API call")
+			}
+		}
+	}
 
-		const tokenReady = await ensureCSRFToken()
-		if (!tokenReady) {
-			console.warn(
-				"CSRF token unavailable after user fetch; will retry automatically",
-			)
+	// Fetch user BEFORE registering router - use .promise to ensure we wait properly
+	try {
+		// Trigger fetch if not already fetching
+		if (!userResource.loading) {
+			userResource.fetch()
+		}
+		// Wait for the fetch to complete
+		await userResource.promise
+
+		// Update session.user so that session.isLoggedIn is reactive and correct
+		session.user = sessionUser()
+		if (import.meta.env.DEV) {
+			console.log(`[Main] User authenticated: ${session.user}`)
 		}
 	} catch (error) {
 		// User not logged in - that's okay, they'll login and get the token then
-		console.log("User not logged in, will get CSRF token after login")
-		// Check if it's an auth error - redirect to login
-		if (error?.exc_type === "AuthenticationError") {
-			router.push({ name: "Login" })
+		if (import.meta.env.DEV) {
+			console.log("User not logged in:", error?.message || "No session")
 		}
+		// Make sure session.user is null
+		session.user = null
 	}
+
+	// NOW register router after session.user is set
+	if (import.meta.env.DEV) {
+		console.log("[Main] Registering router with auth state:", session.isLoggedIn)
+	}
+	app.use(router)
+
+	// Mount app AFTER authentication check and router registration
+	app.mount("#app")
 
 	// Set up periodic token refresh (every 30 minutes)
 	setInterval(
 		async () => {
-			console.log("Performing scheduled CSRF token refresh...")
+			if (import.meta.env.DEV) {
+				console.log("Performing scheduled CSRF token refresh...")
+			}
 			await ensureCSRFToken({ forceRefresh: true, silent: true })
 		},
 		30 * 60 * 1000,

@@ -30,7 +30,8 @@ export const session = reactive({
 			await userResource.reload()
 			session.user = sessionUser()
 			session.login.reset()
-			router.replace(data.default_route || "/")
+			// Don't redirect here - let the Login page watcher handle navigation
+			// This prevents conflicts with the shift opening dialog flow
 		},
 		onError(error) {
 			console.error("Login error:", error)

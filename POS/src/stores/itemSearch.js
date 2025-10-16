@@ -444,8 +444,9 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		// Fetch first batch immediately
 		await fetchBatch()
 
-		// Then fetch a batch every 2 seconds (gentle on server)
-		if (!backgroundSyncInterval) {
+		// Only set up interval if sync should continue (first batch didn't complete sync)
+		// If cacheSyncing is still true, it means there's more data to fetch
+		if (cacheSyncing.value && !backgroundSyncInterval) {
 			backgroundSyncInterval = setInterval(fetchBatch, 2000)
 		}
 	}

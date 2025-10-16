@@ -104,6 +104,7 @@ import { useRouter } from "vue-router"
 import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
 import { useShift } from "../composables/useShift"
 import { session } from "../data/session"
+import { ensureCSRFToken } from "../utils/csrf"
 
 const router = useRouter()
 const { shiftState } = useShift()
@@ -159,8 +160,16 @@ function submit() {
 // Watch for successful login
 watch(
 	() => session.isLoggedIn,
-	(isLoggedIn) => {
+	async (isLoggedIn) => {
 		if (isLoggedIn) {
+			// Initialize CSRF token after successful login
+			try {
+				console.log("User logged in, initializing CSRF token...")
+				await ensureCSRFToken()
+			} catch (error) {
+				console.error("Failed to initialize CSRF token after login:", error)
+			}
+
 			// Show shift opening dialog after successful login
 			showShiftDialog.value = true
 		}

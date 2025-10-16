@@ -21,23 +21,20 @@ async function initDB() {
 		const dexieModule = await import("dexie")
 		Dexie = dexieModule.default || dexieModule
 
+		// Use the same database name as main thread
 		db = new Dexie("pos_next_offline")
 
-		db.version(1).stores({
-			settings: "key",
-			invoice_queue: "++id, synced, timestamp",
-			payment_queue: "++id, synced, timestamp",
-			items: "&item_code, item_group, *item_name, *barcodes",
-			customers: "&name, *customer_name, customer_group",
-			stock: "[item_code+warehouse]",
-		})
-
+		// Open existing database - Dexie will discover the schema automatically
 		await db.open()
+
+		// Verify tables are accessible
+		const tables = db.tables.map((t) => t.name)
+		console.log(`Worker: Connected to database with tables: ${tables.join(", ")}`)
+
 		dbInitialized = true
-		console.log("Worker: Database initialized successfully")
 		return db
 	} catch (error) {
-		console.error("Worker: Failed to initialize database:", error)
+		console.error("Worker: Failed to connect to database:", error)
 		throw error
 	}
 }
@@ -76,7 +73,8 @@ function isOffline(browserOnline) {
 async function getOfflineInvoiceCount() {
 	try {
 		const db = await initDB()
-		const count = await db.invoice_queue
+		const count = await db
+			.table("invoice_queue")
 			.filter((invoice) => invoice.synced === false)
 			.count()
 		return count
@@ -90,7 +88,8 @@ async function getOfflineInvoiceCount() {
 async function getOfflineInvoices() {
 	try {
 		const db = await initDB()
-		const invoices = await db.invoice_queue
+		const invoices = await db
+			.table("invoice_queue")
 			.filter((invoice) => invoice.synced === false)
 			.toArray()
 		return invoices
@@ -109,7 +108,7 @@ async function saveOfflineInvoice(invoiceData) {
 			throw new Error("Cannot save empty invoice")
 		}
 
-		const id = await db.invoice_queue.add({
+		const id = await db.table("invoice_queue").add({
 			data: invoiceData,
 			timestamp: Date.now(),
 			synced: false,
@@ -139,7 +138,7 @@ async function updateLocalStock(items) {
 				continue
 			}
 
-			const currentStock = await db.stock.get({
+			const currentStock = await db.table("stock").get({
 				item_code: item.item_code,
 				warehouse: item.warehouse,
 			})
@@ -147,7 +146,7 @@ async function updateLocalStock(items) {
 			const qty = item.quantity || item.qty || 0
 			const newQty = (currentStock?.qty || 0) - qty
 
-			await db.stock.put({
+			await db.table("stock").put({
 				item_code: item.item_code,
 				warehouse: item.warehouse,
 				qty: newQty,
@@ -166,12 +165,13 @@ async function searchCachedItems(searchTerm = "", limit = 50) {
 		const term = searchTerm.toLowerCase()
 
 		if (!term) {
-			return await db.items.limit(limit).toArray()
+			return await db.table("items").limit(limit).toArray()
 		}
 
 		// Performance: Use IndexedDB queries with multi-entry barcode index
 		// Try exact barcode match first (fastest)
-		const barcodeResults = await db.items
+		const barcodeResults = await db
+			.table("items")
 			.where("barcodes")
 			.equals(term)
 			.limit(limit)
@@ -182,7 +182,8 @@ async function searchCachedItems(searchTerm = "", limit = 50) {
 		}
 
 		// Fall back to prefix searches on indexed fields
-		const results = await db.items
+		const results = await db
+			.table("items")
 			.where("item_code")
 			.startsWithIgnoreCase(term)
 			.or("item_name")
@@ -204,12 +205,12 @@ async function searchCachedCustomers(searchTerm = "", limit = 20) {
 		const term = searchTerm.toLowerCase()
 
 		if (!term) {
-			return await db.customers.limit(limit).toArray()
+			return await db.table("customers").limit(limit).toArray()
 		}
 
 		// Get all customers and filter in memory for 'includes' behavior
 		// This is fast because IndexedDB is already in-memory for small datasets
-		const allCustomers = await db.customers.toArray()
+		const allCustomers = await db.table("customers").toArray()
 
 		const results = allCustomers
 			.filter((cust) => {
@@ -258,10 +259,10 @@ async function cacheItemsFromServer(items) {
 			}
 		})
 
-		await db.items.bulkPut(processedItems)
+		await db.table("items").bulkPut(processedItems)
 
 		// Update settings
-		await db.settings.put({
+		await db.table("settings").put({
 			key: "items_last_sync",
 			value: Date.now(),
 		})
@@ -277,10 +278,10 @@ async function cacheItemsFromServer(items) {
 async function cacheCustomersFromServer(customers) {
 	try {
 		const db = await initDB()
-		await db.customers.bulkPut(customers)
+		await db.table("customers").bulkPut(customers)
 
 		// Update settings
-		await db.settings.put({
+		await db.table("settings").put({
 			key: "customers_last_sync",
 			value: Date.now(),
 		})
@@ -296,7 +297,7 @@ async function cacheCustomersFromServer(customers) {
 async function isCacheReady() {
 	try {
 		const db = await initDB()
-		const itemCount = await db.items.count()
+		const itemCount = await db.table("items").count()
 		return itemCount > 0
 	} catch (error) {
 		return false
@@ -310,10 +311,10 @@ async function getCacheStats() {
 
 		const [itemCount, customerCount, queuedInvoices, lastSyncSetting] =
 			await Promise.all([
-				db.items.count(),
-				db.customers.count(),
+				db.table("items").count(),
+				db.table("customers").count(),
 				getOfflineInvoiceCount(),
-				db.settings.get("items_last_sync"),
+				db.table("settings").get("items_last_sync"),
 			])
 
 		return {
@@ -339,7 +340,7 @@ async function getCacheStats() {
 async function deleteOfflineInvoice(id) {
 	try {
 		const db = await initDB()
-		await db.invoice_queue.delete(id)
+		await db.table("invoice_queue").delete(id)
 		return { success: true }
 	} catch (error) {
 		console.error("Worker: Error deleting offline invoice:", error)
@@ -367,7 +368,7 @@ async function updateStockQuantities(stockUpdates) {
 			}
 
 			// Get the cached item
-			const item = await db.items.get(item_code)
+			const item = await db.table("items").get(item_code)
 
 			if (!item) {
 				continue
@@ -379,7 +380,7 @@ async function updateStockQuantities(stockUpdates) {
 			item.warehouse = warehouse || item.warehouse
 
 			// Save updated item back to cache
-			await db.items.put(item)
+			await db.table("items").put(item)
 			updatedCount++
 		}
 

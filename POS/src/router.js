@@ -26,14 +26,18 @@ const router = createRouter({
 	routes,
 })
 
-router.beforeEach(async (to, from, next) => {
-	let isLoggedIn = session.isLoggedIn
-	try {
-		await userResource.promise
-	} catch (error) {
-		isLoggedIn = false
+router.beforeEach((to, from, next) => {
+	// Check authentication status (session.user is already set in main.js before app mount)
+	const isLoggedIn = session.isLoggedIn
+
+	// Only log during development
+	if (import.meta.env.DEV) {
+		console.log(
+			`[Router] ${to.name} (from: ${from.name || "initial"}), auth: ${isLoggedIn}`,
+		)
 	}
 
+	// Redirect logic
 	if (to.name === "Login" && isLoggedIn) {
 		next({ name: "POSSale" })
 	} else if (to.name !== "Login" && !isLoggedIn) {
