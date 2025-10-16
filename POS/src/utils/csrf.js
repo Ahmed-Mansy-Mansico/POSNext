@@ -1,6 +1,6 @@
 const CSRF_COOKIE = "csrf_token"
 const CSRF_PLACEHOLDER = "{{ csrf_token }}"
-const LOGGED_USER_ENDPOINT = "/api/method/frappe.auth.get_logged_user"
+const CSRF_TOKEN_ENDPOINT = "/api/method/pos_next.api.utilities.get_csrf_token"
 
 let refreshPromise = null
 let lastKnownToken = null
@@ -46,10 +46,16 @@ export function getCSRFTokenFromCookie() {
 	return token
 }
 
-async function fetchLoggedUser() {
-	const response = await fetch(LOGGED_USER_ENDPOINT, {
+async function fetchCSRFToken() {
+	// Use raw fetch (not frappeRequest) to avoid circular dependency:
+	// - This function is called when CSRF token is invalid
+	// - frappeRequest is wrapped with CSRF auto-refresh
+	// - Using frappeRequest here would cause infinite loop
+	// GET requests to @frappe.whitelist() endpoints don't require CSRF tokens
+	const response = await fetch(CSRF_TOKEN_ENDPOINT, {
 		method: "GET",
-		credentials: "include",
+		credentials: "include", // Include session cookies
+		cache: "no-store", // Bypass service worker cache for CSRF token refresh
 		headers: {
 			Accept: "application/json",
 			"X-Frappe-Site-Name": window.location.hostname,
@@ -70,11 +76,18 @@ async function fetchLoggedUser() {
 }
 
 function extractTokenFromResponse(data) {
-	return normalizeToken(data?.csrf_token)
+	// Frappe API response structure: { message: { csrf_token: "..." } }
+	return normalizeToken(data?.message?.csrf_token)
 }
 
 export async function ensureCSRFToken({ forceRefresh = false, silent = false } = {}) {
 	if (!forceRefresh) {
+		// Check if we already have a valid token in window.csrf_token
+		if (window.csrf_token && typeof window.csrf_token === "string" && window.csrf_token !== CSRF_PLACEHOLDER) {
+			return true
+		}
+
+		// Fallback: check cookie (though Frappe typically doesn't use csrf_token cookies)
 		const existingToken = getCSRFTokenFromCookie()
 		if (existingToken) {
 			return true
@@ -87,7 +100,13 @@ export async function ensureCSRFToken({ forceRefresh = false, silent = false } =
 
 	refreshPromise = (async () => {
 		try {
-			const { response, data } = await fetchLoggedUser()
+			// Clear any stale token before fetching a new one
+			if (forceRefresh) {
+				window.csrf_token = null
+				lastKnownToken = null
+			}
+
+			const { response, data } = await fetchCSRFToken()
 
 			if (response.status === 401 || response.status === 403) {
 				if (!silent) {
@@ -96,10 +115,15 @@ export async function ensureCSRFToken({ forceRefresh = false, silent = false } =
 				return false
 			}
 
-			if (!response.ok && !silent) {
-				console.warn("Failed to refresh CSRF token, status:", response.status)
+			if (!response.ok) {
+				if (!silent) {
+					console.warn("Failed to refresh CSRF token, status:", response.status)
+				}
+				// For non-OK responses, don't try to extract token from potentially invalid data
+				return false
 			}
 
+			// First check if the cookie was updated by the API call
 			const tokenFromCookie = getCSRFTokenFromCookie()
 			if (tokenFromCookie) {
 				if (!silent && forceRefresh) {
@@ -108,6 +132,7 @@ export async function ensureCSRFToken({ forceRefresh = false, silent = false } =
 				return true
 			}
 
+			// Extract token from response payload (this is the primary method for Frappe)
 			const tokenFromResponse = extractTokenFromResponse(data)
 			if (tokenFromResponse) {
 				setGlobalToken(tokenFromResponse, "response")
