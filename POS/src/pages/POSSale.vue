@@ -103,12 +103,12 @@
 		<div ref="containerRef" class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
 		<!-- Mobile Tab Navigation -->
 		<div
-				class="lg:hidden bg-white border-b border-gray-200 flex shadow-sm sticky top-0 transition-all z-[100]"
+				class="lg:hidden bg-white border-b border-gray-200 flex shadow-sm sticky top-0 z-[100]"
 			>
 				<button
-					@click="uiStore.setMobileTab('items')"
+					@click="handleTabSwitch('items')"
 					:class="[
-						'flex-1 px-3 py-3 text-sm font-semibold transition-all relative touch-manipulation active:scale-95',
+						'flex-1 px-3 py-3 text-sm font-semibold transition-[color,background-color,border-color] duration-100 relative touch-manipulation',
 						uiStore.mobileActiveTab === 'items'
 							? 'text-blue-600 border-b-3 border-blue-600 bg-blue-50'
 							: 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-100'
@@ -125,9 +125,9 @@
 					</div>
 				</button>
 				<button
-					@click="uiStore.setMobileTab('cart')"
+					@click="handleTabSwitch('cart')"
 					:class="[
-						'flex-1 px-3 py-3 text-sm font-semibold transition-all relative touch-manipulation active:scale-95',
+						'flex-1 px-3 py-3 text-sm font-semibold transition-[color,background-color,border-color] duration-100 relative touch-manipulation',
 						uiStore.mobileActiveTab === 'cart'
 							? 'text-blue-600 border-b-3 border-blue-600 bg-blue-50'
 							: 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-100'
@@ -149,23 +149,25 @@
 			</div>
 
 			<!-- Left: Items Selector (Desktop) / Tab Content (Mobile) -->
-			<div
-				:style="{ width: uiStore.isDesktop ? uiStore.leftPanelWidth + 'px' : '100%' }"
-				:class="[
-					'flex flex-col bg-white overflow-hidden',
-					uiStore.isDesktop ? 'flex-shrink-0' : '',
-					!uiStore.isDesktop && (uiStore.mobileActiveTab === 'items' ? 'flex-1' : 'hidden')
-				]"
-				style="will-change: width; contain: layout;"
-			>
-				<ItemsSelector
-					ref="itemsSelectorRef"
-					:pos-profile="shiftStore.profileName"
-					:cart-items="cartStore.invoiceItems"
-					:currency="shiftStore.profileCurrency"
-					@item-selected="handleItemSelected"
-				/>
-			</div>
+			<keep-alive>
+				<div
+					v-if="uiStore.isDesktop || uiStore.mobileActiveTab === 'items'"
+					:style="{ width: uiStore.isDesktop ? uiStore.leftPanelWidth + 'px' : '100%' }"
+					:class="[
+						'flex flex-col bg-white overflow-hidden',
+						uiStore.isDesktop ? 'flex-shrink-0' : 'flex-1'
+					]"
+					style="contain: layout style paint;"
+				>
+					<ItemsSelector
+						ref="itemsSelectorRef"
+						:pos-profile="shiftStore.profileName"
+						:cart-items="cartStore.invoiceItems"
+						:currency="shiftStore.profileCurrency"
+						@item-selected="handleItemSelected"
+					/>
+				</div>
+			</keep-alive>
 
 			<!-- Draggable Divider (Desktop Only) -->
 			<div
@@ -174,7 +176,7 @@
 				role="separator"
 				aria-orientation="vertical"
 				@pointerdown="startResize"
-				class="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize relative flex-shrink-0 transition-all duration-100 hidden lg:block"
+				class="w-1 bg-gray-200 hover:bg-blue-400 cursor-col-resize relative flex-shrink-0 transition-[background-color] duration-100 hidden lg:block"
 				:class="{
 					'bg-blue-500': uiStore.isResizing,
 					'pointer-events-none opacity-0': uiStore.isAnyDialogOpen,
@@ -190,45 +192,47 @@
 			</div>
 
 			<!-- Right: Invoice Cart (Desktop) / Tab Content (Mobile) -->
-			<div
-				:class="[
-					'flex flex-col bg-gray-50 overflow-hidden',
-					uiStore.isDesktop ? 'flex-1' : '',
-					!uiStore.isDesktop && (uiStore.mobileActiveTab === 'cart' ? 'flex-1' : 'hidden')
-				]"
-				style="min-width: 300px; contain: layout;"
-			>
-				<InvoiceCart
-					:items="cartStore.invoiceItems"
-					:customer="cartStore.customer"
-					:subtotal="cartStore.subtotal"
-					:tax-amount="cartStore.totalTax"
-					:discount-amount="cartStore.totalDiscount"
-					:grand-total="cartStore.grandTotal"
-					:pos-profile="shiftStore.profileName"
-					:currency="shiftStore.profileCurrency"
-					:applied-offers="cartStore.appliedOffers"
-					:warehouses="profileWarehouses"
-					@update-quantity="cartStore.updateItemQuantity"
-					@remove-item="cartStore.removeItem"
-					@select-customer="handleCustomerSelected"
-					@create-customer="handleCreateCustomer"
-					@proceed-to-payment="handleProceedToPayment"
-					@clear-cart="handleClearCart"
-					@save-draft="handleSaveDraft"
-					@apply-coupon="uiStore.showCouponDialog = true"
-					@show-offers="uiStore.showOffersDialog = true"
-					@remove-offer="offer => cartStore.removeOffer(offer, shiftStore.currentProfile, offersDialogRef.value)"
-					@update-uom="cartStore.changeItemUOM"
-					@edit-item="handleEditItem"
-				/>
-			</div>
+			<keep-alive>
+				<div
+					v-if="uiStore.isDesktop || uiStore.mobileActiveTab === 'cart'"
+					:class="[
+						'flex flex-col bg-gray-50 overflow-hidden',
+						uiStore.isDesktop ? 'flex-1' : 'flex-1'
+					]"
+					style="min-width: 300px; contain: layout style paint;"
+				>
+					<InvoiceCart
+						:items="cartStore.invoiceItems"
+						:customer="cartStore.customer"
+						:subtotal="cartStore.subtotal"
+						:tax-amount="cartStore.totalTax"
+						:discount-amount="cartStore.totalDiscount"
+						:grand-total="cartStore.grandTotal"
+						:pos-profile="shiftStore.profileName"
+						:currency="shiftStore.profileCurrency"
+						:applied-offers="cartStore.appliedOffers"
+						:warehouses="profileWarehouses"
+						@update-quantity="cartStore.updateItemQuantity"
+						@remove-item="cartStore.removeItem"
+						@select-customer="handleCustomerSelected"
+						@create-customer="handleCreateCustomer"
+						@proceed-to-payment="handleProceedToPayment"
+						@clear-cart="handleClearCart"
+						@save-draft="handleSaveDraft"
+						@apply-coupon="uiStore.showCouponDialog = true"
+						@show-offers="uiStore.showOffersDialog = true"
+						@remove-offer="offer => cartStore.removeOffer(offer, shiftStore.currentProfile, offersDialogRef.value)"
+						@update-uom="cartStore.changeItemUOM"
+						@edit-item="handleEditItem"
+					/>
+				</div>
+			</keep-alive>
 
 			<!-- Mobile Floating Cart Button -->
 			<button
 				v-if="!uiStore.isDesktop && uiStore.mobileActiveTab === 'items' && cartStore.itemCount > 0"
 				@click="uiStore.setMobileTab('cart')"
-				class="lg:hidden fixed bottom-6 right-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full p-4 shadow-2xl hover:shadow-3xl hover:from-blue-700 hover:to-blue-800 active:from-blue-800 active:to-blue-900 transition-all z-50 touch-manipulation active:scale-95 ring-4 ring-blue-100"
+				class="lg:hidden fixed bottom-6 right-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full p-4 shadow-2xl hover:shadow-3xl hover:from-blue-700 hover:to-blue-800 active:from-blue-800 active:to-blue-900 transition-[background,box-shadow,transform] duration-200 z-50 touch-manipulation active:scale-95 ring-4 ring-blue-100"
 				:aria-label="'View cart with ' + cartStore.itemCount + ' items'"
 			>
 				<div class="relative">
@@ -458,7 +462,7 @@
 						<button
 							@click="logoutWithCloseShift"
 							:disabled="session.logout.loading"
-							class="w-full flex items-center justify-center px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
+							class="w-full flex items-center justify-center px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-blue-500/30 transition-[background,box-shadow,opacity,transform] duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
 						>
 							<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
@@ -471,14 +475,14 @@
 							<button
 								@click="confirmLogout"
 								:disabled="session.logout.loading"
-								class="px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold text-sm rounded-lg shadow-md hover:shadow-red-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+								class="px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold text-sm rounded-lg shadow-md hover:shadow-red-500/30 transition-[background,box-shadow,opacity] duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
 							>
 								Skip & Sign Out
 							</button>
 							<button
 								@click="uiStore.showLogoutDialog = false"
 								:disabled="session.logout.loading"
-								class="px-4 py-3 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300 hover:border-gray-400"
+								class="px-4 py-3 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-lg transition-[background-color,border-color,opacity] duration-200 disabled:opacity-50 disabled:cursor-not-allowed border border-gray-300 hover:border-gray-400"
 							>
 								Cancel
 							</button>
@@ -506,14 +510,14 @@
 						<button
 							@click="uiStore.showLogoutDialog = false"
 							:disabled="session.logout.loading"
-							class="px-5 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-blue-500/30 transition-all disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98]"
+							class="px-5 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-blue-500/30 transition-[background-color,box-shadow,opacity,transform] duration-200 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98]"
 						>
 							Cancel
 						</button>
 						<button
 							@click="confirmLogout"
 							:disabled="session.logout.loading"
-							class="px-5 py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-red-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
+							class="px-5 py-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-red-500/30 transition-[background,box-shadow,opacity,transform] duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
 						>
 							<span v-if="!session.logout.loading">Sign Out</span>
 							<span v-else class="flex items-center justify-center">
@@ -1703,6 +1707,14 @@ function handlePromotionSaved(data) {
 		text: data.message || "Promotion saved successfully",
 		icon: "check",
 		iconClasses: "text-green-600",
+	})
+}
+
+// Optimized tab switching for mobile with RAF for smooth transitions
+function handleTabSwitch(tab) {
+	// Use requestAnimationFrame to ensure smooth transitions
+	requestAnimationFrame(() => {
+		uiStore.setMobileTab(tab)
 	})
 }
 </script>

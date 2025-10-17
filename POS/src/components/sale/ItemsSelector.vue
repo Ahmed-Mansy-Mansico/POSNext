@@ -6,7 +6,7 @@
 				<button
 					@click="itemStore.setSelectedItemGroup(null)"
 					:class="[
-						'flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium whitespace-nowrap transition-all touch-manipulation active:scale-95 snap-start flex-shrink-0',
+						'flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium whitespace-nowrap transition-[background-color,border-color] duration-75 touch-manipulation snap-start flex-shrink-0',
 						!selectedItemGroup
 							? 'bg-blue-50 text-blue-600 border-2 border-blue-500 shadow-sm'
 							: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 active:bg-gray-100',
@@ -22,7 +22,7 @@
 					:key="group.item_group"
 					@click="itemStore.setSelectedItemGroup(group.item_group)"
 					:class="[
-						'flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium whitespace-nowrap transition-all touch-manipulation active:scale-95 snap-start flex-shrink-0',
+						'flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-medium whitespace-nowrap transition-[background-color,border-color] duration-75 touch-manipulation snap-start flex-shrink-0',
 						selectedItemGroup === group.item_group
 							? 'bg-blue-50 text-blue-600 border-2 border-blue-500 shadow-sm'
 							: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 active:bg-gray-100',
@@ -86,7 +86,7 @@
 						<button
 							@click="toggleBarcodeScanner"
 							:class="[
-								'p-1 sm:p-1.5 rounded transition-all touch-manipulation active:scale-95',
+								'p-1 sm:p-1.5 rounded transition-[background-color] duration-75 touch-manipulation',
 								scannerEnabled
 									? 'bg-green-100 hover:bg-green-200 active:bg-green-300 text-green-700'
 									: 'hover:bg-gray-100 active:bg-gray-200 text-gray-600'
@@ -101,7 +101,7 @@
 						<button
 							@click="toggleAutoAdd"
 							:class="[
-								'p-1 sm:p-1.5 rounded transition-all flex items-center gap-0.5 text-[9px] sm:text-xs font-medium px-1 sm:px-2 touch-manipulation active:scale-95',
+								'p-1 sm:p-1.5 rounded transition-[background-color] duration-75 flex items-center gap-0.5 text-[9px] sm:text-xs font-medium px-1 sm:px-2 touch-manipulation',
 								autoAddEnabled
 									? 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-700'
 									: 'hover:bg-gray-100 active:bg-gray-200 text-gray-600'
@@ -120,7 +120,7 @@
 					<button
 						@click="setViewMode('grid')"
 						:class="[
-							'p-1.5 sm:p-2 rounded transition-all touch-manipulation active:scale-95',
+							'p-1.5 sm:p-2 rounded transition-[background-color,box-shadow] duration-75 touch-manipulation',
 							viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 active:bg-gray-300'
 						]"
 						title="Grid View"
@@ -133,7 +133,7 @@
 					<button
 						@click="setViewMode('list')"
 						:class="[
-							'p-1.5 sm:p-2 rounded transition-all touch-manipulation active:scale-95',
+							'p-1.5 sm:p-2 rounded transition-[background-color,box-shadow] duration-75 touch-manipulation',
 							viewMode === 'list' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 active:bg-gray-300'
 						]"
 						title="List View"
@@ -194,7 +194,7 @@
 						:key="item.item_code"
 						v-memo="[item.item_code, item.actual_qty, item.stock_qty, item.rate, item.price_list_rate]"
 						@click="handleItemClick(item)"
-						class="relative bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-lg transition-all touch-manipulation active:scale-95 active:shadow-xl"
+						class="relative bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-[border-color,box-shadow] duration-100 touch-manipulation"
 					>
 						<!-- Stock Badge - Positioned at top right of card -->
 						<div
@@ -281,7 +281,7 @@
 							@click="previousPage"
 							:disabled="currentPage === 1"
 							:class="[
-								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
+								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-[background-color] duration-75 touch-manipulation',
 								currentPage === 1
 									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
 									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
@@ -297,7 +297,7 @@
 								:key="page"
 								@click="goToPage(page)"
 								:class="[
-									'min-w-[28px] sm:min-w-[32px] px-1.5 sm:px-2.5 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
+									'min-w-[28px] sm:min-w-[32px] px-1.5 sm:px-2.5 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-[background-color,border-color] duration-75 touch-manipulation',
 									currentPage === page
 										? 'bg-blue-600 text-white border-blue-600'
 										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
@@ -311,7 +311,7 @@
 							@click="nextPage"
 							:disabled="currentPage === totalPages"
 							:class="[
-								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
+								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-[background-color] duration-75 touch-manipulation',
 								currentPage === totalPages
 									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
 									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
@@ -350,7 +350,7 @@
 							:key="item.item_code"
 							v-memo="[item.item_code, item.actual_qty, item.stock_qty, item.rate, item.price_list_rate]"
 							@click="handleItemClick(item)"
-							class="cursor-pointer hover:bg-blue-50 transition-colors touch-manipulation active:bg-blue-100"
+							class="cursor-pointer hover:bg-blue-50 transition-colors duration-100 touch-manipulation active:bg-blue-100"
 						>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
 								<div class="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
@@ -410,7 +410,7 @@
 							@click="previousPage"
 							:disabled="currentPage === 1"
 							:class="[
-								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
+								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-[background-color] duration-75 touch-manipulation',
 								currentPage === 1
 									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
 									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
@@ -426,7 +426,7 @@
 								:key="page"
 								@click="goToPage(page)"
 								:class="[
-									'min-w-[28px] sm:min-w-[32px] px-1.5 sm:px-2.5 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
+									'min-w-[28px] sm:min-w-[32px] px-1.5 sm:px-2.5 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-[background-color,border-color] duration-75 touch-manipulation',
 									currentPage === page
 										? 'bg-blue-600 text-white border-blue-600'
 										: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
@@ -440,7 +440,7 @@
 							@click="nextPage"
 							:disabled="currentPage === totalPages"
 							:class="[
-								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-all touch-manipulation active:scale-95',
+								'px-2 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg border transition-[background-color] duration-75 touch-manipulation',
 								currentPage === totalPages
 									? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
 									: 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 active:bg-gray-100'
@@ -616,28 +616,40 @@ watch(
 	{ immediate: false },
 )
 
-// Infinite scroll handler
+// Throttle scroll handler for better performance
+let scrollTimeout = null
+const SCROLL_THROTTLE_MS = 100
+
+// Infinite scroll handler with throttling
 function handleScroll(event) {
-	const container = event.target
-	const scrollPosition = container.scrollTop + container.clientHeight
-	const scrollHeight = container.scrollHeight
-
-	// Load more when user is within 200px of the bottom
-	const threshold = 200
-
-	// Only trigger infinite scroll when browsing (not searching)
-	// Search shows all results immediately from server
-	const isSearching = searchTerm.value && searchTerm.value.trim().length > 0
-
-	if (
-		!isSearching &&
-		scrollHeight - scrollPosition < threshold &&
-		hasMore.value &&
-		!loadingMore.value &&
-		!loading.value
-	) {
-		itemStore.loadMoreItems()
+	// Clear existing timeout
+	if (scrollTimeout) {
+		clearTimeout(scrollTimeout)
 	}
+
+	// Throttle scroll handling
+	scrollTimeout = setTimeout(() => {
+		const container = event.target
+		const scrollPosition = container.scrollTop + container.clientHeight
+		const scrollHeight = container.scrollHeight
+
+		// Load more when user is within 200px of the bottom
+		const threshold = 200
+
+		// Only trigger infinite scroll when browsing (not searching)
+		// Search shows all results immediately from server
+		const isSearching = searchTerm.value && searchTerm.value.trim().length > 0
+
+		if (
+			!isSearching &&
+			scrollHeight - scrollPosition < threshold &&
+			hasMore.value &&
+			!loadingMore.value &&
+			!loading.value
+		) {
+			itemStore.loadMoreItems()
+		}
+	}, SCROLL_THROTTLE_MS)
 }
 
 onMounted(() => {
@@ -653,6 +665,12 @@ onMounted(() => {
 onUnmounted(() => {
 	// Cleanup background sync when component unmounts
 	itemStore.cleanup()
+
+	// Clear scroll timeout
+	if (scrollTimeout) {
+		clearTimeout(scrollTimeout)
+		scrollTimeout = null
+	}
 })
 
 // Handle keydown for barcode scanner detection

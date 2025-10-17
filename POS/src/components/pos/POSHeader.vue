@@ -1,7 +1,6 @@
 <template>
 	<div
-		class="bg-white shadow-sm sticky top-0 transition-all"
-		:class="isAnyDialogOpen ? 'z-[100]' : 'z-[200]'"
+		class="bg-white shadow-sm sticky top-0 z-[200]"
 	>
 		<div class="flex py-2 sm:py-3">
 			<!-- POS Icon - Aligned with Management Sidebar (64px) -->
