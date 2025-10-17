@@ -4,9 +4,16 @@
  * Listens to Socket.IO events for stock changes and notifies registered handlers.
  * Provides intelligent event management with deduplication and batching.
  * Each handler is responsible for filtering by warehouse and updating its cache.
+ *
+ * Performance optimization: Batch delay and size are dynamically adjusted
+ * based on device CPU cores and performance tier.
  */
 
+import { performanceConfig } from "@/utils/performanceConfig"
+import { logger } from "@/utils/logger"
 import { onUnmounted, ref } from "vue"
+
+const log = logger.create('RealtimeStock')
 
 // Shared state across all instances
 const isListening = ref(false)
@@ -15,10 +22,13 @@ const pendingUpdates = new Map()
 let batchTimeout = null
 
 /**
- * Batch update configuration
+ * Batch update configuration - dynamically adjusted based on device performance
+ * Low-end devices (800ms, 50 items): More batching to reduce CPU load
+ * Medium devices (500ms, 100 items): Balanced performance
+ * High-end devices (300ms, 200 items): Faster updates with larger batches
  */
-const BATCH_DELAY_MS = 500 // Wait 500ms before applying batched updates
-const MAX_BATCH_SIZE = 100 // Maximum items to batch before forcing update
+const BATCH_DELAY_MS = performanceConfig.get("stockBatchDelay")
+const MAX_BATCH_SIZE = performanceConfig.get("stockMaxBatchSize")
 
 /**
  * Process pending stock updates in batch
@@ -38,11 +48,11 @@ async function processBatchedUpdates() {
 			try {
 				handler(updates)
 			} catch (error) {
-				console.error("[Realtime Stock] Handler error:", error)
+				log.error("Handler error", error)
 			}
 		})
 	} catch (error) {
-		console.error("[Realtime Stock] Failed to process batch updates:", error)
+		log.error("Failed to process batch updates", error)
 	}
 }
 
@@ -99,7 +109,7 @@ function startListening() {
 	}
 
 	if (!window.frappe?.realtime) {
-		console.warn("[Realtime Stock] Socket.IO not available")
+		log.warn("Socket.IO not available")
 		return
 	}
 

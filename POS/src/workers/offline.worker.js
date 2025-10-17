@@ -6,6 +6,9 @@
  * - Cache management
  */
 
+import { logger } from '../utils/logger'
+const log = logger.create('OfflineWorker')
+
 // Import Dexie using importScripts for worker context
 // Note: In Vite, worker imports work differently
 let Dexie
@@ -29,12 +32,12 @@ async function initDB() {
 
 		// Verify tables are accessible
 		const tables = db.tables.map((t) => t.name)
-		console.log(`Worker: Connected to database with tables: ${tables.join(", ")}`)
+		log.debug(`Connected to database with tables: ${tables.join(", ")}`)
 
 		dbInitialized = true
 		return db
 	} catch (error) {
-		console.error("Worker: Failed to connect to database:", error)
+		log.error("Failed to connect to database", error)
 		throw error
 	}
 }
@@ -73,13 +76,26 @@ function isOffline(browserOnline) {
 async function getOfflineInvoiceCount() {
 	try {
 		const db = await initDB()
+
+		// Check if invoice_queue table exists
+		const tableExists = db.tables.some(table => table.name === "invoice_queue")
+		if (!tableExists) {
+			log.debug("invoice_queue table does not exist yet, returning 0")
+			return 0
+		}
+
 		const count = await db
 			.table("invoice_queue")
 			.filter((invoice) => invoice.synced === false)
 			.count()
 		return count
 	} catch (error) {
-		console.error("Worker: Error getting offline invoice count:", error)
+		// Handle Dexie errors gracefully
+		if (error.name === 'NotFoundError' || error.name === 'DatabaseClosedError') {
+			log.debug("Invoice queue not accessible yet, returning 0")
+			return 0
+		}
+		log.error("Error getting offline invoice count", error)
 		return 0
 	}
 }
@@ -88,13 +104,21 @@ async function getOfflineInvoiceCount() {
 async function getOfflineInvoices() {
 	try {
 		const db = await initDB()
+
+		// Check if invoice_queue table exists
+		const tableExists = db.tables.some(table => table.name === "invoice_queue")
+		if (!tableExists) {
+			log.debug("invoice_queue table does not exist yet, returning empty array")
+			return []
+		}
+
 		const invoices = await db
 			.table("invoice_queue")
 			.filter((invoice) => invoice.synced === false)
 			.toArray()
 		return invoices
 	} catch (error) {
-		console.error("Worker: Error getting offline invoices:", error)
+		log.error("Error getting offline invoices", error)
 		return []
 	}
 }
@@ -122,7 +146,7 @@ async function saveOfflineInvoice(invoiceData) {
 
 		return { success: true, id }
 	} catch (error) {
-		console.error("Worker: Error saving offline invoice:", error)
+		log.error("Error saving offline invoice", error)
 		throw error
 	}
 }
@@ -154,7 +178,7 @@ async function updateLocalStock(items) {
 			})
 		}
 	} catch (error) {
-		console.error("Worker: Error updating local stock:", error)
+		log.error("Error updating local stock", error)
 	}
 }
 
@@ -193,7 +217,7 @@ async function searchCachedItems(searchTerm = "", limit = 50) {
 
 		return results
 	} catch (error) {
-		console.error("Worker: Error searching cached items:", error)
+		log.error("Error searching cached items", error)
 		return []
 	}
 }
@@ -224,7 +248,7 @@ async function searchCachedCustomers(searchTerm = "", limit = 20) {
 
 		return results
 	} catch (error) {
-		console.error("Worker: Error searching cached customers:", error)
+		log.error("Error searching cached customers", error)
 		return []
 	}
 }
@@ -269,7 +293,7 @@ async function cacheItemsFromServer(items) {
 
 		return { success: true, count: items.length }
 	} catch (error) {
-		console.error("Worker: Error caching items:", error)
+		log.error("Error caching items", error)
 		throw error
 	}
 }
@@ -288,7 +312,7 @@ async function cacheCustomersFromServer(customers) {
 
 		return { success: true, count: customers.length }
 	} catch (error) {
-		console.error("Worker: Error caching customers:", error)
+		log.error("Error caching customers", error)
 		throw error
 	}
 }
@@ -325,7 +349,7 @@ async function getCacheStats() {
 			lastSync: lastSyncSetting?.value || null,
 		}
 	} catch (error) {
-		console.error("Worker: Error getting cache stats:", error)
+		log.error("Error getting cache stats", error)
 		return {
 			items: 0,
 			customers: 0,
@@ -343,7 +367,7 @@ async function deleteOfflineInvoice(id) {
 		await db.table("invoice_queue").delete(id)
 		return { success: true }
 	} catch (error) {
-		console.error("Worker: Error deleting offline invoice:", error)
+		log.error("Error deleting offline invoice", error)
 		throw error
 	}
 }
@@ -386,7 +410,7 @@ async function updateStockQuantities(stockUpdates) {
 
 		return { success: true, updated: updatedCount }
 	} catch (error) {
-		console.error("Worker: Error updating stock quantities:", error)
+		log.error("Error updating stock quantities", error)
 		throw error
 	}
 }
@@ -482,7 +506,7 @@ async function initialize() {
 	try {
 		// Initialize database first
 		await initDB()
-		console.log("Offline worker: Database ready")
+		log.info("Database ready")
 
 		// Start periodic server ping (every 30 seconds)
 		setInterval(async () => {
@@ -501,9 +525,9 @@ async function initialize() {
 			payload: { serverOnline: isOnline },
 		})
 
-		console.log("Offline worker initialized and ready")
+		log.success("Offline worker initialized and ready")
 	} catch (error) {
-		console.error("Offline worker initialization failed:", error)
+		log.error("Offline worker initialization failed", error)
 		self.postMessage({
 			type: "ERROR",
 			payload: {

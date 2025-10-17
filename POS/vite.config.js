@@ -113,6 +113,21 @@ export default defineConfig({
 							},
 						},
 					},
+					// Cache product images with StaleWhileRevalidate for better UX
+					{
+						urlPattern: /\/files\/.*\.(jpg|jpeg|png|gif|webp|svg)$/i,
+						handler: "StaleWhileRevalidate",
+						options: {
+							cacheName: "product-images-cache",
+							expiration: {
+								maxEntries: 200, // Cache up to 200 product images
+								maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+							},
+							cacheableResponse: {
+								statuses: [0, 200],
+							},
+						},
+					},
 					{
 						urlPattern: /\/api\/.*/i,
 						handler: "NetworkFirst",

@@ -212,32 +212,46 @@
 						</div>
 
 						<!-- Item Image -->
-						<div class="relative aspect-square bg-gray-100 rounded-md mb-1.5 sm:mb-2 flex items-center justify-center overflow-hidden">
-							<img
+						<div class="relative aspect-square bg-gray-100 rounded-md mb-1.5 sm:mb-2 overflow-hidden">
+							<LazyImage
 								v-if="item.image"
 								:src="item.image"
 								:alt="item.item_name"
-								loading="lazy"
-								width="100"
-								height="100"
-								decoding="async"
-								class="w-full h-full object-cover"
-								@error="handleImageError"
-							/>
-							<svg
-								v-else
-								class="h-8 w-8 sm:h-10 sm:w-10 text-gray-300"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
+								container-class="relative w-full h-full"
+								img-class="w-full h-full object-cover"
+								root-margin="100px"
 							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-								/>
-							</svg>
+								<template #error>
+									<svg
+										class="h-8 w-8 sm:h-10 sm:w-10 text-gray-300"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+										/>
+									</svg>
+								</template>
+							</LazyImage>
+							<div v-else class="w-full h-full flex items-center justify-center">
+								<svg
+									class="h-8 w-8 sm:h-10 sm:w-10 text-gray-300"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+									/>
+								</svg>
+							</div>
 						</div>
 
 						<!-- Item Details -->
@@ -354,7 +368,20 @@
 						>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
 								<div class="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
-									<img v-if="item.image" :src="item.image" :alt="item.item_name" loading="lazy" width="40" height="40" decoding="async" class="w-full h-full object-cover" @error="handleImageError" />
+									<LazyImage
+										v-if="item.image"
+										:src="item.image"
+										:alt="item.item_name"
+										container-class="relative w-full h-full"
+										img-class="w-full h-full object-cover"
+										root-margin="100px"
+									>
+										<template #error>
+											<svg class="h-4 w-4 sm:h-5 sm:w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+											</svg>
+										</template>
+									</LazyImage>
 									<svg v-else class="h-4 w-4 sm:h-5 sm:w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
 									</svg>
@@ -458,6 +485,7 @@
 </template>
 
 <script setup>
+import LazyImage from "@/components/common/LazyImage.vue"
 import { useItemSearchStore } from "@/stores/itemSearch"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { toast } from "frappe-ui"
@@ -919,10 +947,6 @@ defineExpose({
 	loadItemGroups: () => itemStore.loadItemGroups(),
 	loadMoreItems: () => itemStore.loadMoreItems(),
 })
-
-function handleImageError(event) {
-	event.target.style.display = "none"
-}
 
 // View mode functions
 function setViewMode(mode) {
