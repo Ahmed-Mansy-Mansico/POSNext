@@ -191,7 +191,6 @@
 					<div
 						v-for="item in paginatedItems"
 						:key="item.item_code"
-						v-memo="[item.item_code, item.actual_qty, item.stock_qty, item.rate, item.price_list_rate]"
 						@touchstart.passive="getOptimizedClickHandler(item).touchstart"
 						@touchmove.passive="getOptimizedClickHandler(item).touchmove"
 						@touchend.passive="getOptimizedClickHandler(item).touchend"
@@ -363,8 +362,7 @@
 						<tr
 							v-for="item in paginatedItems"
 							:key="item.item_code"
-							v-memo="[item.item_code, item.actual_qty, item.stock_qty, item.rate, item.price_list_rate]"
-							@click="handleItemClick(item)"
+							@click="handleItemClick(item.item_code)"
 							class="cursor-pointer hover:bg-blue-50 transition-colors duration-100 touch-manipulation active:bg-blue-100"
 						>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
@@ -527,6 +525,7 @@ const {
 	cacheReady,
 	cacheSyncing,
 	cacheStats,
+	stockUpdateVersion,
 } = storeToRefs(itemStore)
 
 // Local state
@@ -553,8 +552,9 @@ const itemsPerPage = ref(20)
 
 // Computed paginated items
 const paginatedItems = computed(() => {
+	// Access stockUpdateVersion to ensure reactivity when stock changes
+	const _version = stockUpdateVersion.value
 	if (!filteredItems.value) return []
-
 	const start = (currentPage.value - 1) * itemsPerPage.value
 	const end = start + itemsPerPage.value
 	return filteredItems.value.slice(start, end)
@@ -593,7 +593,7 @@ watch(
 	() => {
 		itemStore.setCartItems(props.cartItems)
 	},
-	{ immediate: true },
+	{ immediate: true, flush: 'sync' }, // Synchronous to ensure immediate stock updates
 )
 
 watch(
@@ -810,8 +810,9 @@ const optimizedClickHandlers = new Map()
 function getOptimizedClickHandler(item) {
 	const key = item.item_code
 	if (!optimizedClickHandlers.has(key)) {
+		// Pass item_code instead of item reference to avoid closure issues
 		const handler = createOptimizedClickHandler(() => {
-			handleItemClick(item)
+			handleItemClick(item.item_code)
 		}, {
 			feedback: true,
 			haptic: true
@@ -821,8 +822,12 @@ function getOptimizedClickHandler(item) {
 	return optimizedClickHandlers.get(key)
 }
 
-function handleItemClick(item) {
-	emit("item-selected", item)
+function handleItemClick(itemCode) {
+	// Find the current item by code to get latest stock values
+	const item = filteredItems.value.find(i => i.item_code === itemCode)
+	if (item) {
+		emit("item-selected", item)
+	}
 }
 
 async function handleBarcodeSearch(forceAutoAdd = false) {

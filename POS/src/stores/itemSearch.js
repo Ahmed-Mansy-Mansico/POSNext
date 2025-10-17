@@ -36,6 +36,7 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 	// Performance helpers
 	const allItemsVersion = ref(0)
 	const searchResultsVersion = ref(0)
+	const stockUpdateVersion = ref(0) // Track stock updates for reactivity
 
 	const MAX_CACHE_ENTRIES = 50
 	const baseResultCache = new Map()
@@ -193,9 +194,7 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 
 	function updateReservedStock(itemCode, reservedQty) {
 		const bucket = itemRegistry.get(itemCode)
-		if (!bucket || bucket.size === 0) {
-			return
-		}
+		if (!bucket || bucket.size === 0) return
 
 		const reservation = Math.max(Number.parseFloat(reservedQty) || 0, 0)
 
@@ -205,29 +204,25 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 			item.actual_qty = updated
 			item.stock_qty = updated
 		})
+
+		// Trigger reactivity by incrementing version (cache key includes this)
+		stockUpdateVersion.value += 1
 	}
 
 	const filteredItems = computed(() => {
-		// When searching, use search results from server
-		// When browsing, use loaded items with client-side filtering
 		const term = (searchTerm.value || "").trim()
 		const usingSearch = term.length > 0
 		const sourceItems = usingSearch ? searchResults.value : allItems.value
 
 		if (!sourceItems || sourceItems.length === 0) return []
 
-		const sourceVersion = usingSearch
-			? searchResultsVersion.value
-			: allItemsVersion.value
-		const selectionKey = selectedItemGroup.value || ""
-		const cacheKey = `${usingSearch ? "search" : "browse"}|${term}|${selectionKey}|${sourceVersion}`
+		const sourceVersion = usingSearch ? searchResultsVersion.value : allItemsVersion.value
+		const cacheKey = `${usingSearch ? "search" : "browse"}|${term}|${selectedItemGroup.value || ""}|${sourceVersion}|${stockUpdateVersion.value}`
 
 		let list = baseResultCache.get(cacheKey)
 		if (!list) {
 			list = selectedItemGroup.value
-				? sourceItems.filter(
-						(item) => item.item_group === selectedItemGroup.value,
-					)
+				? sourceItems.filter((item) => item.item_group === selectedItemGroup.value)
 				: sourceItems
 			setCache(baseResultCache, cacheKey, list)
 		}
@@ -767,6 +762,7 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		cacheReady,
 		cacheSyncing,
 		cacheStats,
+		stockUpdateVersion,
 
 		// Getters
 		filteredItems,

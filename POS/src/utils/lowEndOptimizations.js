@@ -213,7 +213,7 @@ export const domBatcher = new DOMBatcher()
  * @returns {Object} Touch and click handlers
  */
 export function createOptimizedClickHandler(handler, options = {}) {
-	const { feedback = true, haptic = false } = options
+	const { feedback = true } = options
 
 	let touchStartTime = 0
 	let touchMoved = false
@@ -233,11 +233,6 @@ export function createOptimizedClickHandler(handler, options = {}) {
 			// Visual feedback
 			if (feedback && event.currentTarget) {
 				event.currentTarget.style.opacity = '0.7'
-			}
-
-			// Haptic feedback on supported devices
-			if (haptic && navigator.vibrate) {
-				navigator.vibrate(10)
 			}
 		},
 
