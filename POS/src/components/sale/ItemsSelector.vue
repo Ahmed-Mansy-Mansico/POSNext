@@ -186,14 +186,16 @@
 			<div
 				ref="gridScrollContainer"
 				class="flex-1 overflow-y-auto p-1.5 sm:p-3"
-				@scroll="handleScroll"
 			>
 				<div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 sm:gap-2.5">
 					<div
 						v-for="item in paginatedItems"
 						:key="item.item_code"
 						v-memo="[item.item_code, item.actual_qty, item.stock_qty, item.rate, item.price_list_rate]"
-						@click="handleItemClick(item)"
+						@touchstart.passive="getOptimizedClickHandler(item).touchstart"
+						@touchmove.passive="getOptimizedClickHandler(item).touchmove"
+						@touchend.passive="getOptimizedClickHandler(item).touchend"
+						@click="getOptimizedClickHandler(item).click"
 						class="relative bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-[border-color,box-shadow] duration-100 touch-manipulation"
 					>
 						<!-- Stock Badge - Positioned at top right of card -->
@@ -345,7 +347,6 @@
 			<div
 				ref="listScrollContainer"
 				class="flex-1 overflow-x-auto overflow-y-auto"
-				@scroll="handleScroll"
 			>
 				<table class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50 sticky top-0 z-0">
@@ -491,6 +492,12 @@ import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { toast } from "frappe-ui"
 import { storeToRefs } from "pinia"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
+import {
+	createOptimizedClickHandler,
+	throttleRAF,
+	addPassiveListener,
+	runWhenIdle
+} from "@/utils/lowEndOptimizations"
 
 const props = defineProps({
 	posProfile: String,
@@ -648,36 +655,31 @@ watch(
 let scrollTimeout = null
 const SCROLL_THROTTLE_MS = 100
 
-// Infinite scroll handler with throttling
-function handleScroll(event) {
-	// Clear existing timeout
-	if (scrollTimeout) {
-		clearTimeout(scrollTimeout)
-	}
+// Optimized scroll handler using RAF throttling
+const handleScrollRAF = throttleRAF((event) => {
+	const container = event.target
+	const scrollPosition = container.scrollTop + container.clientHeight
+	const scrollHeight = container.scrollHeight
+	const threshold = 200
 
-	// Throttle scroll handling
-	scrollTimeout = setTimeout(() => {
-		const container = event.target
-		const scrollPosition = container.scrollTop + container.clientHeight
-		const scrollHeight = container.scrollHeight
+	const isSearching = searchTerm.value && searchTerm.value.trim().length > 0
 
-		// Load more when user is within 200px of the bottom
-		const threshold = 200
-
-		// Only trigger infinite scroll when browsing (not searching)
-		// Search shows all results immediately from server
-		const isSearching = searchTerm.value && searchTerm.value.trim().length > 0
-
-		if (
-			!isSearching &&
-			scrollHeight - scrollPosition < threshold &&
-			hasMore.value &&
-			!loadingMore.value &&
-			!loading.value
-		) {
+	if (
+		!isSearching &&
+		scrollHeight - scrollPosition < threshold &&
+		hasMore.value &&
+		!loadingMore.value &&
+		!loading.value
+	) {
+		// Use runWhenIdle to load more items without blocking scroll
+		runWhenIdle(() => {
 			itemStore.loadMoreItems()
-		}
-	}, SCROLL_THROTTLE_MS)
+		}, { timeout: 1000 })
+	}
+})
+
+function handleScroll(event) {
+	handleScrollRAF(event)
 }
 
 onMounted(() => {
@@ -686,8 +688,31 @@ onMounted(() => {
 		itemStore.loadItemGroups()
 	}
 
-	// Attach scroll listeners for infinite scroll
-	// Note: We'll use onScroll event on the containers directly in template
+	// Add passive scroll listeners for better performance
+	const cleanupFns = []
+
+	if (gridScrollContainer.value) {
+		const cleanup = addPassiveListener(
+			gridScrollContainer.value,
+			'scroll',
+			handleScroll,
+			{ passive: true }
+		)
+		cleanupFns.push(cleanup)
+	}
+
+	if (listScrollContainer.value) {
+		const cleanup = addPassiveListener(
+			listScrollContainer.value,
+			'scroll',
+			handleScroll,
+			{ passive: true }
+		)
+		cleanupFns.push(cleanup)
+	}
+
+	// Store cleanup functions for onUnmounted
+	window.__scrollCleanup = cleanupFns
 })
 
 onUnmounted(() => {
@@ -699,6 +724,15 @@ onUnmounted(() => {
 		clearTimeout(scrollTimeout)
 		scrollTimeout = null
 	}
+
+	// Cleanup passive listeners
+	if (window.__scrollCleanup) {
+		window.__scrollCleanup.forEach(cleanup => cleanup())
+		delete window.__scrollCleanup
+	}
+
+	// Clear optimized click handlers
+	optimizedClickHandlers.clear()
 })
 
 // Handle keydown for barcode scanner detection
@@ -768,6 +802,23 @@ function handleSearchInput(event) {
 			handleBarcodeSearch(true) // Auto-add mode
 		}, 500) // 500ms delay after typing stops
 	}
+}
+
+// Create optimized click handlers for better touch response
+const optimizedClickHandlers = new Map()
+
+function getOptimizedClickHandler(item) {
+	const key = item.item_code
+	if (!optimizedClickHandlers.has(key)) {
+		const handler = createOptimizedClickHandler(() => {
+			handleItemClick(item)
+		}, {
+			feedback: true,
+			haptic: true
+		})
+		optimizedClickHandlers.set(key, handler)
+	}
+	return optimizedClickHandlers.get(key)
 }
 
 function handleItemClick(item) {
@@ -1044,5 +1095,37 @@ function getStockStatus(qty) {
 .scrollbar-hide {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+}
+
+/* Performance optimizations for low-end devices */
+[class*="grid-cols-"] > div {
+	/* Tell browser which properties will change */
+	will-change: opacity;
+	/* Use GPU acceleration for transforms */
+	transform: translateZ(0);
+	/* Optimize for speed over quality */
+	backface-visibility: hidden;
+}
+
+/* Optimize scroll containers */
+.overflow-y-auto, .overflow-x-auto {
+	/* Enable smooth scrolling with GPU acceleration */
+	-webkit-overflow-scrolling: touch;
+	/* Create stacking context for better compositing */
+	transform: translateZ(0);
+	will-change: scroll-position;
+}
+
+/* Reduce paint areas */
+.relative {
+	/* Isolate paint regions */
+	isolation: isolate;
+}
+
+/* Optimize images */
+img {
+	/* Use browser's image optimization */
+	image-rendering: -webkit-optimize-contrast;
+	image-rendering: crisp-edges;
 }
 </style>
