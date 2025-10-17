@@ -227,8 +227,18 @@ class Logger {
 	success(message, ...args) {
 		if (this.config.shouldLog(this.namespace, LOG_LEVELS.INFO)) {
 			const formatted = this.format(LOG_LEVELS.INFO, message, ...args)
-			formatted[1] = formatted[1].replace('INFO', '✓ SUCCESS')
-			formatted[2] = `${COLORS.SUCCESS}; font-weight: bold`
+
+			// In browser context, formatted[1] and formatted[2] are style strings
+			// In Node.js/SSR/Worker context, formatted[0] is the message and formatted[1+] are args
+			if (typeof window !== 'undefined') {
+				// Browser context: modify style strings
+				formatted[1] = formatted[1].replace('INFO', '✓ SUCCESS')
+				formatted[2] = `${COLORS.SUCCESS}; font-weight: bold`
+			} else {
+				// Node.js/SSR/Worker context: modify the message string
+				formatted[0] = formatted[0].replace('INFO', '✓ SUCCESS')
+			}
+
 			console.log(...formatted)
 		}
 	}
