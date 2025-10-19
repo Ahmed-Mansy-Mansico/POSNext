@@ -2,7 +2,6 @@ import { useOffline } from "@/composables/useOffline"
 import { parseError } from "@/utils/errorHandler"
 import {
 	cacheCustomersFromServer,
-	cacheItemsFromServer,
 	cachePaymentMethodsFromServer,
 } from "@/utils/offline"
 import { toast } from "frappe-ui"
@@ -106,23 +105,26 @@ export const usePOSSyncStore = defineStore("posSync", () => {
 				!stats.lastSync || Date.now() - stats.lastSync > 24 * 60 * 60 * 1000
 
 			if (!cacheReady || needsRefresh) {
+				// NOTE: Items are now handled by itemStore's background sync
+				// to prevent duplicate fetches and improve performance.
+				// Only cache customers and payment methods here.
+
 				toast.create({
 					title: "Syncing Data",
-					text: "Loading items and customers for offline use...",
+					text: "Loading customers and payment methods for offline use...",
 					icon: "download",
 					iconClasses: "text-blue-600",
 				})
 
-				// Fetch from server
-				const [itemsData, customersData, paymentMethodsData] =
+				// Fetch only customers and payment methods (items handled by itemStore)
+				const [customersData] =
 					await Promise.all([
-						cacheItemsFromServer(currentProfile.name),
 						cacheCustomersFromServer(currentProfile.name),
 						cachePaymentMethodsFromServer(currentProfile.name),
 					])
 
-				// Cache data using composable
-				await cacheData(itemsData.items || [], customersData.customers || [])
+				// Cache data using composable (items will be empty array since itemStore handles them)
+				await cacheData([], customersData.customers || [])
 
 				toast.create({
 					title: "Sync Complete",

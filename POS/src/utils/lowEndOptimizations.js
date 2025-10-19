@@ -217,7 +217,10 @@ export function createOptimizedClickHandler(handler, options = {}) {
 
 	let touchStartTime = 0
 	let touchMoved = false
+	let touchHandled = false
+	let touchEndTime = 0
 	const MOVE_THRESHOLD = 10
+	const GHOST_CLICK_THRESHOLD = 500 // Time window to ignore click after touch
 	let startX = 0
 	let startY = 0
 
@@ -225,6 +228,7 @@ export function createOptimizedClickHandler(handler, options = {}) {
 		touchstart: (event) => {
 			touchStartTime = Date.now()
 			touchMoved = false
+			touchHandled = false
 
 			const touch = event.touches[0]
 			startX = touch.clientX
@@ -261,6 +265,8 @@ export function createOptimizedClickHandler(handler, options = {}) {
 			const touchDuration = Date.now() - touchStartTime
 			if (!touchMoved && touchDuration < 500) {
 				event.preventDefault() // Prevent mouse events
+				touchHandled = true
+				touchEndTime = Date.now()
 
 				// Use requestAnimationFrame for smooth execution
 				requestAnimationFrame(() => {
@@ -273,13 +279,19 @@ export function createOptimizedClickHandler(handler, options = {}) {
 		},
 
 		click: (event) => {
-			// Fallback for non-touch devices or if touch events aren't working
-			// Check if this is a delayed click from touch (ignore it)
-			if (touchStartTime === 0) {
-				requestAnimationFrame(() => {
-					handler(event)
-				})
+			// Prevent ghost clicks after touch events
+			const timeSinceTouchEnd = Date.now() - touchEndTime
+			if (touchHandled && timeSinceTouchEnd < GHOST_CLICK_THRESHOLD) {
+				// This is a ghost click from a touch event - ignore it
+				event.preventDefault()
+				event.stopPropagation()
+				return
 			}
+
+			// Real click from mouse or non-touch device
+			requestAnimationFrame(() => {
+				handler(event)
+			})
 		}
 	}
 

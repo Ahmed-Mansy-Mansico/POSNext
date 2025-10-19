@@ -763,3 +763,97 @@ def get_item_groups(pos_profile):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get Item Groups Error")
 		frappe.throw(_("Error fetching item groups: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_stock_quantities(item_codes, warehouse):
+	"""
+	Lightweight endpoint to get only stock quantities for specified items.
+	Used for real-time stock updates after invoice submission.
+
+	Args:
+		item_codes: JSON string or list of item codes
+		warehouse: Warehouse name
+
+	Returns:
+		List of dicts with item_code, warehouse, and actual_qty
+	"""
+	try:
+		# Parse item_codes if it's a JSON string
+		if isinstance(item_codes, str):
+			try:
+				item_codes = json.loads(item_codes)
+			except (json.JSONDecodeError, ValueError):
+				item_codes = [item_codes]
+
+		if not item_codes or not warehouse:
+			return []
+
+		# Normalize input: accept any iterable, drop falsy values, keep order while deduplicating
+		if not isinstance(item_codes, (list, tuple, set)):
+			item_codes = [item_codes]
+
+		normalized_codes = []
+		seen = set()
+		for code in item_codes:
+			clean_code = (code or "").strip() if isinstance(code, str) else code
+			if not clean_code or clean_code in seen:
+				continue
+			seen.add(clean_code)
+			normalized_codes.append(clean_code)
+
+		if not normalized_codes:
+			return []
+
+		# Support group warehouses by expanding to leaf warehouses
+		warehouses = [warehouse]
+		if frappe.db.get_value("Warehouse", warehouse, "is_group"):
+			child_warehouses = frappe.db.get_descendants("Warehouse", warehouse) or []
+			# Fallback to original warehouse if no children are returned
+			warehouses = child_warehouses or [warehouse]
+
+		if not warehouses:
+			return []
+
+		# Batch query for stock quantities across all relevant warehouses
+		stock_rows = frappe.db.sql(
+			"""
+			SELECT
+				item_code,
+				COALESCE(SUM(actual_qty), 0) AS actual_qty,
+				COALESCE(SUM(reserved_qty), 0) AS reserved_qty
+			FROM `tabBin`
+			WHERE item_code IN %(item_codes)s
+			AND warehouse IN %(warehouses)s
+			GROUP BY item_code
+			""",
+			{
+				"item_codes": tuple(normalized_codes),
+				"warehouses": tuple(warehouses),
+			},
+			as_dict=1
+		)
+
+		# Create a lookup for items that have stock entries
+		stock_lookup = {row["item_code"]: row for row in stock_rows}
+
+		# Return stock for all requested items (0 if not in Bin table)
+		result = []
+		for item_code in normalized_codes:
+			row = stock_lookup.get(item_code)
+			actual_qty = flt(row["actual_qty"]) if row else 0.0
+			reserved_qty = flt(row["reserved_qty"]) if row else 0.0
+			result.append({
+				"item_code": item_code,
+				"warehouse": warehouse,
+				"actual_qty": actual_qty,
+				"stock_qty": actual_qty,  # Alias for frontend convenience
+				"reserved_qty": reserved_qty,
+				"available_qty": actual_qty - reserved_qty,
+			})
+
+		return result
+
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Stock Quantities Error")
+		frappe.throw(_("Error fetching stock quantities: {0}").format(str(e)))

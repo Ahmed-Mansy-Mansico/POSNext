@@ -108,9 +108,9 @@
 							>
 								<path d="M12 2C8.13 2 5 3.12 5 4.5V7c0 1.38 3.13 2.5 7 2.5S19 8.38 19 7V4.5C19 3.12 15.87 2 12 2zM5 9v3c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5V9c0 1.38-3.13 2.5-7 2.5S5 10.38 5 9zm0 5v3c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5v-3c0 1.38-3.13 2.5-7 2.5S5 15.38 5 14z"/>
 							</svg>
-							<!-- Spinning overlay when syncing -->
+							<!-- Spinning overlay when syncing or refreshing -->
 							<svg
-								v-if="cacheSyncing"
+								v-if="cacheSyncing || isRefreshing"
 								class="w-5 h-5 absolute top-2 left-2 animate-spin opacity-70"
 								fill="none"
 								stroke="currentColor"
@@ -169,6 +169,13 @@
 												Syncing...
 											</span>
 										</div>
+										<div v-if="stockSyncActive" class="flex items-center justify-between">
+											<span class="text-gray-400">Auto-Sync:</span>
+											<span class="text-green-400 font-semibold flex items-center gap-1.5">
+												<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+												Active
+											</span>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -215,6 +222,13 @@
 											Syncing...
 										</span>
 									</div>
+									<div v-if="stockSyncActive" class="flex items-center justify-between">
+										<span class="text-gray-400">Auto-Sync:</span>
+										<span class="text-green-400 font-semibold flex items-center gap-1">
+											<div class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+											Active
+										</span>
+									</div>
 								</div>
 							</div>
 						</div>
@@ -232,10 +246,13 @@
 					<!-- Refresh -->
 					<ActionButton
 						:icon="refreshIcon"
-						title="Refresh Items"
+						:title="isRefreshing ? 'Refreshing...' : 'Refresh Items'"
 						@click="$emit('refresh-click')"
-						class="touch-manipulation p-1 sm:p-2"
-						:aria-label="'Refresh items list'"
+						:class="[
+							'touch-manipulation p-1 sm:p-2',
+							isRefreshing ? 'animate-spin' : ''
+						]"
+						:aria-label="isRefreshing ? 'Refreshing items...' : 'Refresh items list'"
 					/>
 
 					<div class="w-px h-4 sm:h-6 bg-gray-200 mx-0.5 sm:mx-2"></div>
@@ -318,6 +335,14 @@ const props = defineProps({
 	cacheStats: {
 		type: Object,
 		default: () => ({ items: 0, lastSync: null }),
+	},
+	stockSyncActive: {
+		type: Boolean,
+		default: false,
+	},
+	isRefreshing: {
+		type: Boolean,
+		default: false,
 	},
 })
 

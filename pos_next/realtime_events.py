@@ -10,6 +10,8 @@ Emits Socket.IO events when stock-affecting transactions occur.
 import frappe
 from frappe import _
 
+from pos_next.api.items import get_stock_quantities
+
 
 def emit_stock_update_event(doc, method=None):
 	"""
@@ -30,52 +32,43 @@ def emit_stock_update_event(doc, method=None):
 		return
 
 	try:
-		# Collect item-warehouse combinations directly from invoice items
-		# This is much faster than querying Bin individually
-		item_warehouse_pairs = []
+		# Collect unique item codes per warehouse to avoid redundant queries
+		item_codes_by_warehouse = {}
 		for item in doc.items:
-			if item.warehouse and item.item_code:
-				item_warehouse_pairs.append({
-					"item_code": item.item_code,
-					"warehouse": item.warehouse
-				})
+			item_code = getattr(item, "item_code", None)
+			warehouse = getattr(item, "warehouse", None)
 
-		if not item_warehouse_pairs:
+			# Skip rows that don't affect stock
+			if not item_code or not warehouse:
+				continue
+
+			if hasattr(item, "is_stock_item") and item.is_stock_item is not None:
+				if not int(item.is_stock_item):
+					continue
+			elif hasattr(item, "stock_qty") and not frappe.utils.flt(item.stock_qty):
+				continue
+
+			item_codes_by_warehouse.setdefault(warehouse, set()).add(item_code)
+
+		if not item_codes_by_warehouse:
 			return
-
-		# PERFORMANCE: Single bulk query instead of multiple individual queries
-		# Use SQL with IN clause to fetch all stock levels at once
-		conditions = " OR ".join([
-			f"(item_code = {frappe.db.escape(pair['item_code'])} AND warehouse = {frappe.db.escape(pair['warehouse'])})"
-			for pair in item_warehouse_pairs
-		])
-
-		stock_data = frappe.db.sql(f"""
-			SELECT item_code, warehouse, actual_qty
-			FROM `tabBin`
-			WHERE {conditions}
-		""", as_dict=1)
-
-		# Convert to lookup dict for O(1) access
-		stock_lookup = {
-			f"{row['item_code']}|{row['warehouse']}": row['actual_qty']
-			for row in stock_data
-		}
 
 		# Build stock updates with current quantities
 		stock_updates = []
 		warehouses = set()
-		for pair in item_warehouse_pairs:
-			key = f"{pair['item_code']}|{pair['warehouse']}"
-			actual_qty = stock_lookup.get(key, 0)  # Default to 0 if Bin doesn't exist
+		for warehouse, codes in item_codes_by_warehouse.items():
+			warehouses.add(warehouse)
+			# Use shared stock utility to keep logic consistent with API responses
+			warehouse_updates = get_stock_quantities(list(codes), warehouse)
 
-			stock_updates.append({
-				"item_code": pair['item_code'],
-				"warehouse": pair['warehouse'],
-				"actual_qty": actual_qty,
-				"stock_qty": actual_qty,
-			})
-			warehouses.add(pair['warehouse'])
+			# Ensure events always have numeric qty fields, even if API returns None
+			for update in warehouse_updates:
+				actual_qty = frappe.utils.flt(update.get("actual_qty"))
+				update["actual_qty"] = actual_qty
+				update["stock_qty"] = actual_qty if update.get("stock_qty") is None else update["stock_qty"]
+				update["warehouse"] = update.get("warehouse") or warehouse
+
+			stock_updates.extend(warehouse_updates)
 
 		if not stock_updates:
 			return

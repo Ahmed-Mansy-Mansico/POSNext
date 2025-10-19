@@ -74,6 +74,26 @@ class OfflineWorkerClient {
 					return
 				}
 
+				if (type === "STOCK_SYNC_COMPLETE") {
+					// Emit custom event for stock sync completion
+					window.dispatchEvent(
+						new CustomEvent("stockSyncComplete", {
+							detail: payload,
+						}),
+					)
+					return
+				}
+
+				if (type === "STOCK_SYNC_ERROR") {
+					// Emit custom event for stock sync errors
+					window.dispatchEvent(
+						new CustomEvent("stockSyncError", {
+							detail: payload,
+						}),
+					)
+					return
+				}
+
 				if (id !== undefined && this.pendingMessages.has(id)) {
 					const { resolve, reject, messageType, payload: originalPayload } = this.pendingMessages.get(id)
 					this.pendingMessages.delete(id)
@@ -396,6 +416,54 @@ class OfflineWorkerClient {
 
 	async updateStockQuantities(stockUpdates) {
 		return this.sendMessage("UPDATE_STOCK_QUANTITIES", { stockUpdates })
+	}
+
+	// ========================================================================
+	// PERIODIC STOCK SYNC API
+	// ========================================================================
+
+	/**
+	 * Start periodic stock sync in background worker
+	 * @returns {Promise<{success: boolean, status: Object}>}
+	 */
+	async startStockSync() {
+		return this.sendMessage("START_STOCK_SYNC")
+	}
+
+	/**
+	 * Stop periodic stock sync
+	 * @returns {Promise<{success: boolean, status: Object}>}
+	 */
+	async stopStockSync() {
+		return this.sendMessage("STOP_STOCK_SYNC")
+	}
+
+	/**
+	 * Configure periodic stock sync
+	 * @param {Object} config - Configuration object
+	 * @param {string} config.warehouse - Warehouse to track
+	 * @param {Array<string>} config.itemCodes - Item codes to sync
+	 * @param {number} config.intervalMs - Sync interval in milliseconds (min 10000)
+	 * @returns {Promise<Object>} Current configuration
+	 */
+	async configureStockSync({ warehouse, itemCodes, intervalMs }) {
+		return this.sendMessage("CONFIGURE_STOCK_SYNC", { warehouse, itemCodes, intervalMs })
+	}
+
+	/**
+	 * Get current stock sync status
+	 * @returns {Promise<Object>} Status object
+	 */
+	async getStockSyncStatus() {
+		return this.sendMessage("GET_STOCK_SYNC_STATUS")
+	}
+
+	/**
+	 * Manually trigger a stock sync cycle (one-time)
+	 * @returns {Promise<{success: boolean, status: Object}>}
+	 */
+	async triggerStockSync() {
+		return this.sendMessage("TRIGGER_STOCK_SYNC")
 	}
 
 	terminate() {

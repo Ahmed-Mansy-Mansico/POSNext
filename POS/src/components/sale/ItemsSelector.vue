@@ -525,7 +525,6 @@ const {
 	cacheReady,
 	cacheSyncing,
 	cacheStats,
-	stockUpdateVersion,
 } = storeToRefs(itemStore)
 
 // Local state
@@ -551,9 +550,8 @@ const currentPage = ref(1)
 const itemsPerPage = ref(20)
 
 // Computed paginated items
+// filteredItems is already reactive and includes live stock from stockStore
 const paginatedItems = computed(() => {
-	// Access stockUpdateVersion to ensure reactivity when stock changes
-	const _version = stockUpdateVersion.value
 	if (!filteredItems.value) return []
 	const start = (currentPage.value - 1) * itemsPerPage.value
 	const end = start + itemsPerPage.value

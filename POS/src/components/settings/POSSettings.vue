@@ -150,6 +150,77 @@
 											</div>
 										</div>
 									</div>
+
+									<!-- Background Stock Sync Settings -->
+									<div :class="stockSyncSubsectionClasses.container">
+										<div class="flex items-center space-x-2 mb-4">
+											<svg :class="stockSyncSubsectionClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+											</svg>
+											<h4 class="text-sm font-semibold text-gray-900">Background Stock Sync</h4>
+											<div v-if="stockSyncStatus.enabled" class="ml-auto flex items-center px-2.5 py-1 bg-green-100 border border-green-300 rounded-full">
+												<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+												<span class="text-xs font-medium text-green-800">Active</span>
+											</div>
+											<div v-else class="ml-auto flex items-center px-2.5 py-1 bg-gray-100 border border-gray-300 rounded-full">
+												<div class="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
+												<span class="text-xs font-medium text-gray-600">Inactive</span>
+											</div>
+										</div>
+
+										<div class="space-y-4">
+											<!-- Enable Sync Toggle -->
+											<CheckboxField
+												v-model="stockSyncEnabled"
+												label="Enable Automatic Stock Sync"
+												description="Periodically sync stock quantities from server in the background (runs in Web Worker)"
+											/>
+
+											<!-- Sync Interval -->
+											<div v-if="stockSyncEnabled" class="pl-6 space-y-3 border-l-2 border-blue-200">
+												<NumberField
+													v-model="stockSyncIntervalSeconds"
+													label="Sync Interval (seconds)"
+													description="How often to check server for stock updates (minimum 10 seconds)"
+													:min="10"
+													:max="300"
+													:step="10"
+												/>
+
+												<!-- Sync Status Info -->
+												<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+													<div class="flex items-start space-x-2">
+														<svg class="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="icons.info"/>
+														</svg>
+														<div class="text-xs text-blue-800 space-y-1">
+															<p><strong>Status:</strong> {{ stockSyncStatus.enabled ? 'Running' : 'Stopped' }}</p>
+															<p><strong>Items Tracked:</strong> {{ stockSyncStatus.itemCount || 0 }}</p>
+															<p><strong>Warehouse:</strong> {{ stockSyncStatus.warehouse || 'Not set' }}</p>
+															<p v-if="stockSyncStatus.lastSync">
+																<strong>Last Sync:</strong> {{ formatSyncTime(stockSyncStatus.lastSync) }}
+															</p>
+															<p v-else><strong>Last Sync:</strong> Never</p>
+														</div>
+													</div>
+												</div>
+
+												<!-- Network Usage Info -->
+												<div class="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+													<div class="flex items-start space-x-2">
+														<svg class="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+															<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+														</svg>
+														<div class="text-xs text-gray-700">
+															<p class="font-medium mb-1">Network Usage:</p>
+															<p>~15 KB per sync cycle</p>
+															<p>~{{ Math.round((3600 / stockSyncIntervalSeconds) * 15 / 1024) }} MB per hour</p>
+														</div>
+													</div>
+												</div>
+											</div>
+										</div>
+									</div>
 								</div>
 							</div>
 
@@ -263,12 +334,16 @@ import CheckboxField from "@/components/settings/CheckboxField.vue"
 import NumberField from "@/components/settings/NumberField.vue"
 import SelectField from "@/components/settings/SelectField.vue"
 import { Button, call, createResource, toast } from "frappe-ui"
-import { computed, ref, watch } from "vue"
+import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import {
 	getSectionHeaderClasses,
 	getSubsectionClasses,
 	icons,
 } from "./settingsConfig"
+import { offlineWorker } from "@/utils/offline/workerClient"
+import { logger } from "@/utils/logger"
+
+const log = logger.create('POSSettings')
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -299,6 +374,18 @@ const settings = ref({
 	allow_negative_stock: 0,
 })
 
+// Stock Sync Settings (localStorage persisted)
+const stockSyncEnabled = ref(false)
+const stockSyncIntervalSeconds = ref(60) // Default 60 seconds
+const stockSyncStatus = ref({
+	enabled: false,
+	warehouse: null,
+	itemCount: 0,
+	intervalMs: 60000,
+	lastSync: null,
+	running: false
+})
+
 // Warehouse options
 const warehouseOptions = computed(() => {
 	if (warehousesList.value.length === 0) return []
@@ -315,6 +402,7 @@ const warehouseSubsectionClasses = computed(() => getSubsectionClasses("gray"))
 const stockPolicySubsectionClasses = computed(() =>
 	getSubsectionClasses("blue"),
 )
+const stockSyncSubsectionClasses = computed(() => getSubsectionClasses("indigo"))
 const pricingSubsectionClasses = computed(() => getSubsectionClasses("emerald"))
 const operationsSubsectionClasses = computed(() => getSubsectionClasses("teal"))
 
@@ -415,7 +503,7 @@ async function loadSettings() {
 		// Load settings
 		settingsResource.reload()
 	} catch (error) {
-		console.error("Error loading warehouses:", error)
+		log.error("Error loading warehouses:", error)
 		warehousesList.value = []
 		// Still load settings even if warehouses fail
 		settingsResource.reload()
@@ -477,7 +565,7 @@ async function saveSettings() {
 			iconClasses: "text-green-600",
 		})
 	} catch (error) {
-		console.error("Error saving settings:", error)
+		log.error("Error saving settings:", error)
 		toast.create({
 			title: "Error",
 			text: error.message || "Failed to save settings",
@@ -488,6 +576,119 @@ async function saveSettings() {
 		saving.value = false
 	}
 }
+
+// ============================================================================
+// STOCK SYNC FUNCTIONS
+// ============================================================================
+
+// Load stock sync settings from localStorage
+function loadStockSyncSettings() {
+	try {
+		const saved = localStorage.getItem('pos_stock_sync_settings')
+		if (saved) {
+			const parsed = JSON.parse(saved)
+			stockSyncEnabled.value = parsed.enabled ?? false
+			stockSyncIntervalSeconds.value = parsed.intervalSeconds ?? 60
+		}
+	} catch (error) {
+		log.error('Failed to load stock sync settings:', error)
+	}
+}
+
+// Save stock sync settings to localStorage
+function saveStockSyncSettings() {
+	try {
+		localStorage.setItem('pos_stock_sync_settings', JSON.stringify({
+			enabled: stockSyncEnabled.value,
+			intervalSeconds: stockSyncIntervalSeconds.value
+		}))
+	} catch (error) {
+		log.error('Failed to save stock sync settings:', error)
+	}
+}
+
+// Update stock sync status
+async function updateStockSyncStatus() {
+	try {
+		const status = await offlineWorker.getStockSyncStatus()
+		stockSyncStatus.value = status
+	} catch (error) {
+		log.error('Failed to get stock sync status:', error)
+	}
+}
+
+// Apply stock sync configuration to worker
+async function applyStockSyncConfig() {
+	try {
+		const intervalMs = stockSyncIntervalSeconds.value * 1000
+
+		if (stockSyncEnabled.value) {
+			// Configure and start sync
+			await offlineWorker.configureStockSync({
+				intervalMs
+			})
+			await offlineWorker.startStockSync()
+		} else {
+			// Stop sync
+			await offlineWorker.stopStockSync()
+		}
+
+		// Update status
+		await updateStockSyncStatus()
+
+		// Save to localStorage
+		saveStockSyncSettings()
+	} catch (error) {
+		log.error('Failed to apply stock sync config:', error)
+	}
+}
+
+// Format sync time for display
+function formatSyncTime(timestamp) {
+	if (!timestamp) return 'Never'
+
+	const now = Date.now()
+	const diff = now - timestamp
+
+	if (diff < 60000) {
+		return `${Math.floor(diff / 1000)}s ago`
+	} else if (diff < 3600000) {
+		return `${Math.floor(diff / 60000)}m ago`
+	} else {
+		const date = new Date(timestamp)
+		return date.toLocaleTimeString()
+	}
+}
+
+// Watch for changes and apply
+watch(stockSyncEnabled, () => {
+	applyStockSyncConfig()
+})
+
+watch(stockSyncIntervalSeconds, () => {
+	if (stockSyncEnabled.value) {
+		applyStockSyncConfig()
+	}
+})
+
+// Lifecycle hooks
+onMounted(async () => {
+	// Load settings
+	loadStockSyncSettings()
+
+	// Update status initially
+	await updateStockSyncStatus()
+
+	// Poll status every 5 seconds
+	const statusInterval = setInterval(() => {
+		updateStockSyncStatus()
+	}, 5000)
+
+	// Cleanup on unmount
+	onUnmounted(() => {
+		clearInterval(statusInterval)
+	})
+})
 </script>
 
 <style scoped>

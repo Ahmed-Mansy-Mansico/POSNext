@@ -6,10 +6,14 @@ import { logger } from "@/utils/logger"
 import { createResource } from "frappe-ui"
 import { defineStore } from "pinia"
 import { computed, ref } from "vue"
+import { useStockStore } from "./stock"
 
 const log = logger.create('ItemSearch')
 
 export const useItemSearchStore = defineStore("itemSearch", () => {
+	// Get stock store instance
+	const stockStore = useStockStore()
+
 	// State
 	const allItems = ref([]) // For browsing (lazy loaded)
 	const searchResults = ref([]) // For search results (cache + server)
@@ -36,14 +40,12 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 	// Performance helpers
 	const allItemsVersion = ref(0)
 	const searchResultsVersion = ref(0)
-	const stockUpdateVersion = ref(0) // Track stock updates for reactivity
 
 	const MAX_CACHE_ENTRIES = 50
 	const baseResultCache = new Map()
 	const itemRegistry = new Map()
 	const registeredAllItems = new Set()
 	const registeredSearchItems = new Set()
-	let cartReservedLookup = new Map()
 
 	// Search debounce timer
 	let searchDebounceTimer = null
@@ -87,16 +89,6 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		baseResultCache.clear()
 	}
 
-	function ensureOriginalStock(item) {
-		if (!item) return 0
-		if (item.original_stock === undefined) {
-			const fallback =
-				item.actual_qty !== undefined ? item.actual_qty : item.stock_qty || 0
-			item.original_stock = fallback
-		}
-		return item.original_stock ?? 0
-	}
-
 	function removeRegisteredItems(registrySet) {
 		if (!registrySet || registrySet.size === 0) return
 
@@ -115,14 +107,18 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		registrySet.clear()
 	}
 
+	/**
+	 * Register items and initialize their stock
+	 */
 	function registerItems(items, registrySet) {
 		if (!Array.isArray(items) || items.length === 0) return
 
+		// Initialize stock (smart & simple!)
+		stockStore.init(items)
+
+		// Register items for tracking
 		items.forEach((item) => {
 			if (!item || !item.item_code) return
-
-			ensureOriginalStock(item)
-
 			let bucket = itemRegistry.get(item.item_code)
 			if (!bucket) {
 				bucket = new Set()
@@ -138,96 +134,48 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		removeRegisteredItems(registeredAllItems)
 		allItems.value = next
 		allItemsVersion.value += 1
-		registerItems(next, registeredAllItems)
+		registerItems(next, registeredAllItems) // Initializes stock in stock store
 		clearBaseCache()
-
-		// Re-apply cart reservations to ensure new references reflect locked stock
-		cartReservedLookup.forEach((qty, code) => {
-			if (!code) return
-			updateReservedStock(code, qty)
-		})
 	}
 
 	function appendAllItems(items) {
 		if (!Array.isArray(items) || items.length === 0) return
 		allItems.value.push(...items)
 		allItemsVersion.value += 1
-		registerItems(items, registeredAllItems)
+		registerItems(items, registeredAllItems) // Initializes stock in stock store
 		clearBaseCache()
-
-		const impactedCodes = new Set()
-		items.forEach((item) => {
-			if (!item || !item.item_code) return
-			if (cartReservedLookup.has(item.item_code)) {
-				impactedCodes.add(item.item_code)
-			}
-		})
-
-		impactedCodes.forEach((code) => {
-			const qty = cartReservedLookup.get(code) || 0
-			updateReservedStock(code, qty)
-		})
 	}
 
 	function setSearchResults(items) {
 		const next = Array.isArray(items) ? items : []
-
 		removeRegisteredItems(registeredSearchItems)
 		searchResults.value = next
 		searchResultsVersion.value += 1
-		registerItems(next, registeredSearchItems)
+		registerItems(next, registeredSearchItems) // Initializes stock in stock store
 		clearBaseCache()
-
-		const impactedCodes = new Set()
-		next.forEach((item) => {
-			if (!item || !item.item_code) return
-			if (cartReservedLookup.has(item.item_code)) {
-				impactedCodes.add(item.item_code)
-			}
-		})
-
-		impactedCodes.forEach((code) => {
-			const qty = cartReservedLookup.get(code) || 0
-			updateReservedStock(code, qty)
-		})
 	}
 
-	function updateReservedStock(itemCode, reservedQty) {
-		const bucket = itemRegistry.get(itemCode)
-		if (!bucket || bucket.size === 0) return
-
-		const reservation = Math.max(Number.parseFloat(reservedQty) || 0, 0)
-
-		bucket.forEach((item) => {
-			const original = ensureOriginalStock(item)
-			const updated = Math.max(original - reservation, 0)
-			item.actual_qty = updated
-			item.stock_qty = updated
-		})
-
-		// Trigger reactivity by incrementing version (cache key includes this)
-		stockUpdateVersion.value += 1
-	}
-
+	/**
+	 * Filtered items with live stock - Smart & reactive!
+	 */
 	const filteredItems = computed(() => {
-		const term = (searchTerm.value || "").trim()
-		const usingSearch = term.length > 0
-		const sourceItems = usingSearch ? searchResults.value : allItems.value
+		const sourceItems = searchTerm.value?.trim()
+			? searchResults.value
+			: allItems.value
 
-		if (!sourceItems || sourceItems.length === 0) return []
+		if (!sourceItems?.length) return []
 
-		const sourceVersion = usingSearch ? searchResultsVersion.value : allItemsVersion.value
-		const cacheKey = `${usingSearch ? "search" : "browse"}|${term}|${selectedItemGroup.value || ""}|${sourceVersion}|${stockUpdateVersion.value}`
+		const list = selectedItemGroup.value
+			? sourceItems.filter(i => i.item_group === selectedItemGroup.value)
+			: sourceItems
 
-		let list = baseResultCache.get(cacheKey)
-		if (!list) {
-			list = selectedItemGroup.value
-				? sourceItems.filter((item) => item.item_group === selectedItemGroup.value)
-				: sourceItems
-			setCache(baseResultCache, cacheKey, list)
-		}
-
-		return list
+		// Inject live stock (Pinia auto-updates!)
+		return list.map(item => ({
+			...item,
+			actual_qty: stockStore.getDisplayStock(item.item_code),
+			stock_qty: stockStore.getDisplayStock(item.item_code),
+			original_stock: stockStore.server.get(item.item_code)?.qty || 0
+		}))
 	})
 
 	// Actions
@@ -274,10 +222,14 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 					currentOffset.value = cached.length
 					loading.value = false // Show UI immediately with cached data
 					log.success(`Loaded ${cached.length} items from cache`)
+
+					// Cache is ready - skip server fetch to prevent duplicate load
+					// Background sync will handle updates if needed
+					return
 				}
 			}
 
-			// Now fetch fresh data from server (small batch only!)
+			// Only fetch from server if cache is not ready
 			log.debug(`Fetching ${itemsPerPage.value} items from server`)
 			const response = await call("pos_next.api.items.get_items", {
 				pos_profile: profile,
@@ -675,28 +627,12 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		clearBaseCache()
 	}
 
+	/**
+	 * Update cart items - delegates to stock store
+	 */
 	function setCartItems(items) {
 		cartItems.value = items
-
-		const nextLookup = new Map()
-		if (Array.isArray(items) && items.length > 0) {
-			items.forEach((item) => {
-				const code = item?.item_code
-				if (!code) return
-				const qty = Number(item.quantity) || 0
-				nextLookup.set(code, qty)
-			})
-		}
-
-		const previousLookup = cartReservedLookup
-		cartReservedLookup = nextLookup
-
-		const touched = new Set([...previousLookup.keys(), ...nextLookup.keys()])
-
-		touched.forEach((code) => {
-			const reserved = nextLookup.get(code) || 0
-			updateReservedStock(code, reserved)
-		})
+		stockStore.reserve(items) // Simple!
 	}
 
 	function setPosProfile(profile) {
@@ -708,44 +644,14 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		clearBaseCache()
 	}
 
-	function applyStockUpdates(stockUpdates) {
-		// Apply stock updates directly to reactive arrays for immediate UI refresh
-		if (!stockUpdates || stockUpdates.length === 0) {
-			return
-		}
-
-		stockUpdates.forEach((update) => {
-			if (!update || !update.item_code) return
-
-			const bucket = itemRegistry.get(update.item_code)
-			if (!bucket || bucket.size === 0) {
-				return
-			}
-
-			const reserved = cartReservedLookup.get(update.item_code) || 0
-			const baseline = update.actual_qty ?? update.stock_qty
-
-			bucket.forEach((item) => {
-				const baseStock =
-					baseline !== undefined && baseline !== null
-						? baseline
-						: ensureOriginalStock(item)
-				item.original_stock = baseStock
-				const available = Math.max(baseStock - reserved, 0)
-				item.actual_qty = available
-				item.stock_qty = available
-				if (update.warehouse) {
-					item.warehouse = update.warehouse
-				}
-			})
-		})
-
-		// Clear cached filters so the next compute uses fresh references
-		clearBaseCache()
-	}
+	// Stock delegates - Smart & minimal!
+	const applyStockUpdates = (updates) => stockStore.update(updates)
+	const refreshStockFromServer = (codes, wh) => stockStore.refresh(codes, wh)
 
 	return {
-		// State
+		// ========================================================================
+		// CORE STATE
+		// ========================================================================
 		allItems,
 		searchResults,
 		searchTerm,
@@ -762,12 +668,15 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		cacheReady,
 		cacheSyncing,
 		cacheStats,
-		stockUpdateVersion,
 
-		// Getters
-		filteredItems,
+		// ========================================================================
+		// COMPUTED PROPERTIES
+		// ========================================================================
+		filteredItems, // Injects live stock from stock store
 
-		// Actions
+		// ========================================================================
+		// ACTIONS - Items & Search
+		// ========================================================================
 		loadAllItems,
 		loadMoreItems,
 		searchItems,
@@ -777,15 +686,27 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		setSearchTerm,
 		clearSearch,
 		setSelectedItemGroup,
-		setCartItems,
+		setCartItems, // Delegates to stock store for reservations
 		setPosProfile,
 		startBackgroundCacheSync,
 		stopBackgroundCacheSync,
 		cleanup,
 		invalidateCache,
-		applyStockUpdates,
 
-		// Resources
+		// ========================================================================
+		// STOCK ACTIONS - Delegates to stock store
+		// ========================================================================
+		applyStockUpdates,        // Delegates to stockStore.applyUpdates
+		refreshStockFromServer,   // Delegates to stockStore.refreshFromServer
+
+		// ========================================================================
+		// STOCK STORE ACCESS
+		// ========================================================================
+		stockStore, // Direct access to dedicated stock store
+
+		// ========================================================================
+		// RESOURCES
+		// ========================================================================
 		itemGroupsResource,
 		searchByBarcodeResource,
 	}
