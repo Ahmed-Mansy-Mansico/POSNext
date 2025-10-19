@@ -18,6 +18,8 @@
 				:is-any-dialog-open="uiStore.isAnyDialogOpen"
 				:cache-syncing="itemStore.cacheSyncing"
 				:cache-stats="itemStore.cacheStats"
+				:stock-sync-active="isStockSyncActive"
+				:is-refreshing="stockStore.refreshing"
 				@sync-click="handleSyncClick"
 				@printer-click="uiStore.showHistoryDialog = true"
 				@refresh-click="handleRefresh"
@@ -640,12 +642,14 @@ import { Button, Dialog, createResource, toast } from "frappe-ui"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 
 import { useItemSearchStore } from "@/stores/itemSearch"
+import { useStockStore } from "@/stores/stock"
 // Pinia Stores
 import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSDraftsStore } from "@/stores/posDrafts"
 import { usePOSShiftStore } from "@/stores/posShift"
 import { usePOSSyncStore } from "@/stores/posSync"
 import { usePOSUIStore } from "@/stores/posUI"
+import { logger } from "@/utils/logger"
 
 // Initialize stores
 const cartStore = usePOSCartStore()
@@ -654,9 +658,13 @@ const uiStore = usePOSUIStore()
 const offlineStore = usePOSSyncStore()
 const draftsStore = usePOSDraftsStore()
 const itemStore = useItemSearchStore()
+const stockStore = useStockStore()
 
 // Real-time stock updates
 const { onStockUpdate } = useRealtimeStock()
+
+// Initialize logger
+const log = logger.create('POSSale')
 
 // Component refs
 const itemsSelectorRef = ref(null)
@@ -688,6 +696,9 @@ const showPromotionManagement = ref(false)
 // Settings dialog
 const showPOSSettings = ref(false)
 
+// Stock sync status
+const isStockSyncActive = ref(false)
+
 // Warehouses state and resource
 const warehousesList = ref([])
 
@@ -704,7 +715,7 @@ const warehousesResource = createResource({
 		warehousesList.value = warehouses
 	},
 	onError(error) {
-		console.error("Error loading warehouses:", error)
+		log.error("Error loading warehouses:", error)
 		warehousesList.value = []
 	},
 })
@@ -764,11 +775,9 @@ onMounted(async () => {
 		)
 
 		if (relevantUpdates.length > 0) {
-			// Update IndexedDB cache with filtered updates (warehouse-specific)
+			// Apply stock updates - Pinia auto-updates UI!
+			stockStore.update(relevantUpdates)
 			await offlineWorker.updateStockQuantities(relevantUpdates)
-
-			// Apply stock updates directly to reactive arrays for immediate UI refresh
-			itemStore.applyStockUpdates(relevantUpdates)
 		}
 	})
 
@@ -791,6 +800,14 @@ onMounted(async () => {
 				cartStore.posOpeningShift = shiftStore.currentShift?.name
 				await cartStore.loadTaxRules(shiftStore.profileName)
 
+				// Set warehouse context in stock store for stock operations
+				if (shiftStore.profileWarehouse) {
+					stockStore.setWarehouse(shiftStore.profileWarehouse)
+
+					// Note: Periodic stock sync will be configured after items load
+					// See watch() on itemStore.allItems below
+				}
+
 				// Pre-load data for offline use
 				if (!offlineStore.isOffline) {
 					await offlineStore.preloadDataForOffline(shiftStore.currentProfile)
@@ -803,7 +820,7 @@ onMounted(async () => {
 		updateLayoutBounds()
 		await draftsStore.updateDraftsCount()
 	} catch (error) {
-		console.error("Error checking shift:", error)
+		log.error("Error checking shift:", error)
 	} finally {
 		uiStore.setLoading(false)
 	}
@@ -887,12 +904,201 @@ watch(
 	},
 )
 
+// ============================================================================
+// PERIODIC STOCK SYNC - Setup when items are loaded
+// ============================================================================
+
+// Track if periodic sync has been initialized
+let periodicSyncConfigured = false
+let lastSyncWarehouse = null
+let lastSyncItemSignature = ''
+
+// Watch for items to be loaded or changed, then configure periodic stock sync
+watch(
+	() => {
+		const items = itemStore.allItems
+		const warehouse = shiftStore.profileWarehouse
+		const count = items.length
+
+		// Create signature from item codes to detect catalog changes even with same count
+		const signature = count > 0
+			? `${items[0]?.item_code || ''}-${items[Math.floor(count/2)]?.item_code || ''}-${items[count-1]?.item_code || ''}`
+			: ''
+
+		return { count, warehouse, signature }
+	},
+	async ({ count, warehouse, signature }, oldValue) => {
+		// Only proceed if we have a warehouse and items are loaded
+		if (!warehouse || count === 0) return
+
+		const warehouseChanged = warehouse !== lastSyncWarehouse
+		const itemsChanged = signature !== lastSyncItemSignature
+
+		// Initial configuration when items first load
+		if (!periodicSyncConfigured && count > 0) {
+			log.info(`Items loaded (${count}), configuring periodic stock sync`)
+			await setupPeriodicStockSync(warehouse)
+			periodicSyncConfigured = true
+			lastSyncWarehouse = warehouse
+			lastSyncItemSignature = signature
+		}
+		// Update configuration when warehouse changes or items change (including replacements)
+		else if (periodicSyncConfigured && (warehouseChanged || itemsChanged)) {
+			if (warehouseChanged) {
+				log.info(`Warehouse changed (${lastSyncWarehouse} → ${warehouse}), updating periodic stock sync`)
+			} else {
+				log.info(`Items changed (catalog replacement or new items), updating periodic stock sync`)
+			}
+			await updatePeriodicStockSyncItems(warehouse)
+			lastSyncWarehouse = warehouse
+			lastSyncItemSignature = signature
+		}
+	}
+)
+
 onUnmounted(() => {
 	window.removeEventListener("resize", () => {
 		uiStore.setWindowWidth(window.innerWidth)
 		updateLayoutBounds()
 	})
 	stopResize()
+
+	// Stop periodic stock sync on unmount
+	offlineWorker.stopStockSync().catch(() => {})
+})
+
+// ============================================================================
+// PERIODIC STOCK SYNC
+// ============================================================================
+
+/**
+ * Setup and start periodic stock sync from worker (called when items first load)
+ */
+async function setupPeriodicStockSync(warehouse) {
+	try {
+		// Check if user has enabled stock sync in settings
+		let syncEnabled = false
+		let syncIntervalMs = 60000 // Default 60 seconds
+
+		try {
+			const savedSettings = localStorage.getItem('pos_stock_sync_settings')
+			if (savedSettings) {
+				const parsed = JSON.parse(savedSettings)
+				syncEnabled = parsed.enabled ?? false
+				syncIntervalMs = (parsed.intervalSeconds ?? 60) * 1000
+			}
+		} catch (error) {
+			log.error('Failed to load stock sync settings:', error)
+		}
+
+		// Get all currently loaded item codes from the item store
+		const itemCodes = itemStore.allItems.map(item => item.item_code)
+
+		// Configure stock sync with warehouse and items
+		const config = await offlineWorker.configureStockSync({
+			warehouse,
+			itemCodes,
+			intervalMs: syncIntervalMs
+		})
+
+		log.info('Periodic stock sync configured:', config)
+
+		// Only start sync if user has enabled it
+		if (syncEnabled) {
+			const result = await offlineWorker.startStockSync()
+			log.success('Periodic stock sync started:', result.status)
+			isStockSyncActive.value = true
+		} else {
+			log.info('Stock sync is disabled in settings (not starting)')
+			isStockSyncActive.value = false
+		}
+
+		// Listen for stock sync completion events (regardless of enabled state)
+		window.addEventListener('stockSyncComplete', handleStockSyncComplete)
+		window.addEventListener('stockSyncError', handleStockSyncError)
+
+		// Poll stock sync status every 10 seconds to update the indicator
+		const statusPollInterval = setInterval(async () => {
+			try {
+				const status = await offlineWorker.getStockSyncStatus()
+				isStockSyncActive.value = status.enabled
+			} catch (error) {
+				// Ignore errors
+			}
+		}, 10000)
+
+		// Cleanup on unmount
+		onUnmounted(() => {
+			clearInterval(statusPollInterval)
+		})
+	} catch (error) {
+		log.error('Failed to setup periodic stock sync:', error)
+	}
+}
+
+/**
+ * Handle stock sync completion from worker
+ */
+async function handleStockSyncComplete(event) {
+	const { updated, total, duration } = event.detail
+
+	log.success(`Background stock sync: ${updated}/${total} items updated in ${duration}ms`)
+
+	// The worker has already updated IndexedDB
+	// Now we need to refresh the Pinia stock store from IndexedDB or server
+	if (updated > 0) {
+		// Trigger a refresh of displayed stock
+		// Note: refresh() now preserves reservations internally
+		try {
+			await stockStore.refresh(null, shiftStore.profileWarehouse)
+		} catch (err) {
+			log.error('Failed to refresh stock after background sync:', err)
+		}
+
+		// Refresh cache stats to update the "Last Sync" timestamp in the tooltip
+		try {
+			const stats = await offlineWorker.getCacheStats()
+			itemStore.cacheStats = stats
+		} catch (error) {
+			log.error('Failed to refresh cache stats:', error)
+		}
+	}
+}
+
+/**
+ * Handle stock sync errors from worker
+ */
+function handleStockSyncError(event) {
+	const { message } = event.detail
+	log.warn('Background stock sync error:', message)
+}
+
+/**
+ * Update periodic stock sync with newly loaded items
+ * Called when more items are loaded dynamically (pagination, background cache)
+ */
+async function updatePeriodicStockSyncItems(warehouse) {
+	try {
+		// Get all currently loaded item codes
+		const itemCodes = itemStore.allItems.map(item => item.item_code)
+
+		// Reconfigure worker with updated item list
+		await offlineWorker.configureStockSync({
+			warehouse,
+			itemCodes,
+			// Keep existing interval setting
+		})
+
+		log.info(`Updated periodic stock sync with ${itemCodes.length} items`)
+	} catch (error) {
+		log.error('Failed to update periodic stock sync items:', error)
+	}
+}
+
+// Cleanup event listeners on unmount
+onUnmounted(() => {
+	window.removeEventListener('stockSyncComplete', handleStockSyncComplete)
+	window.removeEventListener('stockSyncError', handleStockSyncError)
 })
 
 // Handlers
@@ -1116,6 +1322,9 @@ async function handlePaymentCompleted(paymentData) {
 				iconClasses: "text-orange-600",
 			})
 		} else {
+			// Get item codes from cart before clearing
+			const soldItemCodes = cartStore.invoiceItems.map(item => item.item_code)
+
 			const result = await cartStore.submitInvoice()
 
 			if (result) {
@@ -1127,9 +1336,8 @@ async function handlePaymentCompleted(paymentData) {
 				// Reset cart hash after successful payment
 				previousCartHash = ""
 
-				if (itemsSelectorRef.value) {
-					itemsSelectorRef.value.loadItems()
-				}
+				// Refresh stock - Direct API (50-200ms), no Socket.IO lag!
+				await stockStore.refresh(soldItemCodes, shiftStore.profileWarehouse)
 
 				if (shiftStore.autoPrintEnabled) {
 					try {
@@ -1141,7 +1349,7 @@ async function handlePaymentCompleted(paymentData) {
 							iconClasses: "text-green-600",
 						})
 					} catch (error) {
-						console.error("Auto-print error:", error)
+						log.error("Auto-print error:", error)
 						toast.create({
 							title: "Invoice Created",
 							text: `Invoice ${invoiceName} created but print failed`,
@@ -1161,7 +1369,7 @@ async function handlePaymentCompleted(paymentData) {
 			}
 		}
 	} catch (error) {
-		console.error("Error submitting invoice:", error)
+		log.error("Error submitting invoice:", error)
 		uiStore.showPaymentDialog = false
 
 		const errorContext = parseError(error)
@@ -1268,7 +1476,7 @@ async function handleOptionSelected(option) {
 			}
 		}
 	} catch (error) {
-		console.error("Error handling option selection:", error)
+		log.error("Error handling option selection:", error)
 		toast.create({
 			title: "Error",
 			text: "Failed to process selection. Please try again.",
@@ -1287,7 +1495,7 @@ async function handlePrintInvoice() {
 		await printInvoiceByName(uiStore.lastInvoiceName)
 		uiStore.showSuccessDialog = false
 	} catch (error) {
-		console.error("Error printing invoice:", error)
+		log.error("Error printing invoice:", error)
 		toast.create({
 			title: "Print Error",
 			text: "Failed to print invoice. Please try again.",
@@ -1363,7 +1571,7 @@ async function handleLoadDraft(draft) {
 
 		uiStore.showDraftDialog = false
 	} catch (error) {
-		// Error handled in store
+		log.error("Error loading draft:", error)
 	}
 }
 
@@ -1429,15 +1637,21 @@ function handleCustomerCreated(newCustomer) {
 	})
 }
 
-function handleRefresh() {
-	if (itemsSelectorRef.value) {
-		itemsSelectorRef.value.loadItems()
-		toast.create({
-			title: "Refreshed",
-			text: "Items list has been refreshed",
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+async function handleRefresh() {
+	try {
+		log.info('Manual stock refresh initiated')
+
+		// Refresh stock from server
+		// Note: refresh() now preserves reservations internally
+		await stockStore.refresh(null, shiftStore.profileWarehouse)
+
+		// Refresh cache stats to update "Last Updated" timestamp
+		const stats = await offlineWorker.getCacheStats()
+		itemStore.cacheStats = stats
+
+		log.success('Manual stock refresh completed')
+	} catch (error) {
+		log.error('Manual stock refresh failed:', error)
 	}
 }
 
@@ -1469,8 +1683,7 @@ async function handleEditOfflineInvoice(invoice) {
 			iconClasses: "text-blue-600",
 		})
 	} catch (error) {
-		console.error("Error editing offline invoice:", error)
-		// Error handled in store
+		log.error("Error editing offline invoice:", error)
 	}
 }
 
@@ -1478,7 +1691,7 @@ async function handleDeleteOfflineInvoice(invoiceId) {
 	try {
 		await offlineStore.deleteOfflineInvoice(invoiceId)
 	} catch (error) {
-		// Error handled in store
+		log.error("Error deleting offline invoice:", error)
 	}
 }
 
@@ -1536,7 +1749,7 @@ async function handleSyncAll() {
 			})
 		}
 	} catch (error) {
-		console.error("Sync error:", error)
+		log.error("Sync error:", error)
 		const errorContext = parseError(error)
 		uiStore.showError(
 			errorContext.title,
@@ -1668,7 +1881,7 @@ function handleManagementMenuClick(menuItem) {
 }
 
 async function handleWarehouseChanged(newWarehouse) {
-	console.log("Warehouse changed to:", newWarehouse)
+	log.info("Warehouse changed to:", newWarehouse)
 
 	try {
 		// Update the shift store with new warehouse
@@ -1691,7 +1904,7 @@ async function handleWarehouseChanged(newWarehouse) {
 			iconClasses: "text-green-600",
 		})
 	} catch (error) {
-		console.error("Error handling warehouse change:", error)
+		log.error("Error handling warehouse change:", error)
 		toast.create({
 			title: "Warning",
 			text: `Warehouse updated but failed to reload stock. Please refresh manually.`,
