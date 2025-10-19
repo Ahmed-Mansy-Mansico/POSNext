@@ -205,7 +205,7 @@
 
 <script setup>
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
-import { getCachedPaymentMethods } from "@/utils/offline"
+import { offlineWorker } from "@/utils/offline/workerClient"
 import { Button, Dialog, Input, createResource } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
@@ -267,8 +267,8 @@ async function loadPaymentMethods() {
 	}
 
 	if (props.isOffline) {
-		// Load from cache when offline
-		const cached = await getCachedPaymentMethods(props.posProfile)
+		// Load from cache when offline using worker
+		const cached = await offlineWorker.getCachedPaymentMethods(props.posProfile)
 		if (cached && cached.length > 0) {
 			paymentMethods.value = cached
 			if (paymentMethods.value.length > 0) {

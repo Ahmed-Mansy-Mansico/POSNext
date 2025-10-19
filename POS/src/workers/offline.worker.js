@@ -326,6 +326,49 @@ async function cacheCustomersFromServer(customers) {
 	}
 }
 
+// Cache payment methods from server
+async function cachePaymentMethodsFromServer(paymentMethods) {
+	try {
+		const db = await initDB()
+		await db.table("payment_methods").bulkPut(paymentMethods)
+
+		// Update settings
+		await db.table("settings").put({
+			key: "payment_methods_last_sync",
+			value: Date.now(),
+		})
+
+		return { success: true, count: paymentMethods.length }
+	} catch (error) {
+		log.error("Error caching payment methods", error)
+		throw error
+	}
+}
+
+// Get cached payment methods for a POS profile
+async function getCachedPaymentMethods(posProfile) {
+	try {
+		const db = await initDB()
+
+		if (!posProfile) {
+			// Return all payment methods if no profile specified
+			return await db.table("payment_methods").toArray()
+		}
+
+		// Get payment methods for specific profile
+		const methods = await db
+			.table("payment_methods")
+			.where("pos_profile")
+			.equals(posProfile)
+			.toArray()
+
+		return methods
+	} catch (error) {
+		log.error("Error getting cached payment methods", error)
+		return []
+	}
+}
+
 // Check if cache is ready
 async function isCacheReady() {
 	try {
@@ -679,6 +722,14 @@ self.onmessage = async (event) => {
 
 			case "CACHE_CUSTOMERS":
 				result = await cacheCustomersFromServer(payload.customers)
+				break
+
+			case "CACHE_PAYMENT_METHODS":
+				result = await cachePaymentMethodsFromServer(payload.paymentMethods)
+				break
+
+			case "GET_PAYMENT_METHODS":
+				result = await getCachedPaymentMethods(payload.posProfile)
 				break
 
 			case "IS_CACHE_READY":

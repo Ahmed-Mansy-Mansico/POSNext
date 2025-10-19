@@ -143,5 +143,144 @@ export const setSetting = async (key, value) => {
 	}
 }
 
+/**
+ * Clear all cached data (items, customers, stock, etc.)
+ * Preserves critical data like invoices, drafts, and settings
+ * @param {Object} options - Options for clearing
+ * @param {boolean} options.preserveInvoices - Keep invoice queue (default: true)
+ * @param {boolean} options.preserveDrafts - Keep drafts (default: true)
+ * @param {boolean} options.preserveSettings - Keep settings (default: true)
+ * @returns {Promise<Object>} - Status of cleared tables
+ */
+export const clearCachedData = async (options = {}) => {
+	const {
+		preserveInvoices = true,
+		preserveDrafts = true,
+		preserveSettings = true,
+	} = options
+
+	const results = {
+		items: 0,
+		customers: 0,
+		stock: 0,
+		item_prices: 0,
+		payment_methods: 0,
+		invoices: 0,
+		payments: 0,
+		drafts: 0,
+		settings: 0,
+	}
+
+	try {
+		// Always clear these cache tables
+		results.items = await db.items.clear()
+		results.customers = await db.customers.clear()
+		results.stock = await db.stock.clear()
+		results.item_prices = await db.item_prices.clear()
+		results.payment_methods = await db.payment_methods.clear()
+
+		// Conditionally clear invoice and payment queues
+		if (!preserveInvoices) {
+			results.invoices = await db.invoice_queue.clear()
+			results.payments = await db.payment_queue.clear()
+		}
+
+		// Conditionally clear drafts
+		if (!preserveDrafts) {
+			results.drafts = await db.drafts.clear()
+		}
+
+		// Conditionally clear settings
+		if (!preserveSettings) {
+			results.settings = await db.settings.clear()
+		}
+
+		console.log("Cached data cleared:", results)
+		return { success: true, cleared: results }
+	} catch (error) {
+		console.error("Error clearing cached data:", error)
+		return { success: false, error: error.message, cleared: results }
+	}
+}
+
+/**
+ * NUCLEAR OPTION: Delete entire database and recreate
+ * Use with caution - clears EVERYTHING including invoices and drafts
+ * @returns {Promise<boolean>} - Success status
+ */
+export const nukeDatabase = async () => {
+	try {
+		console.warn("NUKING DATABASE - All data will be lost!")
+
+		// Close database connection
+		if (db.isOpen()) {
+			db.close()
+		}
+
+		// Delete entire database
+		await Dexie.delete("pos_next_offline")
+
+		// Clear localStorage schema tracking
+		localStorage.removeItem("pos_next_schema_hash")
+		localStorage.removeItem("pos_next_schema_version")
+
+		// Recreate database
+		await db.open()
+
+		console.log("Database nuked and recreated successfully")
+		return true
+	} catch (error) {
+		console.error("Error nuking database:", error)
+		return false
+	}
+}
+
+/**
+ * Clear browser cache and localStorage (POS-specific data only)
+ * @returns {Object} - Status of cleared data
+ */
+export const clearBrowserCache = () => {
+	const results = {
+		localStorage: 0,
+		sessionStorage: 0,
+	}
+
+	try {
+		// Clear POS-specific localStorage items
+		const keysToRemove = []
+		for (let i = 0; i < localStorage.length; i++) {
+			const key = localStorage.key(i)
+			if (key?.startsWith('pos_next_') || key?.startsWith('frappe_')) {
+				keysToRemove.push(key)
+			}
+		}
+
+		keysToRemove.forEach(key => {
+			localStorage.removeItem(key)
+			results.localStorage++
+		})
+
+		// Clear sessionStorage
+		const sessionKeys = []
+		for (let i = 0; i < sessionStorage.length; i++) {
+			const key = sessionStorage.key(i)
+			if (key?.startsWith('pos_next_') || key?.startsWith('frappe_')) {
+				sessionKeys.push(key)
+			}
+		}
+
+		sessionKeys.forEach(key => {
+			sessionStorage.removeItem(key)
+			results.sessionStorage++
+		})
+
+		console.log("Browser cache cleared:", results)
+		return { success: true, cleared: results }
+	} catch (error) {
+		console.error("Error clearing browser cache:", error)
+		return { success: false, error: error.message, cleared: results }
+	}
+}
+
 // Initialize database on import
 initDB()

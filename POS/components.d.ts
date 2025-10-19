@@ -11,6 +11,7 @@ declare module 'vue' {
     ActionButton: typeof import('./src/components/common/ActionButton.vue')['default']
     BatchSerialDialog: typeof import('./src/components/sale/BatchSerialDialog.vue')['default']
     CheckboxField: typeof import('./src/components/settings/CheckboxField.vue')['default']
+    ClearCacheOverlay: typeof import('./src/components/common/ClearCacheOverlay.vue')['default']
     CouponDialog: typeof import('./src/components/sale/CouponDialog.vue')['default']
     CreateCustomerDialog: typeof import('./src/components/sale/CreateCustomerDialog.vue')['default']
     CustomerDialog: typeof import('./src/components/sale/CustomerDialog.vue')['default']

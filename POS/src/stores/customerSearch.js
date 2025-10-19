@@ -218,10 +218,10 @@ export const useCustomerSearchStore = defineStore("customerSearch", () => {
 			if (cachedCustomers && cachedCustomers.length > 0) {
 				allCustomers.value = cachedCustomers
 				console.log(
-					`✓ Loaded ${cachedCustomers.length} customers for instant search`,
+					`✓ Loaded ${cachedCustomers.length} customers from cache`,
 				)
 			} else if (!isOffline()) {
-				// Fetch from server if cache is empty
+				// Fetch from server if cache is empty and online
 				const response = await call("pos_next.api.customers.get_customers", {
 					pos_profile: posProfile,
 					search_term: "",
@@ -235,7 +235,11 @@ export const useCustomerSearchStore = defineStore("customerSearch", () => {
 				if (list.length) {
 					await offlineWorker.cacheCustomers(list)
 				}
-				console.log(`✓ Loaded ${list.length} customers for instant search`)
+				console.log(`✓ Loaded ${list.length} customers from server`)
+			} else {
+				// Offline and cache is empty - show warning
+				console.warn("⚠️ Offline mode: No cached customers available. Please sync data when online.")
+				allCustomers.value = []
 			}
 
 			// Clear caches when new data is loaded

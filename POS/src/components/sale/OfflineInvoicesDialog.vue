@@ -1,16 +1,16 @@
 <template>
 	<Dialog v-model="show" :options="{ title: 'Offline Invoices', size: 'xl' }">
 		<template #body-content>
-			<div class="space-y-4">
+			<div class="space-y-3 sm:space-y-4">
 				<!-- Header Info -->
-				<div class="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
-					<div class="flex items-center space-x-3">
-						<svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-orange-50 rounded-lg border border-orange-200">
+					<div class="flex items-center space-x-2 sm:space-x-3">
+						<svg class="w-5 h-5 sm:w-6 sm:h-6 text-orange-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
 						</svg>
-						<div>
-							<h3 class="font-semibold text-gray-900">{{ invoices.length }} Pending Invoice(s)</h3>
-							<p class="text-sm text-gray-600">These invoices will be submitted when you're back online</p>
+						<div class="min-w-0">
+							<h3 class="font-semibold text-gray-900 text-sm sm:text-base">{{ invoices.length }} Pending Invoice(s)</h3>
+							<p class="text-xs sm:text-sm text-gray-600 truncate">These invoices will be submitted when you're back online</p>
 						</div>
 					</div>
 					<Button
@@ -18,7 +18,7 @@
 						@click="syncAll"
 						:loading="isSyncing"
 						variant="solid"
-						class="flex-shrink-0 whitespace-nowrap"
+						class="flex-shrink-0 whitespace-nowrap w-full sm:w-auto text-sm"
 					>
 						<template #prefix>
 							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,73 +43,73 @@
 				</div>
 
 				<!-- Invoices List -->
-				<div v-else class="space-y-3 max-h-96 overflow-y-auto">
+				<div v-else class="space-y-2 sm:space-y-3 max-h-[60vh] sm:max-h-96 overflow-y-auto">
 					<div
 						v-for="invoice in invoices"
 						:key="invoice.id"
-						class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+						class="border border-gray-200 rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition-colors"
 					>
-						<div class="flex items-start justify-between">
-							<div class="flex-1">
-								<div class="flex items-center space-x-3">
-									<h4 class="font-semibold text-gray-900">
+						<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+							<div class="flex-1 min-w-0">
+								<div class="flex flex-wrap items-center gap-2">
+									<h4 class="font-semibold text-gray-900 text-sm sm:text-base truncate">
 										{{ invoice.data.customer || 'Walk-in Customer' }}
 									</h4>
 									<span
 										v-if="invoice.retry_count > 0"
-										class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded-full"
+										class="text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 bg-red-100 text-red-700 rounded-full flex-shrink-0"
 									>
-										{{ invoice.retry_count }} failed attempts
+										{{ invoice.retry_count }} failed
 									</span>
 								</div>
-								<div class="mt-2 space-y-1 text-sm text-gray-600">
-									<div class="flex items-center space-x-4">
+								<div class="mt-2 space-y-1 text-xs sm:text-sm text-gray-600">
+									<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
 										<span>{{ invoice.data.items?.length || 0 }} items</span>
 										<span class="font-semibold text-gray-900">
 											{{ formatCurrency(invoice.data.grand_total || 0) }}
 										</span>
-										<span class="text-xs text-gray-500">
+										<span class="text-[10px] sm:text-xs text-gray-500">
 											{{ formatDate(invoice.timestamp) }}
 										</span>
 									</div>
-									<div v-if="invoice.data.payments?.length > 0" class="flex items-center space-x-2">
-										<span class="text-xs text-gray-500">Payments:</span>
+									<div v-if="invoice.data.payments?.length > 0" class="flex flex-wrap items-center gap-2">
+										<span class="text-[10px] sm:text-xs text-gray-500">Payments:</span>
 										<span
 											v-for="(payment, idx) in invoice.data.payments"
 											:key="idx"
-											class="text-xs px-2 py-0.5 bg-gray-100 rounded"
+											class="text-[10px] sm:text-xs px-2 py-0.5 bg-gray-100 rounded"
 										>
 											{{ payment.mode_of_payment }}: {{ formatCurrency(payment.amount) }}
 										</span>
 									</div>
 								</div>
 							</div>
-							<div class="flex items-center space-x-2">
+							<div class="flex items-center justify-end sm:justify-start gap-1 sm:gap-2">
 								<button
 									@click="editInvoice(invoice)"
-									class="p-2 hover:bg-blue-50 rounded-lg transition-colors"
+									class="p-1.5 sm:p-2 hover:bg-blue-50 rounded-lg transition-colors touch-manipulation"
 									title="Edit Invoice"
 								>
-									<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
 									</svg>
 								</button>
 								<button
 									@click="viewDetails(invoice)"
-									class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+									class="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation"
 									title="View Details"
 								>
-									<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
 									</svg>
 								</button>
 								<button
 									@click="deleteInvoice(invoice)"
-									class="p-2 hover:bg-red-50 rounded-lg transition-colors"
+									class="p-1.5 sm:p-2 hover:bg-red-50 rounded-lg transition-colors touch-manipulation"
 									title="Delete"
 								>
-									<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<svg class="w-4 h-4 sm:w-5 sm:h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
 									</svg>
 								</button>
@@ -124,52 +124,52 @@
 	<!-- Details Dialog -->
 	<Dialog v-model="showDetails" :options="{ title: 'Invoice Details', size: 'lg' }">
 		<template #body-content>
-			<div v-if="selectedInvoice" class="space-y-4">
-				<div class="bg-gray-50 p-4 rounded-lg">
-					<h4 class="font-semibold text-gray-900 mb-2">Customer</h4>
-					<p>{{ selectedInvoice.data.customer || 'Walk-in Customer' }}</p>
+			<div v-if="selectedInvoice" class="space-y-3 sm:space-y-4">
+				<div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
+					<h4 class="font-semibold text-gray-900 mb-2 text-sm sm:text-base">Customer</h4>
+					<p class="text-sm sm:text-base">{{ selectedInvoice.data.customer || 'Walk-in Customer' }}</p>
 				</div>
 
-				<div class="bg-gray-50 p-4 rounded-lg">
-					<h4 class="font-semibold text-gray-900 mb-2">Items</h4>
+				<div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
+					<h4 class="font-semibold text-gray-900 mb-2 text-sm sm:text-base">Items</h4>
 					<div class="space-y-2">
 						<div
 							v-for="(item, idx) in selectedInvoice.data.items"
 							:key="idx"
-							class="flex justify-between text-sm"
+							class="flex justify-between text-xs sm:text-sm gap-2"
 						>
-							<span>{{ item.item_name || item.item_code }} × {{ item.quantity || item.qty }}</span>
-							<span class="font-semibold">{{ formatCurrency(item.amount || 0) }}</span>
+							<span class="truncate">{{ item.item_name || item.item_code }} × {{ item.quantity || item.qty }}</span>
+							<span class="font-semibold flex-shrink-0">{{ formatCurrency(item.amount || 0) }}</span>
 						</div>
 					</div>
 				</div>
 
-				<div class="bg-gray-50 p-4 rounded-lg">
-					<div class="flex justify-between mb-1">
+				<div class="bg-gray-50 p-3 sm:p-4 rounded-lg">
+					<div class="flex justify-between mb-1 text-xs sm:text-sm">
 						<span class="text-gray-600">Subtotal</span>
 						<span>{{ formatCurrency(selectedInvoice.data.total || 0) }}</span>
 					</div>
-					<div v-if="selectedInvoice.data.total_tax" class="flex justify-between mb-1">
+					<div v-if="selectedInvoice.data.total_tax" class="flex justify-between mb-1 text-xs sm:text-sm">
 						<span class="text-gray-600">Tax</span>
 						<span>{{ formatCurrency(selectedInvoice.data.total_tax) }}</span>
 					</div>
-					<div v-if="selectedInvoice.data.total_discount" class="flex justify-between mb-1">
+					<div v-if="selectedInvoice.data.total_discount" class="flex justify-between mb-1 text-xs sm:text-sm">
 						<span class="text-gray-600">Discount</span>
 						<span class="text-red-600">-{{ formatCurrency(selectedInvoice.data.total_discount) }}</span>
 					</div>
-					<div class="flex justify-between font-semibold text-lg pt-2 border-t">
+					<div class="flex justify-between font-semibold text-base sm:text-lg pt-2 border-t">
 						<span>Grand Total</span>
 						<span>{{ formatCurrency(selectedInvoice.data.grand_total || 0) }}</span>
 					</div>
 				</div>
 
-				<div v-if="selectedInvoice.data.payments?.length > 0" class="bg-gray-50 p-4 rounded-lg">
-					<h4 class="font-semibold text-gray-900 mb-2">Payments</h4>
+				<div v-if="selectedInvoice.data.payments?.length > 0" class="bg-gray-50 p-3 sm:p-4 rounded-lg">
+					<h4 class="font-semibold text-gray-900 mb-2 text-sm sm:text-base">Payments</h4>
 					<div class="space-y-1">
 						<div
 							v-for="(payment, idx) in selectedInvoice.data.payments"
 							:key="idx"
-							class="flex justify-between text-sm"
+							class="flex justify-between text-xs sm:text-sm"
 						>
 							<span>{{ payment.mode_of_payment }}</span>
 							<span class="font-semibold">{{ formatCurrency(payment.amount) }}</span>
@@ -179,42 +179,42 @@
 			</div>
 		</template>
 		<template #actions>
-			<Button variant="subtle" @click="showDetails = false">Close</Button>
+			<Button variant="subtle" @click="showDetails = false" class="w-full sm:w-auto">Close</Button>
 		</template>
 	</Dialog>
 
 	<!-- Delete Confirmation Dialog -->
 	<Dialog v-model="showDeleteConfirm" :options="{ title: 'Delete Offline Invoice', size: 'md' }">
 		<template #body-content>
-			<div v-if="invoiceToDelete" class="space-y-4">
-				<div class="flex items-start space-x-3">
-					<svg class="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<div v-if="invoiceToDelete" class="space-y-3 sm:space-y-4">
+				<div class="flex items-start space-x-2 sm:space-x-3">
+					<svg class="w-5 h-5 sm:w-6 sm:h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
 					</svg>
-					<div>
-						<p class="text-gray-900 font-medium mb-2">Are you sure you want to delete this offline invoice?</p>
-						<div class="bg-gray-50 rounded-lg p-3 space-y-1 text-sm">
-							<div class="flex justify-between">
+					<div class="min-w-0 flex-1">
+						<p class="text-gray-900 font-medium mb-2 text-sm sm:text-base">Are you sure you want to delete this offline invoice?</p>
+						<div class="bg-gray-50 rounded-lg p-2.5 sm:p-3 space-y-1 text-xs sm:text-sm">
+							<div class="flex justify-between gap-2">
 								<span class="text-gray-600">Customer:</span>
-								<span class="font-semibold">{{ invoiceToDelete.data.customer || 'Walk-in Customer' }}</span>
+								<span class="font-semibold truncate">{{ invoiceToDelete.data.customer || 'Walk-in Customer' }}</span>
 							</div>
-							<div class="flex justify-between">
+							<div class="flex justify-between gap-2">
 								<span class="text-gray-600">Amount:</span>
 								<span class="font-semibold">{{ formatCurrency(invoiceToDelete.data.grand_total) }}</span>
 							</div>
-							<div class="flex justify-between">
+							<div class="flex justify-between gap-2">
 								<span class="text-gray-600">Items:</span>
 								<span class="font-semibold">{{ invoiceToDelete.data.items?.length || 0 }}</span>
 							</div>
 						</div>
-						<p class="text-red-600 text-sm mt-3">This action cannot be undone.</p>
+						<p class="text-red-600 text-xs sm:text-sm mt-3">This action cannot be undone.</p>
 					</div>
 				</div>
 			</div>
 		</template>
 		<template #actions>
-			<Button variant="subtle" @click="showDeleteConfirm = false">Cancel</Button>
-			<Button variant="solid" theme="red" @click="confirmDelete">Delete Invoice</Button>
+			<Button variant="subtle" @click="showDeleteConfirm = false" class="w-full sm:w-auto">Cancel</Button>
+			<Button variant="solid" theme="red" @click="confirmDelete" class="w-full sm:w-auto">Delete Invoice</Button>
 		</template>
 	</Dialog>
 </template>
@@ -271,6 +271,11 @@ watch(show, async (newVal) => {
 	}
 })
 
+// Watch for prop changes (e.g., after delete or sync)
+watch(() => props.pendingInvoices, (newInvoices) => {
+	invoices.value = newInvoices
+})
+
 async function loadInvoices() {
 	loading.value = true
 	try {
@@ -322,11 +327,14 @@ function deleteInvoice(invoice) {
 
 async function confirmDelete() {
 	if (invoiceToDelete.value) {
-		emit("delete-invoice", invoiceToDelete.value.id)
+		// Close dialog immediately for better UX
 		showDeleteConfirm.value = false
+		const invoiceId = invoiceToDelete.value.id
 		invoiceToDelete.value = null
-		// Refresh list
-		await loadInvoices()
+
+		// Emit the delete event and let parent handle the refresh
+		// The watcher on pendingInvoices will update the list automatically
+		emit("delete-invoice", invoiceId)
 	}
 }
 </script>

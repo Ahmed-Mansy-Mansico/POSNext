@@ -295,6 +295,18 @@ export function createOptimizedClickHandler(handler, options = {}) {
 		}
 	}
 
+	// Reset touchHandled flag after GHOST_CLICK_THRESHOLD
+	// to prevent indefinite blocking of mouse clicks
+	const resetTouchHandled = () => {
+		if (touchHandled) {
+			const timeSinceTouchEnd = Date.now() - touchEndTime
+			if (timeSinceTouchEnd >= GHOST_CLICK_THRESHOLD) {
+				touchHandled = false
+			}
+		}
+	}
+	setInterval(resetTouchHandled, GHOST_CLICK_THRESHOLD)
+
 	return handlers
 }
 

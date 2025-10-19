@@ -4,6 +4,7 @@ import {
 	cacheCustomersFromServer,
 	cachePaymentMethodsFromServer,
 } from "@/utils/offline"
+import { offlineWorker } from "@/utils/offline/workerClient"
 import { toast } from "frappe-ui"
 import { defineStore } from "pinia"
 import { computed, ref } from "vue"
@@ -116,15 +117,25 @@ export const usePOSSyncStore = defineStore("posSync", () => {
 					iconClasses: "text-blue-600",
 				})
 
-				// Fetch only customers and payment methods (items handled by itemStore)
-				const [customersData] =
+				// Fetch customers and payment methods (items handled by itemStore)
+				const [customersData, paymentMethodsData] =
 					await Promise.all([
 						cacheCustomersFromServer(currentProfile.name),
 						cachePaymentMethodsFromServer(currentProfile.name),
 					])
 
-				// Cache data using composable (items will be empty array since itemStore handles them)
+				// Cache customers using composable
 				await cacheData([], customersData.customers || [])
+
+				// Cache payment methods using worker
+				if (paymentMethodsData.payment_methods && paymentMethodsData.payment_methods.length > 0) {
+					// Add pos_profile to each method for indexing
+					const methodsWithProfile = paymentMethodsData.payment_methods.map((method) => ({
+						...method,
+						pos_profile: currentProfile.name,
+					}))
+					await offlineWorker.cachePaymentMethods(methodsWithProfile)
+				}
 
 				toast.create({
 					title: "Sync Complete",

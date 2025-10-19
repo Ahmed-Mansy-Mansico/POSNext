@@ -335,6 +335,7 @@ class OfflineWorkerClient {
 			case "GET_INVOICES":
 			case "SEARCH_ITEMS":
 			case "SEARCH_CUSTOMERS":
+			case "GET_PAYMENT_METHODS":
 				return []
 			case "IS_CACHE_READY":
 				return false
@@ -353,6 +354,7 @@ class OfflineWorkerClient {
 			case "DELETE_INVOICE":
 			case "CACHE_ITEMS":
 			case "CACHE_CUSTOMERS":
+			case "CACHE_PAYMENT_METHODS":
 			case "UPDATE_STOCK_QUANTITIES":
 				// For write operations, throw error so caller knows to handle differently
 				throw new Error(`Worker unavailable: Cannot perform ${type}`)
@@ -396,6 +398,14 @@ class OfflineWorkerClient {
 
 	async cacheCustomers(customers) {
 		return this.sendMessage("CACHE_CUSTOMERS", { customers })
+	}
+
+	async cachePaymentMethods(paymentMethods) {
+		return this.sendMessage("CACHE_PAYMENT_METHODS", { paymentMethods })
+	}
+
+	async getCachedPaymentMethods(posProfile) {
+		return this.sendMessage("GET_PAYMENT_METHODS", { posProfile })
 	}
 
 	async isCacheReady() {

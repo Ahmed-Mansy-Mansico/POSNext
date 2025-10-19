@@ -157,6 +157,8 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 
 	/**
 	 * Filtered items with live stock - Smart & reactive!
+	 * Note: Variants are shown as separate items (not deduplicated)
+	 * Template items with has_variants=1 will show variant selector on click
 	 */
 	const filteredItems = computed(() => {
 		const sourceItems = searchTerm.value?.trim()
@@ -170,6 +172,7 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 			: sourceItems
 
 		// Inject live stock (Pinia auto-updates!)
+		// Each variant appears as a separate item
 		return list.map(item => ({
 			...item,
 			actual_qty: stockStore.getDisplayStock(item.item_code),

@@ -93,13 +93,13 @@
 					</button>
 
 					<!-- Cache Status Indicator -->
-					<div class="relative group">
+					<div class="relative">
 						<button
-							@click="toggleCacheTooltip"
-							class="p-2 sm:p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors relative touch-manipulation"
+							@click="showCacheTooltip = !showCacheTooltip"
+							@blur="handleBlur"
+							class="p-2 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition-colors relative touch-manipulation"
 							:aria-label="getCacheAriaLabel()"
 						>
-							<!-- Database/Cache Icon with color-coded status -->
 							<svg
 								class="w-5 h-5 transition-colors"
 								:class="getCacheIconColor()"
@@ -108,7 +108,6 @@
 							>
 								<path d="M12 2C8.13 2 5 3.12 5 4.5V7c0 1.38 3.13 2.5 7 2.5S19 8.38 19 7V4.5C19 3.12 15.87 2 12 2zM5 9v3c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5V9c0 1.38-3.13 2.5-7 2.5S5 10.38 5 9zm0 5v3c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5v-3c0 1.38-3.13 2.5-7 2.5S5 15.38 5 14z"/>
 							</svg>
-							<!-- Spinning overlay when syncing or refreshing -->
 							<svg
 								v-if="cacheSyncing || isRefreshing"
 								class="w-5 h-5 absolute top-2 left-2 animate-spin opacity-70"
@@ -122,100 +121,40 @@
 							</svg>
 						</button>
 
-						<!-- Custom Tooltip - Works on hover (desktop) and click (mobile) -->
+						<!-- Tooltip -->
 						<div
 							v-if="showCacheTooltip"
-							@click="toggleCacheTooltip"
-							class="fixed inset-0 z-[999] sm:hidden"
+							@mousedown.prevent
+							class="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-[999] w-[90vw] max-w-[240px] sm:max-w-[260px]"
 						>
-							<!-- Mobile backdrop -->
-							<div class="absolute inset-0 bg-black/20"></div>
-							<!-- Mobile tooltip -->
-							<div class="absolute top-20 left-1/2 -translate-x-1/2 w-[90%] max-w-[280px]">
-								<div class="bg-gray-900 text-white text-sm rounded-lg shadow-2xl py-3 px-4">
-									<!-- Tooltip Arrow (pointing up) -->
-									<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-px">
-										<div class="border-[6px] border-transparent border-b-gray-900"></div>
-									</div>
-
-									<!-- Status Header -->
-									<div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-700">
-										<span class="font-semibold text-base">Catalog Cache</span>
-										<span
-											class="px-2.5 py-1 rounded text-xs font-bold uppercase"
-											:class="getCacheStatusBadgeClass()"
-										>
-											{{ getCacheStatus() }}
-										</span>
-									</div>
-
-									<!-- Cache Stats -->
-									<div class="space-y-2">
-										<div class="flex items-center justify-between">
-											<span class="text-gray-400">Items Cached:</span>
-											<span class="font-semibold text-base">{{ cacheStats?.items || 0 }}</span>
-										</div>
-										<div v-if="cacheStats?.lastSync" class="flex items-center justify-between">
-											<span class="text-gray-400">Last Sync:</span>
-											<span class="font-semibold text-xs">{{ formatLastSync() }}</span>
-										</div>
-										<div v-if="cacheSyncing" class="flex items-center justify-between">
-											<span class="text-gray-400">Status:</span>
-											<span class="text-orange-400 font-semibold flex items-center gap-1.5">
-												<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-												</svg>
-												Syncing...
-											</span>
-										</div>
-										<div v-if="stockSyncActive" class="flex items-center justify-between">
-											<span class="text-gray-400">Auto-Sync:</span>
-											<span class="text-green-400 font-semibold flex items-center gap-1.5">
-												<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-												Active
-											</span>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-
-						<!-- Desktop Tooltip - Hover only -->
-						<div
-							class="hidden sm:block absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-50"
-						>
-							<div class="bg-gray-900 text-white text-xs rounded-lg shadow-xl py-2 px-3 min-w-[220px]">
-								<!-- Tooltip Arrow (pointing up) -->
+							<div class="bg-gray-900 text-white text-xs rounded-lg shadow-xl py-2 px-2.5 sm:px-3">
+								<!-- Arrow -->
 								<div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-px">
-									<div class="border-4 border-transparent border-b-gray-900"></div>
+									<div class="border-[5px] sm:border-4 border-transparent border-b-gray-900"></div>
 								</div>
 
-								<!-- Status Header -->
-								<div class="flex items-center justify-between mb-2 pb-2 border-b border-gray-700">
-									<span class="font-semibold">Catalog Cache</span>
-									<span
-										class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-										:class="getCacheStatusBadgeClass()"
-									>
+								<!-- Header -->
+								<div class="flex items-center justify-between mb-1.5 sm:mb-2 pb-1.5 sm:pb-2 border-b border-gray-700">
+									<span class="font-semibold text-[11px] sm:text-xs">Cache</span>
+									<span class="px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase" :class="getCacheStatusBadgeClass()">
 										{{ getCacheStatus() }}
 									</span>
 								</div>
 
-								<!-- Cache Stats -->
-								<div class="space-y-1.5">
+								<!-- Stats -->
+								<div class="space-y-1 sm:space-y-1.5 text-[10px] sm:text-xs">
 									<div class="flex items-center justify-between">
-										<span class="text-gray-400">Items Cached:</span>
+										<span class="text-gray-400">Items:</span>
 										<span class="font-semibold">{{ cacheStats?.items || 0 }}</span>
 									</div>
 									<div v-if="cacheStats?.lastSync" class="flex items-center justify-between">
 										<span class="text-gray-400">Last Sync:</span>
-										<span class="font-semibold text-[10px]">{{ formatLastSync() }}</span>
+										<span class="font-semibold text-[9px] sm:text-[10px]">{{ formatLastSync() }}</span>
 									</div>
 									<div v-if="cacheSyncing" class="flex items-center justify-between">
 										<span class="text-gray-400">Status:</span>
 										<span class="text-orange-400 font-semibold flex items-center gap-1">
-											<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+											<svg class="w-2.5 h-2.5 sm:w-3 sm:h-3 animate-spin" fill="none" viewBox="0 0 24 24">
 												<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
 												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 											</svg>
@@ -229,6 +168,19 @@
 											Active
 										</span>
 									</div>
+								</div>
+
+								<!-- Clear Cache Button -->
+								<div class="mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-gray-700">
+									<button
+										@click="handleClearCacheClick"
+										class="w-full px-2 py-1.5 sm:py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 rounded transition-colors font-semibold text-[10px] sm:text-[11px] flex items-center justify-center gap-1.5 active:scale-95"
+									>
+										<svg class="w-2.5 h-2.5 sm:w-3 sm:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+										</svg>
+										Clear Cache
+									</button>
 								</div>
 							</div>
 						</div>
@@ -282,13 +234,33 @@
 import ActionButton from "@/components/common/ActionButton.vue"
 import StatusBadge from "@/components/common/StatusBadge.vue"
 import UserMenu from "@/components/common/UserMenu.vue"
-import { ref } from "vue"
+import { computed, ref } from "vue"
 
-// Mobile tooltip state
 const showCacheTooltip = ref(false)
 
-function toggleCacheTooltip() {
-	showCacheTooltip.value = !showCacheTooltip.value
+const emit = defineEmits([
+	"sync-click",
+	"printer-click",
+	"refresh-click",
+	"menu-click",
+	"logout",
+	"menu-opened",
+	"menu-closed",
+	"clear-cache",
+])
+
+function handleClearCacheClick() {
+	showCacheTooltip.value = false
+	emit('clear-cache')
+}
+
+function handleBlur(event) {
+	// Don't close if clicking inside the tooltip
+	if (!event.relatedTarget || !event.currentTarget.parentElement.contains(event.relatedTarget)) {
+		setTimeout(() => {
+			showCacheTooltip.value = false
+		}, 200)
+	}
 }
 
 const props = defineProps({
@@ -345,16 +317,6 @@ const props = defineProps({
 		default: false,
 	},
 })
-
-defineEmits([
-	"sync-click",
-	"printer-click",
-	"refresh-click",
-	"menu-click",
-	"logout",
-	"menu-opened",
-	"menu-closed",
-])
 
 // Cache status helpers
 function getCacheIconColor() {

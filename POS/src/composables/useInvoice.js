@@ -1,5 +1,6 @@
 import { createResource } from "frappe-ui"
 import { computed, ref } from "vue"
+import { isOffline } from "@/utils/offline"
 
 export function useInvoice() {
 	// State
@@ -666,14 +667,17 @@ export function useInvoice() {
 		_cachedTotalPaid.value = 0
 
 		// Cleanup old draft invoices (older than 1 hour) in background
-		try {
-			await cleanupDraftsResource.submit({
-				pos_profile: posProfile.value,
-				max_age_hours: 1,
-			})
-		} catch (error) {
-			// Silent fail - don't block cart clearing
-			console.warn("Failed to cleanup old drafts:", error)
+		// Skip if offline to avoid network errors
+		if (!isOffline()) {
+			try {
+				await cleanupDraftsResource.submit({
+					pos_profile: posProfile.value,
+					max_age_hours: 1,
+				})
+			} catch (error) {
+				// Silent fail - don't block cart clearing
+				console.warn("Failed to cleanup old drafts:", error)
+			}
 		}
 	}
 

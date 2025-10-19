@@ -522,6 +522,7 @@
 import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSOffersStore } from "@/stores/posOffers"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { isOffline } from "@/utils/offline"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { createResource } from "frappe-ui"
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
@@ -610,7 +611,7 @@ const customersResource = createResource({
 			limit: 9999, // Get all customers
 		}
 	},
-	auto: true, // Auto-load on mount
+	auto: false, // Don't auto-load - check offline status first
 	async onSuccess(data) {
 		const customers = data?.message || data || []
 		allCustomers.value = customers
@@ -624,6 +625,25 @@ const customersResource = createResource({
 	},
 })
 
+// Load customers from cache first (instant), then from server if online
+;(async () => {
+	try {
+		// Always try cache first for instant load
+		const cachedCustomers = await offlineWorker.searchCachedCustomers("", 9999)
+		if (cachedCustomers && cachedCustomers.length > 0) {
+			allCustomers.value = cachedCustomers
+			customersLoaded.value = true
+		}
+	} catch (error) {
+		console.error("Error loading customers from cache:", error)
+	}
+
+	// Only fetch from server if online (to refresh cache)
+	if (!isOffline()) {
+		customersResource.reload()
+	}
+})()
+
 // Load offers resource and set them in store
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const offersResource = createResource({
@@ -633,7 +653,7 @@ const offersResource = createResource({
 			pos_profile: props.posProfile,
 		}
 	},
-	auto: true,
+	auto: false, // Don't auto-load - check offline status first
 	onSuccess(data) {
 		const offers = data?.message || data || []
 		offersStore.setAvailableOffers(offers)
@@ -642,6 +662,11 @@ const offersResource = createResource({
 		console.error("Error loading offers:", error)
 	},
 })
+
+// Load offers only when online (offers not cached for offline use)
+if (!isOffline()) {
+	offersResource.reload()
+}
 
 // Load gift cards resource
 const giftCardsResource = createResource({
@@ -662,7 +687,7 @@ const giftCardsResource = createResource({
 watch(
 	() => props.customer,
 	(newCustomer) => {
-		if (newCustomer && props.posProfile) {
+		if (newCustomer && props.posProfile && !isOffline()) {
 			giftCardsResource.reload()
 		} else {
 			availableGiftCards.value = []

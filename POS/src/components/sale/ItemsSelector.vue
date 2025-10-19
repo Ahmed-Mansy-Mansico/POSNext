@@ -182,7 +182,8 @@
 		</div>
 
 		<!-- Grid View -->
-		<div v-else-if="viewMode === 'grid'" class="flex-1 flex flex-col overflow-hidden">
+		<Transition name="view-fade" mode="out-in">
+		<div v-if="viewMode === 'grid'" key="grid" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="gridScrollContainer"
 				class="flex-1 overflow-y-auto p-1.5 sm:p-3"
@@ -340,30 +341,35 @@
 				</div>
 			</div>
 		</div>
+		</Transition>
 
 		<!-- Table View -->
-		<div v-else class="flex-1 flex flex-col overflow-hidden">
+		<Transition name="view-fade" mode="out-in">
+		<div v-if="viewMode === 'list'" key="list" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="listScrollContainer"
 				class="flex-1 overflow-x-auto overflow-y-auto"
 			>
 				<table class="min-w-full divide-y divide-gray-200">
-					<thead class="bg-gray-50 sticky top-0 z-0">
+					<thead class="bg-gray-50 sticky top-0 z-10">
 						<tr>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Image</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Name</th>
-							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Code</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Rate</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">Qty</th>
-							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200">UOM</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Image</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
+							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Code</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Rate</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Qty</th>
+							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">UOM</th>
 						</tr>
 					</thead>
 					<tbody class="bg-white divide-y divide-gray-200">
 						<tr
 							v-for="item in paginatedItems"
 							:key="item.item_code"
-							@click="handleItemClick(item.item_code)"
-							class="cursor-pointer hover:bg-blue-50 transition-colors duration-100 touch-manipulation active:bg-blue-100"
+							@touchstart.passive="getOptimizedClickHandler(item).touchstart"
+							@touchmove.passive="getOptimizedClickHandler(item).touchmove"
+							@touchend.passive="getOptimizedClickHandler(item).touchend"
+							@click="getOptimizedClickHandler(item).click"
+							class="cursor-pointer hover:bg-blue-50 hover:shadow-md transition-[background-color,box-shadow] duration-100 touch-manipulation active:bg-blue-100"
 						>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
 								<div class="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
@@ -480,6 +486,7 @@
 				</div>
 			</div>
 		</div>
+		</Transition>
 	</div>
 </template>
 
@@ -489,7 +496,7 @@ import { useItemSearchStore } from "@/stores/itemSearch"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { toast } from "frappe-ui"
 import { storeToRefs } from "pinia"
-import { computed, onMounted, onUnmounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import {
 	createOptimizedClickHandler,
 	throttleRAF,
@@ -522,7 +529,6 @@ const {
 	loadingMore,
 	searching,
 	hasMore,
-	cacheReady,
 	cacheSyncing,
 	cacheStats,
 } = storeToRefs(itemStore)
@@ -544,6 +550,9 @@ const lastFilterSignature = ref("")
 // Infinite scroll refs
 const gridScrollContainer = ref(null)
 const listScrollContainer = ref(null)
+
+// Store scroll listener cleanup functions
+const scrollCleanupFns = ref([])
 
 // Pagination state (for client-side display)
 const currentPage = ref(1)
@@ -651,7 +660,6 @@ watch(
 
 // Throttle scroll handler for better performance
 let scrollTimeout = null
-const SCROLL_THROTTLE_MS = 100
 
 // Optimized scroll handler using RAF throttling
 const handleScrollRAF = throttleRAF((event) => {
@@ -687,30 +695,24 @@ onMounted(() => {
 	}
 
 	// Add passive scroll listeners for better performance
-	const cleanupFns = []
-
-	if (gridScrollContainer.value) {
+	// Only bind to the currently active view
+	if (viewMode.value === 'grid' && gridScrollContainer.value) {
 		const cleanup = addPassiveListener(
 			gridScrollContainer.value,
 			'scroll',
 			handleScroll,
 			{ passive: true }
 		)
-		cleanupFns.push(cleanup)
-	}
-
-	if (listScrollContainer.value) {
+		scrollCleanupFns.value.push(cleanup)
+	} else if (viewMode.value === 'list' && listScrollContainer.value) {
 		const cleanup = addPassiveListener(
 			listScrollContainer.value,
 			'scroll',
 			handleScroll,
 			{ passive: true }
 		)
-		cleanupFns.push(cleanup)
+		scrollCleanupFns.value.push(cleanup)
 	}
-
-	// Store cleanup functions for onUnmounted
-	window.__scrollCleanup = cleanupFns
 })
 
 onUnmounted(() => {
@@ -724,10 +726,8 @@ onUnmounted(() => {
 	}
 
 	// Cleanup passive listeners
-	if (window.__scrollCleanup) {
-		window.__scrollCleanup.forEach(cleanup => cleanup())
-		delete window.__scrollCleanup
-	}
+	scrollCleanupFns.value.forEach(cleanup => cleanup())
+	scrollCleanupFns.value = []
 
 	// Clear optimized click handlers
 	optimizedClickHandlers.clear()
@@ -812,8 +812,7 @@ function getOptimizedClickHandler(item) {
 		const handler = createOptimizedClickHandler(() => {
 			handleItemClick(item.item_code)
 		}, {
-			feedback: true,
-			haptic: true
+			feedback: true
 		})
 		optimizedClickHandlers.set(key, handler)
 	}
@@ -1002,6 +1001,35 @@ defineExpose({
 	loadMoreItems: () => itemStore.loadMoreItems(),
 })
 
+// Watch for view mode changes and rebind scroll listeners
+watch(viewMode, async () => {
+	// Wait for DOM to update
+	await nextTick()
+
+	// Clean up existing listeners
+	scrollCleanupFns.value.forEach(cleanup => cleanup())
+	scrollCleanupFns.value = []
+
+	// Rebind listeners to the new active container
+	if (viewMode.value === 'grid' && gridScrollContainer.value) {
+		const cleanup = addPassiveListener(
+			gridScrollContainer.value,
+			'scroll',
+			handleScroll,
+			{ passive: true }
+		)
+		scrollCleanupFns.value.push(cleanup)
+	} else if (viewMode.value === 'list' && listScrollContainer.value) {
+		const cleanup = addPassiveListener(
+			listScrollContainer.value,
+			'scroll',
+			handleScroll,
+			{ passive: true }
+		)
+		scrollCleanupFns.value.push(cleanup)
+	}
+})
+
 // View mode functions
 function setViewMode(mode) {
 	viewMode.value = mode
@@ -1130,5 +1158,40 @@ img {
 	/* Use browser's image optimization */
 	image-rendering: -webkit-optimize-contrast;
 	image-rendering: crisp-edges;
+}
+
+/* View mode transition animations */
+.view-fade-enter-active,
+.view-fade-leave-active {
+	transition: opacity 150ms ease-in-out, transform 150ms ease-in-out;
+}
+
+.view-fade-enter-from {
+	opacity: 0;
+	transform: translateY(10px);
+}
+
+.view-fade-leave-to {
+	opacity: 0;
+	transform: translateY(-10px);
+}
+
+.view-fade-enter-to,
+.view-fade-leave-from {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+/* Performance hints for list rows */
+tbody tr {
+	/* Optimize for compositing */
+	will-change: opacity, background-color;
+	/* Create rendering layer */
+	contain: layout style paint;
+}
+
+/* Remove will-change when not hovering to save resources */
+tbody tr:not(:hover):not(:active) {
+	will-change: auto;
 }
 </style>

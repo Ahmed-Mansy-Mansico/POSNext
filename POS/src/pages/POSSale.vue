@@ -23,6 +23,7 @@
 				@sync-click="handleSyncClick"
 				@printer-click="uiStore.showHistoryDialog = true"
 				@refresh-click="handleRefresh"
+				@clear-cache="handleClearCache"
 				@logout="uiStore.showLogoutDialog = true"
 			>
 				<template #menu-items>
@@ -608,6 +609,14 @@
 				</div>
 			</template>
 		</Dialog>
+
+		<!-- Clear Cache Overlay -->
+		<ClearCacheOverlay
+			ref="clearCacheOverlayRef"
+			:show="showClearCacheDialog"
+			@cancel="showClearCacheDialog = false"
+			@confirm="confirmClearCache"
+		/>
 		</template>
 	</div>
 </template>
@@ -615,6 +624,7 @@
 <script setup>
 import ShiftClosingDialog from "@/components/ShiftClosingDialog.vue"
 import ShiftOpeningDialog from "@/components/ShiftOpeningDialog.vue"
+import ClearCacheOverlay from "@/components/common/ClearCacheOverlay.vue"
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue"
 import ManagementSlider from "@/components/pos/ManagementSlider.vue"
 import POSHeader from "@/components/pos/POSHeader.vue"
@@ -673,6 +683,8 @@ const containerRef = ref(null)
 const dividerRef = ref(null)
 const pendingPaymentAfterCustomer = ref(false)
 const logoutAfterClose = ref(false)
+const showClearCacheDialog = ref(false)
+const clearCacheOverlayRef = ref(null)
 
 // Debounce timer for offer reapplication
 const offerReapplyTimer = ref(null)
@@ -1652,6 +1664,82 @@ async function handleRefresh() {
 		log.success('Manual stock refresh completed')
 	} catch (error) {
 		log.error('Manual stock refresh failed:', error)
+	}
+}
+
+function handleClearCache() {
+	showClearCacheDialog.value = true
+}
+
+async function confirmClearCache() {
+	try {
+		// Keep overlay open to show clearing animation
+		log.info('Clearing cached data...')
+
+		// Import the clear functions from db.js
+		const { clearCachedData, clearBrowserCache } = await import('@/utils/offline/db.js')
+
+		// Clear IndexedDB cache (preserves invoices, drafts, and settings by default)
+		const dbResult = await clearCachedData({
+			preserveInvoices: true,
+			preserveDrafts: true,
+			preserveSettings: true
+		})
+
+		// Clear browser localStorage and sessionStorage
+		const browserResult = clearBrowserCache()
+
+		if (dbResult.success && browserResult.success) {
+			log.success('Cache cleared successfully', {
+				db: dbResult.cleared,
+				browser: browserResult.cleared
+			})
+
+			// Invalidate item store cache
+			itemStore.invalidateCache()
+
+			// Reload items to fetch fresh data
+			if (itemsSelectorRef.value) {
+				await itemsSelectorRef.value.loadItems()
+			}
+
+			// Refresh stock
+			await stockStore.refresh(null, shiftStore.profileWarehouse)
+
+			// Update cache stats
+			const stats = await offlineWorker.getCacheStats()
+			itemStore.cacheStats = stats
+
+			// Close overlay and reset state
+			showClearCacheDialog.value = false
+			if (clearCacheOverlayRef.value) {
+				clearCacheOverlayRef.value.reset()
+			}
+
+			toast.create({
+				title: "Cache Cleared",
+				text: "All cached data has been cleared successfully",
+				icon: "check",
+				iconClasses: "text-green-600",
+			})
+		} else {
+			throw new Error('Failed to clear cache completely')
+		}
+	} catch (error) {
+		log.error('Error clearing cache:', error)
+
+		// Close overlay on error
+		showClearCacheDialog.value = false
+		if (clearCacheOverlayRef.value) {
+			clearCacheOverlayRef.value.reset()
+		}
+
+		toast.create({
+			title: "Cache Clear Failed",
+			text: "Failed to clear cache. Please try again.",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
 	}
 }
 
