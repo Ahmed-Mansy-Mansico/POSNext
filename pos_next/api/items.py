@@ -531,13 +531,14 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			# Fuzzy search: match if search term appears anywhere in item fields
 			conditions, params = _build_item_base_conditions(pos_profile_doc, item_group)
 
-			# Use parameterized queries - no need to escape, SQL handles it
-			pattern = f"%{search_term}%"
-			prefix_pattern = f"{search_term}%"
+			# Word-order independent: all words must appear somewhere
+			search_text = "CONCAT(COALESCE(name, ''), ' ', COALESCE(item_name, ''), ' ', COALESCE(description, ''))"
+			word_conditions = " AND ".join([f"{search_text} LIKE %s"] * len(search_words))
+			conditions.append(f"({word_conditions})")
+			params.extend([f"%{word}%" for word in search_words])
 
-			# Search term must appear in name OR item_name OR description
-			conditions.append("(name LIKE %s OR item_name LIKE %s OR description LIKE %s)")
-			params.extend([pattern, pattern, pattern])
+			# Use parameterized queries - no need to escape, SQL handles it
+			prefix_pattern = f"{search_term}%"
 
 			where_clause = " AND ".join(conditions)
 

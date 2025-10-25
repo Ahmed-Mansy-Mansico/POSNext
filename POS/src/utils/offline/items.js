@@ -59,6 +59,7 @@ export const searchCachedItems = async (searchTerm, limit = 50) => {
 		}
 
 		const term = searchTerm.toLowerCase().trim();
+		const searchWords = term.split(/\s+/).filter(Boolean);
 		const allItems = await db.items.limit(limit * 10).toArray();
 
 		// Filter and score items
@@ -66,8 +67,8 @@ export const searchCachedItems = async (searchTerm, limit = 50) => {
 			.map((item) => {
 				const searchable = `${item.item_code || ""} ${item.item_name || ""} ${item.description || ""}`.toLowerCase();
 
-				//  Substring match
-				if (!searchable.includes(term)) return null;
+				// Word-order independent: all words must appear somewhere
+				if (!searchWords.every(word => searchable.includes(word))) return null;
 
 				// Score: prefer exact and prefix matches
 				let score = 0;
