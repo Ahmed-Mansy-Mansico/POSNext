@@ -284,47 +284,34 @@ export function useInvoice() {
 
 	function applyDiscount(discount) {
 		/**
-		 * Apply discount to all items in the cart
-		 * @param {Object} discount - { percentage, amount, name }
+		 * Apply discount as Additional Discount (grand total level)
+		 * This prevents conflicts with item-level pricing rules
+		 * @param {Object} discount - { percentage, amount, name, code, apply_on }
 		 */
 		if (!discount) return
 
-		if (discount.percentage > 0) {
-			// Apply percentage discount to all items
-			invoiceItems.value.forEach((item) => {
-				item.discount_percentage = discount.percentage
-				item.discount_amount = 0
-				recalculateItem(item)
-			})
-		} else if (discount.amount > 0) {
-			// Distribute fixed discount amount proportionally across items
-			const total = subtotal.value
-			if (total > 0) {
-				invoiceItems.value.forEach((item) => {
-					const itemTotal = item.rate * item.quantity
-					const itemDiscount = (itemTotal / total) * discount.amount
-					item.discount_amount = itemDiscount
-					item.discount_percentage = 0
-					recalculateItem(item)
-				})
-			}
-		}
+		// Store coupon code for tracking
+		couponCode.value = discount.code || discount.name
 
-		// Rebuild cache after bulk operation
+		// Apply discount as Additional Discount on grand total
+		// This preserves item-level pricing rules while applying coupon discount
+		additionalDiscount.value = discount.amount || 0
+
+		// Rebuild cache after applying additional discount
 		rebuildIncrementalCache()
 	}
 
 	function removeDiscount() {
 		/**
-		 * Remove all discounts from cart items
+		 * Remove additional discount (coupon discount)
 		 */
-		invoiceItems.value.forEach((item) => {
-			item.discount_percentage = 0
-			item.discount_amount = 0
-			recalculateItem(item)
-		})
+		// Clear additional discount
+		additionalDiscount.value = 0
 
-		// Rebuild cache after bulk operation
+		// Clear coupon code
+		couponCode.value = null
+
+		// Rebuild cache after removing discount
 		rebuildIncrementalCache()
 	}
 

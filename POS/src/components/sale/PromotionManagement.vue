@@ -14,21 +14,11 @@
 						<div class="flex items-center space-x-3">
 							<FeatherIcon name="tag" class="w-5 h-5 text-gray-700" />
 							<div>
-								<h2 class="text-lg font-semibold text-gray-900">Promotion Management</h2>
-								<p class="text-sm text-gray-600">Create and manage promotional schemes</p>
+								<h2 class="text-lg font-semibold text-gray-900">Promotion & Coupon Management</h2>
+								<p class="text-sm text-gray-600">Manage promotional schemes and coupons</p>
 							</div>
 						</div>
 						<div class="flex items-center space-x-2">
-							<Button
-								v-if="!isCreating && !selectedPromotion && permissions.create"
-								@click="handleCreateNew"
-								icon-left="plus"
-							>
-								<template #prefix>
-									<FeatherIcon name="plus" class="w-4 h-4" />
-								</template>
-								New Promotion
-							</Button>
 							<Button
 								variant="ghost"
 								@click="handleClose"
@@ -41,8 +31,44 @@
 						</div>
 					</div>
 
+					<!-- Tabs -->
+					<div class="border-b bg-white px-6">
+						<div class="flex space-x-1">
+							<button
+								@click="activeTab = 'promotions'"
+								:class="[
+									'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+									activeTab === 'promotions'
+										? 'text-blue-600 border-blue-600'
+										: 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300'
+								]"
+							>
+								<div class="flex items-center space-x-2">
+									<FeatherIcon name="percent" class="w-4 h-4" />
+									<span>Promotional Schemes</span>
+								</div>
+							</button>
+							<button
+								@click="activeTab = 'coupons'"
+								:class="[
+									'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+									activeTab === 'coupons'
+										? 'text-blue-600 border-blue-600'
+										: 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300'
+								]"
+							>
+								<div class="flex items-center space-x-2">
+									<FeatherIcon name="gift" class="w-4 h-4" />
+									<span>Coupons</span>
+								</div>
+							</button>
+						</div>
+					</div>
+
 					<!-- Content: Split Layout -->
 					<div class="flex-1 flex overflow-hidden">
+						<!-- PROMOTIONS TAB -->
+						<template v-if="activeTab === 'promotions'">
 						<!-- LEFT SIDE: Promotion List & Navigation -->
 						<div class="w-80 flex-shrink-0 border-r bg-gray-50 flex flex-col">
 							<!-- Search & Filter -->
@@ -610,6 +636,16 @@
 								</div>
 							</div>
 						</div>
+						</template>
+
+						<!-- COUPONS TAB -->
+						<CouponManagement
+							v-if="activeTab === 'coupons'"
+							:company="company"
+							:currency="currency"
+							:permissions="permissions"
+							@coupon-saved="handleCouponSaved"
+						/>
 					</div>
 				</div>
 
@@ -667,6 +703,7 @@
 import { usePOSPermissions } from "@/composables/usePermissions"
 import { useToast } from "@/composables/useToast"
 import { useItemSearchStore } from "@/stores/itemSearch"
+import CouponManagement from "./CouponManagement.vue"
 import {
 	Badge,
 	Button,
@@ -711,6 +748,7 @@ const isCreating = ref(false)
 const selectedPromotion = ref(null)
 const showDeleteConfirm = ref(false)
 const promotionToDelete = ref(null)
+const activeTab = ref("promotions") // Tab state: 'promotions' or 'coupons'
 
 // List view state
 const promotions = ref([])
@@ -1294,6 +1332,11 @@ function getStatusTheme(status) {
 		default:
 			return "gray"
 	}
+}
+
+function handleCouponSaved(data) {
+	// Emit event to parent if needed
+	emit("promotion-saved", data)
 }
 </script>
 

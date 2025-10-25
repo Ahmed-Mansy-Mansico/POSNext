@@ -546,3 +546,421 @@ def search_items(search_term, pos_profile=None, limit=20):
 		limit=limit,
 		order_by="item_name"
 	)
+
+
+# ==================== COUPON MANAGEMENT ====================
+
+@frappe.whitelist()
+def get_coupons(company=None, include_disabled=False, coupon_type=None):
+	"""Get all coupons for the company with enhanced filtering."""
+	check_promotion_permissions("read")
+
+	filters = {}
+
+	if company:
+		filters["company"] = company
+
+	# Check if disabled field exists before filtering
+	has_disabled_field = frappe.db.has_column("POS Coupon", "disabled")
+
+	if not include_disabled and has_disabled_field:
+		filters["disabled"] = 0
+
+	if coupon_type:
+		filters["coupon_type"] = coupon_type
+
+	# Build field list - only include disabled if it exists
+	fields = [
+		"name", "coupon_name", "coupon_code", "coupon_type",
+		"customer", "customer_name", "pos_offer",
+		"valid_from", "valid_upto", "maximum_use", "used",
+		"one_use", "company", "campaign"
+	]
+
+	if has_disabled_field:
+		fields.append("disabled")
+
+	coupons = frappe.get_all(
+		"POS Coupon",
+		filters=filters,
+		fields=fields,
+		order_by="modified desc"
+	)
+
+	# Enrich with status
+	today = getdate(nowdate())
+
+	for coupon in coupons:
+		# Set disabled to 0 if field doesn't exist
+		if not has_disabled_field:
+			coupon["disabled"] = 0
+
+		# Calculate status - disabled takes precedence
+		if coupon.get("disabled"):
+			coupon["status"] = "Disabled"
+		elif coupon.valid_from and getdate(coupon.valid_from) > today:
+			coupon["status"] = "Not Started"
+		elif coupon.valid_upto and getdate(coupon.valid_upto) < today:
+			coupon["status"] = "Expired"
+		elif coupon.maximum_use and coupon.used >= coupon.maximum_use:
+			coupon["status"] = "Exhausted"
+		else:
+			coupon["status"] = "Active"
+
+		# Add usage percentage
+		if coupon.maximum_use:
+			coupon["usage_percent"] = (coupon.used / coupon.maximum_use) * 100
+		else:
+			coupon["usage_percent"] = 0
+
+	return coupons
+
+
+@frappe.whitelist()
+def get_coupon_details(coupon_name):
+	"""Get detailed information about a specific coupon."""
+	check_promotion_permissions("read")
+
+	if not frappe.db.exists("POS Coupon", coupon_name):
+		frappe.throw(_("Coupon {0} not found").format(coupon_name))
+
+	coupon = frappe.get_doc("POS Coupon", coupon_name)
+	data = coupon.as_dict()
+
+	return data
+
+
+@frappe.whitelist()
+def create_coupon(data):
+	"""
+	Create a new coupon.
+
+	Input format:
+	{
+		"coupon_name": "Summer Sale Coupon",
+		"coupon_type": "Promotional",  # Promotional or Gift Card
+		"coupon_code": "SAVE20",  # Optional, auto-generated if not provided
+		"discount_type": "Percentage",  # Percentage or Amount
+		"discount_percentage": 20,  # Required if discount_type is Percentage
+		"discount_amount": 100,  # Required if discount_type is Amount
+		"min_amount": 500,  # Optional - Minimum cart amount
+		"max_amount": 200,  # Optional - Maximum discount cap
+		"apply_on": "Grand Total",  # Grand Total or Net Total
+		"company": "Company Name",
+		"customer": "CUST-001",  # Required for Gift Card
+		"valid_from": "2025-01-01",
+		"valid_upto": "2025-12-31",
+		"maximum_use": 100,  # Optional
+		"one_use": 0,  # 0 or 1
+		"campaign": "Campaign Name"  # Optional
+	}
+	"""
+	check_promotion_permissions("write")
+
+	import json
+	if isinstance(data, str):
+		data = json.loads(data)
+
+	# Validate required fields
+	if not data.get("coupon_name"):
+		frappe.throw(_("Coupon name is required"))
+	if not data.get("coupon_type"):
+		frappe.throw(_("Coupon type is required"))
+	if not data.get("discount_type"):
+		frappe.throw(_("Discount type is required"))
+	if not data.get("company"):
+		frappe.throw(_("Company is required"))
+
+	# Validate discount configuration
+	if data.get("discount_type") == "Percentage":
+		if not data.get("discount_percentage"):
+			frappe.throw(_("Discount percentage is required when discount type is Percentage"))
+		if flt(data.get("discount_percentage")) <= 0 or flt(data.get("discount_percentage")) > 100:
+			frappe.throw(_("Discount percentage must be between 0 and 100"))
+	elif data.get("discount_type") == "Amount":
+		if not data.get("discount_amount"):
+			frappe.throw(_("Discount amount is required when discount type is Amount"))
+		if flt(data.get("discount_amount")) <= 0:
+			frappe.throw(_("Discount amount must be greater than 0"))
+
+	# Validate Gift Card requires customer
+	if data.get("coupon_type") == "Gift Card" and not data.get("customer"):
+		frappe.throw(_("Customer is required for Gift Card coupons"))
+
+	try:
+		# Create coupon
+		coupon = frappe.new_doc("POS Coupon")
+		coupon.update({
+			"coupon_name": data.get("coupon_name"),
+			"coupon_type": data.get("coupon_type"),
+			"coupon_code": data.get("coupon_code"),  # Will auto-generate if empty
+			"discount_type": data.get("discount_type"),
+			"discount_percentage": flt(data.get("discount_percentage")) if data.get("discount_type") == "Percentage" else None,
+			"discount_amount": flt(data.get("discount_amount")) if data.get("discount_type") == "Amount" else None,
+			"min_amount": flt(data.get("min_amount")) if data.get("min_amount") else None,
+			"max_amount": flt(data.get("max_amount")) if data.get("max_amount") else None,
+			"apply_on": data.get("apply_on", "Grand Total"),
+			"company": data.get("company"),
+			"customer": data.get("customer"),
+			"valid_from": data.get("valid_from"),
+			"valid_upto": data.get("valid_upto"),
+			"maximum_use": cint(data.get("maximum_use", 0)) or None,
+			"one_use": cint(data.get("one_use", 0)),
+			"campaign": data.get("campaign"),
+		})
+
+		coupon.insert()
+
+		return {
+			"success": True,
+			"message": _("Coupon {0} created successfully").format(coupon.coupon_code),
+			"coupon_name": coupon.name,
+			"coupon_code": coupon.coupon_code
+		}
+
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(
+			title=_("Coupon Creation Failed"),
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Failed to create coupon: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def update_coupon(coupon_name, data):
+	"""
+	Update an existing coupon.
+	Can update validity dates, usage limits, disabled status, and discount configuration.
+	"""
+	check_promotion_permissions("write")
+
+	import json
+	if isinstance(data, str):
+		data = json.loads(data)
+
+	if not frappe.db.exists("POS Coupon", coupon_name):
+		frappe.throw(_("Coupon {0} not found").format(coupon_name))
+
+	try:
+		coupon = frappe.get_doc("POS Coupon", coupon_name)
+
+		# Update discount fields
+		if "discount_type" in data:
+			coupon.discount_type = data["discount_type"]
+		if "discount_percentage" in data:
+			coupon.discount_percentage = flt(data["discount_percentage"]) if data["discount_percentage"] else None
+		if "discount_amount" in data:
+			coupon.discount_amount = flt(data["discount_amount"]) if data["discount_amount"] else None
+		if "min_amount" in data:
+			coupon.min_amount = flt(data["min_amount"]) if data["min_amount"] else None
+		if "max_amount" in data:
+			coupon.max_amount = flt(data["max_amount"]) if data["max_amount"] else None
+		if "apply_on" in data:
+			coupon.apply_on = data["apply_on"]
+
+		# Update validity and usage fields
+		if "valid_from" in data:
+			coupon.valid_from = data["valid_from"]
+		if "valid_upto" in data:
+			coupon.valid_upto = data["valid_upto"]
+		if "maximum_use" in data:
+			coupon.maximum_use = cint(data["maximum_use"]) or None
+		if "one_use" in data:
+			coupon.one_use = cint(data["one_use"])
+		if "disabled" in data:
+			coupon.disabled = cint(data["disabled"])
+		if "description" in data:
+			coupon.description = data["description"]
+
+		coupon.save()
+
+		return {
+			"success": True,
+			"message": _("Coupon {0} updated successfully").format(coupon.coupon_code)
+		}
+
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(
+			title=_("Coupon Update Failed"),
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Failed to update coupon: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def toggle_coupon(coupon_name, disabled=None):
+	"""Enable or disable a coupon."""
+	check_promotion_permissions("write")
+
+	if not frappe.db.exists("POS Coupon", coupon_name):
+		frappe.throw(_("Coupon {0} not found").format(coupon_name))
+
+	try:
+		coupon = frappe.get_doc("POS Coupon", coupon_name)
+
+		if disabled is not None:
+			coupon.disabled = cint(disabled)
+		else:
+			# Toggle current state
+			coupon.disabled = 0 if coupon.disabled else 1
+
+		coupon.save()
+
+		status = "disabled" if coupon.disabled else "enabled"
+		return {
+			"success": True,
+			"message": _("Coupon {0} {1}").format(coupon.coupon_code, status),
+			"disabled": coupon.disabled
+		}
+
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(
+			title=_("Coupon Toggle Failed"),
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Failed to toggle coupon: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def delete_coupon(coupon_name):
+	"""Delete a coupon."""
+	check_promotion_permissions("delete")
+
+	if not frappe.db.exists("POS Coupon", coupon_name):
+		frappe.throw(_("Coupon {0} not found").format(coupon_name))
+
+	try:
+		# Check if coupon has been used
+		coupon = frappe.get_doc("POS Coupon", coupon_name)
+		if coupon.used > 0:
+			frappe.throw(_("Cannot delete coupon {0} as it has been used {1} times").format(
+				coupon.coupon_code, coupon.used
+			))
+
+		frappe.delete_doc("POS Coupon", coupon_name)
+
+		return {
+			"success": True,
+			"message": _("Coupon deleted successfully")
+		}
+
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(
+			title=_("Coupon Deletion Failed"),
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Failed to delete coupon: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_pos_offers(company=None):
+	"""Get all coupon-based POS offers."""
+	filters = {"coupon_based": 1, "disable": 0}
+
+	if company:
+		filters["company"] = company
+
+	offers = frappe.get_all(
+		"POS Offer",
+		filters=filters,
+		fields=[
+			"name", "title", "discount_percentage", "discount_amount",
+			"apply_on", "valid_from", "valid_upto"
+		],
+		order_by="title"
+	)
+
+	return offers
+
+
+# =============================================================================
+# REFERRAL CODE APIs
+# =============================================================================
+
+@frappe.whitelist()
+def apply_referral_code(referral_code, customer):
+	"""
+	Apply a referral code for a customer - generates coupons for both referrer and referee
+
+	Args:
+		referral_code: The referral code to apply
+		customer: The customer (referee) using the referral code
+
+	Returns:
+		dict with generated coupon information
+	"""
+	from pos_next.pos_next.doctype.referral_code.referral_code import apply_referral_code as apply_code
+
+	try:
+		result = apply_code(referral_code, customer)
+		return {
+			"success": True,
+			"message": _("Referral code applied successfully! You've received a welcome coupon."),
+			"referrer_coupon": result.get("referrer_coupon"),
+			"referee_coupon": result.get("referee_coupon")
+		}
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(
+			title=_("Apply Referral Code Failed"),
+			message=frappe.get_traceback()
+		)
+		frappe.throw(_("Failed to apply referral code: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_referral_codes(company=None, include_disabled=False):
+	"""Get all referral codes with optional filters."""
+	filters = {}
+
+	if company:
+		filters["company"] = company
+
+	if not include_disabled:
+		filters["disabled"] = 0
+
+	referrals = frappe.get_all(
+		"Referral Code",
+		filters=filters,
+		fields=[
+			"name", "referral_name", "referral_code", "customer", "customer_name",
+			"company", "campaign", "disabled", "referrals_count",
+			"referrer_discount_type", "referrer_discount_percentage", "referrer_discount_amount",
+			"referee_discount_type", "referee_discount_percentage", "referee_discount_amount"
+		],
+		order_by="creation desc"
+	)
+
+	return referrals
+
+
+@frappe.whitelist()
+def get_referral_details(referral_name):
+	"""Get detailed information about a specific referral code."""
+	check_promotion_permissions("read")
+
+	if not frappe.db.exists("Referral Code", referral_name):
+		frappe.throw(_("Referral Code {0} not found").format(referral_name))
+
+	referral = frappe.get_doc("Referral Code", referral_name)
+	data = referral.as_dict()
+
+	# Get generated coupons for this referral
+	coupons = frappe.get_all(
+		"POS Coupon",
+		filters={"referral_code": referral_name},
+		fields=[
+			"name", "coupon_code", "coupon_type", "customer", "customer_name",
+			"used", "valid_from", "valid_upto", "disabled"
+		],
+		order_by="creation desc"
+	)
+
+	data["generated_coupons"] = coupons
+	data["total_coupons_generated"] = len(coupons)
+
+	return data

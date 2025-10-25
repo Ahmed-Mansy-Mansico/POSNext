@@ -18,7 +18,7 @@
 				</div>
 
 				<!-- Coupon Code Input -->
-				<div>
+				<div v-if="!appliedDiscount">
 					<label class="block text-sm font-medium text-gray-700 mb-2">
 						Coupon Code
 					</label>
@@ -36,7 +36,7 @@
 				</div>
 
 				<!-- My Gift Cards -->
-				<div v-if="giftCards.length > 0">
+				<div v-if="giftCards.length > 0 && !appliedDiscount">
 					<label class="block text-sm font-medium text-gray-700 mb-2">
 						<div class="flex items-center space-x-2">
 							<svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
@@ -124,13 +124,15 @@
 			</div>
 		</template>
 		<template #actions>
-			<div class="flex justify-between w-full">
-				<Button v-if="appliedDiscount" variant="subtle" theme="red" @click="removeDiscount">
-					<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-							d="M6 18L18 6M6 6l12 12" />
-					</svg>
-					Remove Coupon
+			<div class="flex justify-between items-center w-full gap-2">
+				<Button v-if="appliedDiscount" variant="subtle" theme="red" @click="removeDiscount" class="flex-shrink-0">
+					<template #prefix>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+								d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</template>
+					Remove
 				</Button>
 				<div class="flex space-x-2 ml-auto">
 					<Button variant="subtle" @click="show = false">
@@ -260,11 +262,15 @@ async function applyCoupon() {
 
 	try {
 		await couponResource.reload()
+		// Frappe wraps response in { message: {...} }
 		const result = couponResource.data?.message || couponResource.data
 
-		if (!result || !result.valid) {
+		// Handle if result is the actual response object
+		const validationData = typeof result === 'object' && result.valid !== undefined ? result : couponResource.data
+
+		if (!validationData || !validationData.valid) {
 			errorMessage.value =
-				result?.message || "The coupon code you entered is not valid"
+				validationData?.message || "The coupon code you entered is not valid"
 			toast.create({
 				title: "Invalid Coupon",
 				text: errorMessage.value,
@@ -274,11 +280,11 @@ async function applyCoupon() {
 			return
 		}
 
-		const offer = result.offer
+		const coupon = validationData.coupon
 
 		// Check minimum amount (on subtotal before tax)
-		if (offer.min_amt && props.subtotal < offer.min_amt) {
-			errorMessage.value = `This offer requires a minimum purchase of ${formatCurrency(offer.min_amt)}`
+		if (coupon.min_amount && props.subtotal < coupon.min_amount) {
+			errorMessage.value = `This coupon requires a minimum purchase of ${formatCurrency(coupon.min_amount)}`
 			toast.create({
 				title: "Minimum Amount Required",
 				text: errorMessage.value,
@@ -288,67 +294,30 @@ async function applyCoupon() {
 			return
 		}
 
-		// Check maximum amount (on subtotal before tax)
-		if (offer.max_amt && props.subtotal > offer.max_amt) {
-			errorMessage.value = `This offer is only valid for purchases up to ${formatCurrency(offer.max_amt)}`
-			toast.create({
-				title: "Maximum Amount Exceeded",
-				text: errorMessage.value,
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
-			return
-		}
-
-		// Check minimum quantity
-		if (offer.min_qty) {
-			const totalQty = props.items.reduce((sum, item) => sum + item.quantity, 0)
-			if (totalQty < offer.min_qty) {
-				errorMessage.value = `This offer requires at least ${offer.min_qty} items in your cart`
-				toast.create({
-					title: "Minimum Quantity Required",
-					text: errorMessage.value,
-					icon: "alert-circle",
-					iconClasses: "text-orange-600",
-				})
-				return
-			}
-		}
-
-		// Check maximum quantity
-		if (offer.max_qty) {
-			const totalQty = props.items.reduce((sum, item) => sum + item.quantity, 0)
-			if (totalQty > offer.max_qty) {
-				errorMessage.value = `This offer is only valid for up to ${offer.max_qty} items`
-				toast.create({
-					title: "Maximum Quantity Exceeded",
-					text: errorMessage.value,
-					icon: "alert-circle",
-					iconClasses: "text-orange-600",
-				})
-				return
-			}
-		}
-
 		// Calculate discount on subtotal (before tax)
 		let discountAmount = 0
-		if (offer.discount_percentage) {
-			discountAmount = (props.subtotal * offer.discount_percentage) / 100
-		} else if (offer.discount_amount) {
-			discountAmount = offer.discount_amount
+		if (coupon.discount_type === "Percentage") {
+			discountAmount = (props.subtotal * coupon.discount_percentage) / 100
+		} else if (coupon.discount_type === "Amount") {
+			discountAmount = coupon.discount_amount
+		}
+
+		// Apply maximum discount limit if specified
+		if (coupon.max_amount && discountAmount > coupon.max_amount) {
+			discountAmount = coupon.max_amount
 		}
 
 		// Clamp discount to subtotal to prevent negative totals
 		discountAmount = Math.min(discountAmount, props.subtotal)
 
 		appliedDiscount.value = {
-			name: offer.title || offer.name,
+			name: coupon.coupon_name || coupon.coupon_code,
 			code: couponCode.value.toUpperCase(),
-			percentage: offer.discount_percentage || 0,
+			percentage: coupon.discount_percentage || 0,
 			amount: discountAmount,
-			type: offer.discount_type,
-			coupon: result.coupon,
-			offer: offer,
+			type: coupon.discount_type,
+			coupon: coupon,
+			apply_on: coupon.apply_on,
 		}
 
 		emit("discount-applied", appliedDiscount.value)

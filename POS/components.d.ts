@@ -13,6 +13,7 @@ declare module 'vue' {
     CheckboxField: typeof import('./src/components/settings/CheckboxField.vue')['default']
     ClearCacheOverlay: typeof import('./src/components/common/ClearCacheOverlay.vue')['default']
     CouponDialog: typeof import('./src/components/sale/CouponDialog.vue')['default']
+    CouponManagement: typeof import('./src/components/sale/CouponManagement.vue')['default']
     CreateCustomerDialog: typeof import('./src/components/sale/CreateCustomerDialog.vue')['default']
     CustomerDialog: typeof import('./src/components/sale/CustomerDialog.vue')['default']
     DraftInvoicesDialog: typeof import('./src/components/sale/DraftInvoicesDialog.vue')['default']

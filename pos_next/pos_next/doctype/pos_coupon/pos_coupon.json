@@ -16,10 +16,20 @@
   "email_id",
   "column_break_4",
   "coupon_code",
+  "disabled",
   "company",
   "campaign",
-  "pos_offer",
-  "referral_code",
+  "erpnext_integration_section",
+  "erpnext_coupon_code",
+  "pricing_rule",
+  "discount_section",
+  "discount_type",
+  "discount_percentage",
+  "discount_amount",
+  "column_break_discount",
+  "min_amount",
+  "max_amount",
+  "apply_on",
   "uses",
   "valid_from",
   "valid_upto",
@@ -71,10 +81,111 @@
    "unique": 1
   },
   {
-   "fieldname": "pos_offer",
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "company",
    "fieldtype": "Link",
-   "label": "POS Offer",
-   "options": "POS Offer",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "campaign",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Campaign",
+   "options": "Campaign"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "erpnext_integration_section",
+   "fieldtype": "Section Break",
+   "label": "ERPNext Integration"
+  },
+  {
+   "fieldname": "erpnext_coupon_code",
+   "fieldtype": "Link",
+   "label": "ERPNext Coupon Code",
+   "options": "Coupon Code",
+   "read_only": 1,
+   "description": "Linked ERPNext Coupon Code for accounting integration"
+  },
+  {
+   "fieldname": "pricing_rule",
+   "fieldtype": "Link",
+   "label": "Pricing Rule",
+   "options": "Pricing Rule",
+   "read_only": 1,
+   "description": "Auto-generated Pricing Rule for discount application"
+  },
+  {
+   "fieldname": "referral_code",
+   "fieldtype": "Link",
+   "label": "Referral Code",
+   "options": "Referral Code",
+   "read_only": 1
+  },
+  {
+   "fieldname": "discount_section",
+   "fieldtype": "Section Break",
+   "label": "Discount Configuration"
+  },
+  {
+   "default": "Percentage",
+   "fieldname": "discount_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Discount Type",
+   "options": "Percentage\nAmount",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.discount_type=='Percentage'",
+   "fieldname": "discount_percentage",
+   "fieldtype": "Float",
+   "label": "Discount Percentage",
+   "precision": "2"
+  },
+  {
+   "depends_on": "eval:doc.discount_type=='Amount'",
+   "fieldname": "discount_amount",
+   "fieldtype": "Currency",
+   "label": "Discount Amount",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_discount",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "min_amount",
+   "fieldtype": "Currency",
+   "label": "Minimum Cart Amount",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "fieldname": "max_amount",
+   "fieldtype": "Currency",
+   "label": "Maximum Discount Amount",
+   "description": "Maximum discount that can be applied",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "default": "Grand Total",
+   "fieldname": "apply_on",
+   "fieldtype": "Select",
+   "label": "Apply Discount On",
+   "options": "Grand Total\nNet Total",
    "reqd": 1
   },
   {
@@ -109,36 +220,19 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_11",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fetch_from": "pos_offer.description",
-   "fetch_if_empty": 1,
-   "fieldname": "description",
-   "fieldtype": "Text Editor",
-   "label": "Coupon Description"
-  },
-  {
-   "fieldname": "company",
-   "fieldtype": "Link",
-   "in_standard_filter": 1,
-   "label": "Company",
-   "options": "Company",
-   "reqd": 1
-  },
-  {
-   "fieldname": "campaign",
-   "fieldtype": "Link",
-   "in_standard_filter": 1,
-   "label": "Campaign",
-   "options": "Campaign"
-  },
-  {
    "default": "0",
    "fieldname": "one_use",
    "fieldtype": "Check",
    "label": "Only One Use Per Customer"
+  },
+  {
+   "fieldname": "column_break_11",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Coupon Description"
   },
   {
    "depends_on": "customer",
@@ -165,13 +259,6 @@
    "fieldtype": "Data",
    "label": "Email ID",
    "options": "Email"
-  },
-  {
-   "fieldname": "referral_code",
-   "fieldtype": "Link",
-   "label": "Referral Code",
-   "options": "Referral Code",
-   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

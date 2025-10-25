@@ -411,6 +411,25 @@ def update_invoice(data):
                 sum(p.base_amount or 0 for p in invoice_doc.payments)
             )
 
+        # Validate and track POS Coupon if coupon_code is provided
+        coupon_code = data.get("coupon_code")
+        if coupon_code:
+            # Validate POS Coupon exists and is valid
+            if frappe.db.table_exists("POS Coupon"):
+                from pos_next.pos_next.doctype.pos_coupon.pos_coupon import check_coupon_code
+
+                coupon_result = check_coupon_code(
+                    coupon_code,
+                    customer=invoice_doc.customer,
+                    company=invoice_doc.company
+                )
+
+                if not coupon_result.get("valid"):
+                    frappe.throw(_(coupon_result.get("msg", "Invalid coupon code")))
+
+                # Store coupon code on invoice for tracking
+                invoice_doc.coupon_code = coupon_code
+
         # Save as draft
         invoice_doc.flags.ignore_permissions = True
         frappe.flags.ignore_account_permission = True
@@ -497,6 +516,20 @@ def submit_invoice(invoice=None, data=None):
                     payment.mode_of_payment, invoice_doc.company
                 )
                 payment.account = account_info["account"]
+
+        # Handle POS Coupon if coupon_code is provided
+        coupon_code = invoice.get("coupon_code") or data.get("coupon_code")
+        if coupon_code:
+            # Increment usage counter for POS Coupon
+            if frappe.db.table_exists("POS Coupon"):
+                try:
+                    from pos_next.pos_next.doctype.pos_coupon.pos_coupon import increment_coupon_usage
+                    increment_coupon_usage(coupon_code)
+                except Exception as e:
+                    frappe.log_error(
+                        title="Failed to increment coupon usage",
+                        message=f"Coupon: {coupon_code}, Error: {str(e)}"
+                    )
 
         # Auto-set batch numbers for returns
         _auto_set_return_batches(invoice_doc)

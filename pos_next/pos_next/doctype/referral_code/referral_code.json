@@ -17,8 +17,23 @@
   "column_break_5",
   "referral_name",
   "referral_code",
-  "customer_offer",
-  "primary_offer"
+  "referrals_count",
+  "referrer_rewards_section",
+  "referrer_discount_type",
+  "referrer_discount_percentage",
+  "referrer_discount_amount",
+  "column_break_referrer",
+  "referrer_min_amount",
+  "referrer_max_amount",
+  "referrer_coupon_valid_days",
+  "referee_rewards_section",
+  "referee_discount_type",
+  "referee_discount_percentage",
+  "referee_discount_amount",
+  "column_break_referee",
+  "referee_min_amount",
+  "referee_max_amount",
+  "referee_coupon_valid_days"
  ],
  "fields": [
   {
@@ -64,17 +79,119 @@
    "reqd": 1
   },
   {
-   "fieldname": "customer_offer",
-   "fieldtype": "Link",
-   "label": "Final Customer Offer",
-   "options": "POS Offer",
+   "default": "0",
+   "fieldname": "referrals_count",
+   "fieldtype": "Int",
+   "label": "Total Referrals",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "referrer_rewards_section",
+   "fieldtype": "Section Break",
+   "label": "Referrer Rewards (Gift Card for Customer Who Referred)"
+  },
+  {
+   "default": "Percentage",
+   "fieldname": "referrer_discount_type",
+   "fieldtype": "Select",
+   "label": "Discount Type",
+   "options": "Percentage\nAmount",
    "reqd": 1
   },
   {
-   "fieldname": "primary_offer",
-   "fieldtype": "Link",
-   "label": "Primary Customer Offer",
-   "options": "POS Offer"
+   "depends_on": "eval:doc.referrer_discount_type=='Percentage'",
+   "fieldname": "referrer_discount_percentage",
+   "fieldtype": "Float",
+   "label": "Discount Percentage (%)",
+   "precision": "2"
+  },
+  {
+   "depends_on": "eval:doc.referrer_discount_type=='Amount'",
+   "fieldname": "referrer_discount_amount",
+   "fieldtype": "Currency",
+   "label": "Discount Amount",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_referrer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "referrer_min_amount",
+   "fieldtype": "Currency",
+   "label": "Minimum Cart Amount",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "fieldname": "referrer_max_amount",
+   "fieldtype": "Currency",
+   "label": "Maximum Discount Amount",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "default": "30",
+   "description": "Number of days the referrer's coupon will be valid after being generated",
+   "fieldname": "referrer_coupon_valid_days",
+   "fieldtype": "Int",
+   "label": "Coupon Valid Days"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "referee_rewards_section",
+   "fieldtype": "Section Break",
+   "label": "Referee Rewards (Discount for New Customer Using Code)"
+  },
+  {
+   "default": "Percentage",
+   "fieldname": "referee_discount_type",
+   "fieldtype": "Select",
+   "label": "Discount Type",
+   "options": "Percentage\nAmount",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.referee_discount_type=='Percentage'",
+   "fieldname": "referee_discount_percentage",
+   "fieldtype": "Float",
+   "label": "Discount Percentage (%)",
+   "precision": "2"
+  },
+  {
+   "depends_on": "eval:doc.referee_discount_type=='Amount'",
+   "fieldname": "referee_discount_amount",
+   "fieldtype": "Currency",
+   "label": "Discount Amount",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "fieldname": "column_break_referee",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "referee_min_amount",
+   "fieldtype": "Currency",
+   "label": "Minimum Cart Amount",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "fieldname": "referee_max_amount",
+   "fieldtype": "Currency",
+   "label": "Maximum Discount Amount",
+   "options": "Company:company:default_currency",
+   "precision": "2"
+  },
+  {
+   "default": "30",
+   "description": "Number of days the referee's coupon will be valid",
+   "fieldname": "referee_coupon_valid_days",
+   "fieldtype": "Int",
+   "label": "Coupon Valid Days"
   },
   {
    "fieldname": "customer",

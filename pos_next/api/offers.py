@@ -344,73 +344,35 @@ def _get_standalone_pricing_rules(pos_profile, date):
 @frappe.whitelist()
 def validate_coupon(coupon_code, customer=None, company=None):
 	"""
-	Validate coupon code and return associated offer
+	Validate coupon code and return coupon details with discount configuration
 	"""
-	# Check if POS Coupon doctype exists (POSAwesome)
+	# Check if POS Coupon doctype exists
 	if not frappe.db.table_exists("POS Coupon"):
 		return {
 			"valid": False,
 			"message": "Coupon system not installed",
 		}
 
-	# Check if coupon exists
-	if not frappe.db.exists("POS Coupon", {"coupon_code": coupon_code.upper()}):
+	# Use the check_coupon_code function from pos_coupon module
+	from pos_next.pos_next.doctype.pos_coupon.pos_coupon import check_coupon_code
+
+	result = check_coupon_code(coupon_code, customer=customer, company=company)
+
+	# If validation failed, return the error message
+	if not result.get("valid"):
 		return {
 			"valid": False,
-			"message": "Invalid coupon code",
+			"message": result.get("msg", "Invalid coupon"),
 		}
 
-	coupon = frappe.get_doc("POS Coupon", {"coupon_code": coupon_code.upper()})
+	coupon = result.get("coupon")
+	coupon_dict = coupon.as_dict()
 
-	# Validate dates
-	if coupon.valid_from and getdate(coupon.valid_from) > getdate(nowdate()):
-		return {
-			"valid": False,
-			"message": "Coupon not yet valid",
-		}
-
-	if coupon.valid_upto and getdate(coupon.valid_upto) < getdate(nowdate()):
-		return {
-			"valid": False,
-			"message": "Coupon expired",
-		}
-
-	# Check usage limit
-	if coupon.used and coupon.maximum_use and coupon.used >= coupon.maximum_use:
-		return {
-			"valid": False,
-			"message": "Coupon usage limit reached",
-		}
-
-	# Validate customer (for gift cards)
-	if customer and coupon.coupon_type == "Gift Card":
-		if customer != coupon.customer:
-			return {
-				"valid": False,
-				"message": "Coupon not valid for this customer",
-			}
-
-	# Validate company
-	if company and coupon.company != company:
-		return {
-			"valid": False,
-			"message": "Coupon not valid for this company",
-		}
-
-	# Get associated POS Offer
-	pos_offer = frappe.get_doc("POS Offer", coupon.pos_offer)
-
-	if pos_offer.disable:
-		return {
-			"valid": False,
-			"message": "Offer no longer active",
-		}
-
+	# Return coupon with its discount configuration
 	return {
 		"valid": True,
 		"message": "Coupon valid",
-		"coupon": coupon.as_dict(),
-		"offer": pos_offer.as_dict(),
+		"coupon": coupon_dict,
 	}
 
 
