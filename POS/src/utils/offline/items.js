@@ -51,46 +51,40 @@ export const getCachedItems = async (limit = 100) => {
 	}
 };
 
-// Search cached items with fuzzy word-order independent matching
+// Fuzzy search: matches if any search word is contained in item text
 export const searchCachedItems = async (searchTerm, limit = 50) => {
 	try {
 		if (!searchTerm) {
 			return await db.items.limit(limit).toArray();
 		}
 
-		const term = searchTerm.toLowerCase();
-		const searchWords = term.split(/\s+/).filter((word) => word.length > 0);
+		const term = searchTerm.toLowerCase().trim();
+		const allItems = await db.items.limit(limit * 10).toArray();
 
-		// Single word search - use optimized index queries
-		if (searchWords.length === 1) {
-			const results = await db.items
-				.where("item_code")
-				.startsWithIgnoreCase(term)
-				.or("item_name")
-				.startsWithIgnoreCase(term)
-				.or("barcodes")
-				.equals(term)
-				.limit(limit)
-				.toArray();
+		// Filter and score items
+		const results = allItems
+			.map((item) => {
+				const searchable = `${item.item_code || ""} ${item.item_name || ""} ${item.description || ""}`.toLowerCase();
 
-			return results;
-		}
+				//  Substring match
+				if (!searchable.includes(term)) return null;
 
-		// Multi-word fuzzy search - fetch items and filter in JavaScript
-		// Get a larger set for better multi-word matching
-		const allItems = await db.items.limit(limit * 5).toArray();
+				// Score: prefer exact and prefix matches
+				let score = 0;
+				if (item.item_name?.toLowerCase() === term) score = 1000;
+				else if (item.item_code?.toLowerCase() === term) score = 900;
+				else if (item.item_name?.toLowerCase().startsWith(term)) score = 500;
+				else if (item.item_code?.toLowerCase().startsWith(term)) score = 400;
+				else score = 100;
 
-		// Filter items where ALL search words appear (order independent)
-		const results = allItems.filter((item) => {
-			const searchableText = `${item.item_code || ""} ${item.item_name || ""} ${
-				item.description || ""
-			} ${item.barcodes?.join(" ") || ""}`.toLowerCase();
+				return { item, score };
+			})
+			.filter(Boolean)
+			.sort((a, b) => b.score - a.score)
+			.slice(0, limit)
+			.map(({ item }) => item);
 
-			// Check if all words are present in any order
-			return searchWords.every((word) => searchableText.includes(word));
-		});
-
-		return results.slice(0, limit);
+		return results;
 	} catch (error) {
 		console.error("Error searching cached items:", error);
 		return [];

@@ -147,17 +147,17 @@
 			</div>
 		</div>
 
-		<!-- Loading State -->
-		<div v-if="loading || searching" class="flex-1 flex items-center justify-center p-3">
+		<!-- Initial Loading State - Only for first load -->
+		<div v-if="loading && !filteredItems" class="flex-1 flex items-center justify-center p-3">
 			<div class="text-center py-8">
 				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-				<p class="mt-3 text-xs text-gray-500">{{ searching ? 'Searching all items...' : 'Loading items...' }}</p>
+				<p class="mt-3 text-xs text-gray-500">Loading items...</p>
 			</div>
 		</div>
 
-		<!-- Empty State -->
+		<!-- Empty State - Simple, no animation -->
 		<div
-			v-else-if="!filteredItems || filteredItems.length === 0"
+			v-else-if="(!filteredItems || filteredItems.length === 0)"
 			class="flex-1 flex items-center justify-center p-3"
 		>
 			<div class="text-center py-8">
@@ -182,7 +182,6 @@
 		</div>
 
 		<!-- Grid View -->
-		<Transition name="view-fade" mode="out-in">
 		<div v-if="viewMode === 'grid'" key="grid" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="gridScrollContainer"
@@ -341,16 +340,14 @@
 				</div>
 			</div>
 		</div>
-		</Transition>
 
 		<!-- Table View -->
-		<Transition name="view-fade" mode="out-in">
 		<div v-if="viewMode === 'list'" key="list" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="listScrollContainer"
 				class="flex-1 overflow-x-auto overflow-y-auto"
 			>
-				<table class="min-w-full divide-y divide-gray-200">
+				<table v-if="paginatedItems.length > 0" class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50 sticky top-0 z-10">
 						<tr>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Image</th>
@@ -412,7 +409,6 @@
 						</tr>
 					</tbody>
 				</table>
-				<div v-if="paginatedItems.length === 0" class="text-center py-8 text-gray-500">No items found</div>
 
 				<!-- Loading More Indicator for Table View -->
 				<div v-if="loadingMore" class="flex justify-center items-center py-4 bg-white">
@@ -486,7 +482,6 @@
 				</div>
 			</div>
 		</div>
-		</Transition>
 	</div>
 </template>
 
@@ -1160,27 +1155,7 @@ img {
 	image-rendering: crisp-edges;
 }
 
-/* View mode transition animations */
-.view-fade-enter-active,
-.view-fade-leave-active {
-	transition: opacity 150ms ease-in-out, transform 150ms ease-in-out;
-}
-
-.view-fade-enter-from {
-	opacity: 0;
-	transform: translateY(10px);
-}
-
-.view-fade-leave-to {
-	opacity: 0;
-	transform: translateY(-10px);
-}
-
-.view-fade-enter-to,
-.view-fade-leave-from {
-	opacity: 1;
-	transform: translateY(0);
-}
+/* Minimal transitions for performance */
 
 /* Performance hints for list rows */
 tbody tr {

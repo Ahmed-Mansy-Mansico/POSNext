@@ -528,77 +528,42 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			# Deduplicate to keep boolean queries lean and LIKE predicates minimal
 			search_words = list(dict.fromkeys(search_words))
 
-			def run_boolean_search():
-				conditions, params = _build_item_base_conditions(pos_profile_doc, item_group)
-				boolean_terms = []
-				seen = set()
+			# Fuzzy search: match if search term appears anywhere in item fields
+			conditions, params = _build_item_base_conditions(pos_profile_doc, item_group)
 
-				for word in search_words:
-					alnum_word = re.sub(r"[^\w]+", "", word)
-					if not alnum_word:
-						continue
-					if alnum_word in seen:
-						continue
-					seen.add(alnum_word)
-					if len(alnum_word) >= 3:
-						boolean_terms.append(f"+{alnum_word}*")
-					else:
-						# Exact match for very short tokens
-						boolean_terms.append(f'+"{alnum_word}"')
+			# Use parameterized queries - no need to escape, SQL handles it
+			pattern = f"%{search_term}%"
+			prefix_pattern = f"{search_term}%"
 
-				if not boolean_terms:
-					return []
+			# Search term must appear in name OR item_name OR description
+			conditions.append("(name LIKE %s OR item_name LIKE %s OR description LIKE %s)")
+			params.extend([pattern, pattern, pattern])
 
-				boolean_query = " ".join(boolean_terms[:8])  # limit tokens to keep MATCH performant
-				conditions.append("MATCH(search_index) AGAINST (%s IN BOOLEAN MODE)")
-				where_clause = " AND ".join(conditions)
+			where_clause = " AND ".join(conditions)
 
-				query = f"""
-					SELECT
-						{ITEM_RESULT_COLUMNS},
-						MATCH(search_index) AGAINST (%s IN BOOLEAN MODE) AS relevance
-					FROM `tabItem`
-					WHERE {where_clause}
-					ORDER BY relevance DESC, item_name ASC
-					LIMIT %s OFFSET %s
-				"""
+			# Simple relevance scoring with case-insensitive comparison
+			relevance = f"""
+				CASE
+					WHEN LOWER(item_name) = LOWER(%s) THEN 1000
+					WHEN LOWER(name) = LOWER(%s) THEN 900
+					WHEN LOWER(item_name) LIKE LOWER(%s) THEN 500
+					WHEN LOWER(name) LIKE LOWER(%s) THEN 400
+					ELSE 100
+				END
+			"""
+			score_params = [search_term, search_term, prefix_pattern, prefix_pattern]
 
-				query_params = [boolean_query]
-				query_params.extend(params)
-				query_params.append(boolean_query)
-				query_params.extend([limit, start])
-				return frappe.db.sql(query, tuple(query_params), as_dict=1)
+			query = f"""
+				SELECT {ITEM_RESULT_COLUMNS}
+				FROM `tabItem`
+				WHERE {where_clause}
+				ORDER BY {relevance} DESC, item_name ASC
+				LIMIT %s OFFSET %s
+			"""
 
-			def run_like_search():
-				if not search_words:
-					return []
-
-				conditions, params = _build_item_base_conditions(pos_profile_doc, item_group)
-				word_clauses = []
-				for word in search_words:
-					safe_word = frappe.db.escape_like(word)
-					word_clauses.append("(name LIKE %s OR item_name LIKE %s OR description LIKE %s)")
-					pattern = f"%{safe_word}%"
-					params.extend([pattern, pattern, pattern])
-
-				conditions.append(f"({' AND '.join(word_clauses)})")
-				where_clause = " AND ".join(conditions)
-
-				query = f"""
-					SELECT
-						{ITEM_RESULT_COLUMNS}
-					FROM `tabItem`
-					WHERE {where_clause}
-					ORDER BY item_name ASC
-					LIMIT %s OFFSET %s
-				"""
-
-				params.extend([limit, start])
-				return frappe.db.sql(query, tuple(params), as_dict=1)
-
-			items = run_boolean_search()
-			if not items:
-				items = run_like_search()
+			params.extend(score_params)
+			params.extend([limit, start])
+			items = frappe.db.sql(query, tuple(params), as_dict=1)
 		else:
 			# No search term - return all items with base filters
 			items = frappe.get_list(

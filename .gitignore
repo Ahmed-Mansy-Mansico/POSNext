@@ -59,6 +59,5 @@ dev-dist/
 
 # Vite
 .vite/
-image.png
-maxresdefault.jpg
+*.png
 .playwright-mcp/*
