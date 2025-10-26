@@ -195,7 +195,9 @@
 						@touchmove.passive="getOptimizedClickHandler(item).touchmove"
 						@touchend.passive="getOptimizedClickHandler(item).touchend"
 						@click="getOptimizedClickHandler(item).click"
-						class="relative bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2.5 cursor-pointer hover:border-blue-400 hover:shadow-md transition-[border-color,box-shadow] duration-100 touch-manipulation"
+						:class="[
+							'relative bg-white border border-gray-200 rounded-lg p-1.5 sm:p-2.5 touch-manipulation transition-[border-color,box-shadow] duration-100 cursor-pointer hover:border-blue-400 hover:shadow-md',
+						]"
 					>
 						<!-- Stock Badge - Positioned at top right of card -->
 						<div
@@ -204,12 +206,12 @@
 								'px-2 sm:px-2.5 py-1 sm:py-1',
 								'text-[10px] sm:text-xs font-bold',
 								'border-2 border-white',
-								getStockStatus(item.actual_qty || item.stock_qty).color,
-								getStockStatus(item.actual_qty || item.stock_qty).textColor
+								getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).color,
+								getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).textColor
 							]"
-							:title="`${getStockStatus(item.actual_qty || item.stock_qty).label}: ${Math.floor(item.actual_qty || item.stock_qty || 0)} ${item.uom || item.stock_uom || 'Nos'}`"
+							:title="`${getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).label}: ${Math.floor(item.actual_qty ?? item.stock_qty ?? 0)} ${item.uom || item.stock_uom || 'Nos'}`"
 						>
-							{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
+							{{ Math.floor(item.actual_qty ?? item.stock_qty ?? 0) }}
 						</div>
 
 						<!-- Item Image -->
@@ -397,12 +399,12 @@
 									:class="[
 										'inline-block px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md shadow-sm',
 										'text-xs sm:text-sm font-bold',
-										getStockStatus(item.actual_qty || item.stock_qty).color,
-										getStockStatus(item.actual_qty || item.stock_qty).textColor
+										getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).color,
+										getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).textColor
 									]"
-									:title="`${getStockStatus(item.actual_qty || item.stock_qty).label}: ${Math.floor(item.actual_qty || item.stock_qty || 0)} ${item.uom || item.stock_uom || 'Nos'}`"
+									:title="`${getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).label}: ${Math.floor(item.actual_qty ?? item.stock_qty ?? 0)} ${item.uom || item.stock_uom || 'Nos'}`"
 								>
-									{{ Math.floor(item.actual_qty || item.stock_qty || 0) }}
+									{{ Math.floor(item.actual_qty ?? item.stock_qty ?? 0) }}
 								</span>
 							</td>
                                                         <td class="hidden md:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.uom || item.stock_uom || 'Nos' }}</div></td>
@@ -488,8 +490,10 @@
 <script setup>
 import LazyImage from "@/components/common/LazyImage.vue"
 import { useItemSearchStore } from "@/stores/itemSearch"
+import { usePOSSettingsStore } from "@/stores/posSettings"
+import { useStock } from "@/composables/useStock"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
-import { toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
 import { storeToRefs } from "pinia"
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import {
@@ -512,6 +516,11 @@ const props = defineProps({
 })
 
 const emit = defineEmits(["item-selected"])
+
+// Use composables
+const { getStockStatus } = useStock()
+const settingsStore = usePOSSettingsStore()
+const { showError } = useToast()
 
 // Use Pinia store
 const itemStore = useItemSearchStore()
@@ -817,9 +826,17 @@ function getOptimizedClickHandler(item) {
 function handleItemClick(itemCode) {
 	// Find the current item by code to get latest stock values
 	const item = filteredItems.value.find(i => i.item_code === itemCode)
-	if (item) {
-		emit("item-selected", item)
+	if (!item) return
+
+	// Check stock availability and show error if needed, but still emit the event
+	// The parent component (POSSale.vue) will handle the actual validation
+	const qty = Math.floor(item.actual_qty ?? item.stock_qty ?? 0)
+	if (qty <= 0 && settingsStore.shouldEnforceStockValidation()) {
+		showError(`"${item.item_name}" cannot be added to cart. Allow Negative Stock is disabled.`)
+		return
 	}
+
+	emit("item-selected", item)
 }
 
 async function handleBarcodeSearch(forceAutoAdd = false) {
@@ -1081,34 +1098,7 @@ function getPaginationRange() {
 	return range
 }
 
-// Get stock status based on quantity
-function getStockStatus(qty) {
-	const quantity = Math.floor(qty || 0)
-	const lowStockThreshold = 10 // Items with 10 or less are considered low stock
-
-	if (quantity <= 0) {
-		return {
-			level: "out",
-			color: "bg-red-500",
-			textColor: "text-white",
-			label: "Out of Stock",
-		}
-	} else if (quantity <= lowStockThreshold) {
-		return {
-			level: "low",
-			color: "bg-amber-500",
-			textColor: "text-white",
-			label: "Low Stock",
-		}
-	} else {
-		return {
-			level: "safe",
-			color: "bg-green-500",
-			textColor: "text-white",
-			label: "In Stock",
-		}
-	}
-}
+// Check if an item can be added to cart based on stock
 </script>
 
 <style scoped>

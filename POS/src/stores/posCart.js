@@ -1,5 +1,6 @@
 import { useInvoice } from "@/composables/useInvoice"
 import { usePOSOffersStore } from "@/stores/posOffers"
+import { usePOSSettingsStore } from "@/stores/posSettings"
 import { parseError } from "@/utils/errorHandler"
 import {
 	checkStockAvailability,
@@ -36,6 +37,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 	} = useInvoice()
 
 	const offersStore = usePOSOffersStore()
+	const settingsStore = usePOSSettingsStore()
 
 	// Additional cart state
 	const pendingItem = ref(null)
@@ -53,7 +55,8 @@ export const usePOSCartStore = defineStore("posCart", () => {
 	// Actions
 	function addItem(item, qty = 1, autoAdd = false, currentProfile = null) {
 		// Check stock availability before adding to cart
-		if (currentProfile && !autoAdd) {
+		// Only enforce stock validation if negative stock is not allowed
+		if (currentProfile && !autoAdd && settingsStore.shouldEnforceStockValidation()) {
 			const warehouse = item.warehouse || currentProfile.warehouse
 			const actualQty =
 				item.actual_qty !== undefined ? item.actual_qty : item.stock_qty || 0

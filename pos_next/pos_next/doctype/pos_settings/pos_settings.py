@@ -3,23 +3,81 @@
 
 import frappe
 from frappe.model.document import Document
+from frappe.utils import cint, flt
 
 
 class POSSettings(Document):
 	def validate(self):
 		"""Validate POS Settings"""
-		# Validate discount percentage
-		if self.max_discount_allowed < 0 or self.max_discount_allowed > 100:
+		# Guard against None values and validate discount percentage
+		max_discount = flt(self.max_discount_allowed)
+		if max_discount < 0 or max_discount > 100:
 			frappe.throw("Max Discount Allowed must be between 0 and 100")
 
-		# Validate search limit
-		if self.use_limit_search and self.search_limit <= 0:
-			frappe.throw("Search Limit must be greater than 0")
+		# Guard against None values and validate search limit
+		if self.use_limit_search:
+			search_limit = cint(self.search_limit)
+			if search_limit <= 0:
+				frappe.throw("Search Limit must be greater than 0")
+
+	def on_update(self):
+		"""Sync allow_negative_stock with Stock Settings"""
+		self.sync_negative_stock_setting()
+
+	def sync_negative_stock_setting(self):
+		"""
+		Synchronize allow_negative_stock with Stock Settings.
+
+		When enabled in POS Settings, it enables the global Stock Settings.
+		When disabled, it only disables global Stock Settings if no other
+		POS Settings have it enabled.
+
+		Note: Runs in the same transaction as the save, no manual commits.
+		"""
+		current_stock_setting = cint(
+			frappe.db.get_single_value("Stock Settings", "allow_negative_stock") or 0
+		)
+
+		if cint(self.allow_negative_stock):
+			# Enable Stock Settings if not already enabled
+			if not current_stock_setting:
+				frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1, update_modified=False)
+				frappe.msgprint(
+					"Stock Settings 'Allow Negative Stock' has been automatically enabled.",
+					indicator="green",
+					alert=True
+				)
+		else:
+			# Only disable if no other enabled POS Settings have it enabled
+			if current_stock_setting:
+				# Use count for better performance and clarity
+				other_enabled_count = frappe.db.count(
+					"POS Settings",
+					{
+						"allow_negative_stock": 1,
+						"enabled": 1,  # Only check enabled POS Settings
+						"name": ["!=", self.name]
+					}
+				)
+
+				if other_enabled_count == 0:
+					frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 0, update_modified=False)
+					frappe.msgprint(
+						"Stock Settings 'Allow Negative Stock' has been automatically disabled.",
+						indicator="orange",
+						alert=True
+					)
 
 
 @frappe.whitelist()
 def get_pos_settings(pos_profile):
-	"""Get POS Settings for a specific POS Profile"""
+	"""
+	Get POS Settings for a specific POS Profile.
+
+	Also injects the current global Stock Settings value to show the actual
+	source of truth, preventing confusion when the checkbox appears enabled
+	but the global setting was changed elsewhere.
+	"""
 	from frappe import _
 
 	if not pos_profile:
@@ -44,6 +102,12 @@ def get_pos_settings(pos_profile):
 	# If no settings exist, create default settings
 	if not settings:
 		settings = create_default_settings(pos_profile)
+
+	# Inject the current global Stock Settings value for transparency
+	# This helps UI reflect the actual state even if multiple POS Settings exist
+	settings["_global_allow_negative_stock"] = cint(
+		frappe.db.get_single_value("Stock Settings", "allow_negative_stock") or 0
+	)
 
 	return settings
 

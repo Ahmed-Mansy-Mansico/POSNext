@@ -644,18 +644,21 @@ import PromotionManagement from "@/components/sale/PromotionManagement.vue"
 import ReturnInvoiceDialog from "@/components/sale/ReturnInvoiceDialog.vue"
 import POSSettings from "@/components/settings/POSSettings.vue"
 import { useRealtimeStock } from "@/composables/useRealtimeStock"
+import { usePOSEvents } from "@/composables/usePOSEvents"
 import { session } from "@/data/session"
 import { parseError } from "@/utils/errorHandler"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { printInvoiceByName } from "@/utils/printInvoice"
 import { Button, Dialog, createResource, toast } from "frappe-ui"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
+import { useToast } from "@/composables/useToast"
 
 import { useItemSearchStore } from "@/stores/itemSearch"
 import { useStockStore } from "@/stores/stock"
 // Pinia Stores
 import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSDraftsStore } from "@/stores/posDrafts"
+import { usePOSSettingsStore } from "@/stores/posSettings"
 import { usePOSShiftStore } from "@/stores/posShift"
 import { usePOSSyncStore } from "@/stores/posSync"
 import { usePOSUIStore } from "@/stores/posUI"
@@ -669,9 +672,16 @@ const offlineStore = usePOSSyncStore()
 const draftsStore = usePOSDraftsStore()
 const itemStore = useItemSearchStore()
 const stockStore = useStockStore()
+const settingsStore = usePOSSettingsStore()
 
 // Real-time stock updates
 const { onStockUpdate } = useRealtimeStock()
+
+// POS Events system
+const { onWarehouseChanged, onPricingChanged, onStockPolicyChanged } = usePOSEvents()
+
+// Initialize toast
+const { showError } = useToast()
 
 // Initialize logger
 const log = logger.create('POSSale')
@@ -793,6 +803,53 @@ onMounted(async () => {
 		}
 	})
 
+	// Set up POS events listeners
+	// Listen to warehouse changes from settings
+	onWarehouseChanged(async ({ newWarehouse, oldWarehouse }) => {
+		log.info(`Event: Warehouse changed from ${oldWarehouse} to ${newWarehouse}`)
+		await handleWarehouseChanged(newWarehouse)
+	})
+
+	// Listen to pricing changes from settings
+	onPricingChanged(({ changes }) => {
+		log.info('Event: Pricing settings changed', changes)
+
+		// Recalculate cart items if there are any
+		if (cartStore.invoiceItems.length > 0) {
+			cartStore.invoiceItems.forEach(item => {
+				cartStore.recalculateItem(item)
+			})
+			cartStore.rebuildIncrementalCache()
+
+			toast.create({
+				title: 'Pricing Updated',
+				text: 'Discount settings changed. Cart recalculated.',
+				icon: 'info',
+				iconClasses: 'text-blue-600'
+			})
+		}
+	})
+
+	// Listen to stock policy changes
+	onStockPolicyChanged(({ changes, requiresReload }) => {
+		log.info('Event: Stock policy changed', changes)
+
+		if (changes.allow_negative_stock) {
+			const isNowAllowed = changes.allow_negative_stock.new
+
+			const message = isNowAllowed
+				? 'Negative stock sales are now allowed'
+				: 'Negative stock sales are now restricted'
+
+			toast.create({
+				title: 'Stock Policy Updated',
+				text: message,
+				icon: 'info',
+				iconClasses: 'text-blue-600'
+			})
+		}
+	})
+
 	// Store cleanup function for unmount
 	onUnmounted(cleanup)
 
@@ -811,6 +868,9 @@ onMounted(async () => {
 				cartStore.posProfile = shiftStore.profileName
 				cartStore.posOpeningShift = shiftStore.currentShift?.name
 				await cartStore.loadTaxRules(shiftStore.profileName)
+
+				// Load POS Settings for the current profile
+				await settingsStore.loadSettings(shiftStore.profileName)
 
 				// Set warehouse context in stock store for stock operations
 				if (shiftStore.profileWarehouse) {
@@ -1164,6 +1224,17 @@ function handleItemSelected(item, autoAdd = false) {
 			)
 		}
 		return
+	}
+
+	// Check stock availability first (before any dialogs)
+	// Only enforce if negative stock is not allowed
+	if (settingsStore.shouldEnforceStockValidation()) {
+		const actualQty = Math.floor(item.actual_qty ?? item.stock_qty ?? 0)
+
+		if (actualQty <= 0) {
+			showError(`"${item.item_name}" cannot be added to cart. Allow Negative Stock is disabled.`)
+			return
+		}
 	}
 
 	// Check for variants

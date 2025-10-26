@@ -140,15 +140,26 @@ def _collect_stock_errors(items):
 
 def _should_block(pos_profile):
     """Check if sale should be blocked for insufficient stock."""
+    # First check global ERPNext Stock Settings
     allow_negative = cint(
         frappe.db.get_single_value("Stock Settings", "allow_negative_stock") or 0
     )
     if allow_negative:
         return False
 
-    # Check POS Profile setting if it exists
-    block_sale = 1  # Default to blocking
+    # Check POS Settings for the specific profile
     if pos_profile:
+        # Check if POS Settings allows negative stock
+        pos_settings_allow_negative = cint(
+            frappe.db.get_value(
+                "POS Settings",
+                {"pos_profile": pos_profile},
+                "allow_negative_stock"
+            ) or 0
+        )
+        if pos_settings_allow_negative:
+            return False
+
         # Try to get custom field from POSAwesome (may not exist in vanilla ERPNext)
         block_sale = cint(
             frappe.db.get_value(
@@ -156,8 +167,10 @@ def _should_block(pos_profile):
             )
             or 1
         )
+        return bool(block_sale)
 
-    return bool(block_sale)
+    # Default to blocking if no profile specified
+    return True
 
 
 def _validate_stock_on_invoice(invoice_doc):
@@ -534,8 +547,20 @@ def submit_invoice(invoice=None, data=None):
         # Auto-set batch numbers for returns
         _auto_set_return_batches(invoice_doc)
 
-        # Validate stock availability
-        _validate_stock_on_invoice(invoice_doc)
+        # Check if POS Settings allows negative stock
+        pos_settings_allow_negative = False
+        if pos_profile:
+            pos_settings_allow_negative = cint(
+                frappe.db.get_value(
+                    "POS Settings",
+                    {"pos_profile": pos_profile},
+                    "allow_negative_stock"
+                ) or 0
+            )
+
+        # Validate stock availability only if negative stock is not allowed
+        if not pos_settings_allow_negative:
+            _validate_stock_on_invoice(invoice_doc)
 
         # Save before submit
         invoice_doc.flags.ignore_permissions = True
@@ -543,6 +568,8 @@ def submit_invoice(invoice=None, data=None):
         invoice_doc.save()
 
         # Submit invoice with error handling
+        # Note: Negative stock handling is now done through the CustomSalesInvoice override
+        # which checks POS Settings in the update_stock_ledger method
         try:
             invoice_doc.submit()
         except Exception as submit_error:

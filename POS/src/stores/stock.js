@@ -20,14 +20,17 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { call } from '@/utils/apiWrapper'
 import { offlineWorker } from '@/utils/offline/workerClient'
 import { logger } from '@/utils/logger'
+import { usePOSEventsStore } from '@/stores/posEvents'
 
 const log = logger.create('Stock')
 
 export const useStockStore = defineStore('stock', () => {
+	// Get event store instance
+	const eventsStore = usePOSEventsStore()
 	// ========================================================================
 	// STATE - Just 2 Maps, that's it!
 	// ========================================================================
@@ -39,8 +42,11 @@ export const useStockStore = defineStore('stock', () => {
 	// ========================================================================
 	// GETTERS - Functions that return reactive computed values
 	// ========================================================================
-	const getDisplayStock = (itemCode) =>
-		Math.max((server.value.get(itemCode)?.qty || 0) - (reserved.value.get(itemCode) || 0), 0)
+	const getDisplayStock = (itemCode) => {
+		// Always return the actual calculated stock (can be negative)
+		// Display is independent of whether negative stock sales are allowed
+		return (server.value.get(itemCode)?.qty || 0) - (reserved.value.get(itemCode) || 0)
+	}
 
 	const getStockInfo = (itemCode) => ({
 		code: itemCode,
@@ -126,6 +132,25 @@ export const useStockStore = defineStore('stock', () => {
 			refreshing.value = false
 		}
 	}
+
+	// ========================================================================
+	// EVENT LISTENERS - React to settings changes
+	// ========================================================================
+
+	// Listen to warehouse changes from settings
+	eventsStore.on('settings:warehouse-changed', async ({ newWarehouse }) => {
+		log.info(`Event received: Warehouse changed to ${newWarehouse}`)
+
+		// Update warehouse
+		warehouse.value = newWarehouse
+
+		// Refresh all stock for new warehouse
+		const itemCodes = Array.from(server.value.keys())
+		if (itemCodes.length > 0) {
+			log.info(`Refreshing ${itemCodes.length} items for new warehouse`)
+			await refresh(itemCodes, newWarehouse)
+		}
+	})
 
 	return {
 		// State

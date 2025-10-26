@@ -342,8 +342,10 @@ import {
 } from "./settingsConfig"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { logger } from "@/utils/logger"
+import { usePOSEvents } from "@/composables/usePOSEvents"
 
 const log = logger.create('POSSettings')
+const { detectSettingsChanges, updateSettingsSnapshot, emitStockSyncConfigured } = usePOSEvents()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -424,6 +426,9 @@ const warehousesResource = createResource({
 	},
 })
 
+// Track original allow_negative_stock value for detecting changes
+const originalAllowNegativeStock = ref(null)
+
 const settingsResource = createResource({
 	url: "pos_next.pos_next.doctype.pos_settings.pos_settings.get_pos_settings",
 	makeParams() {
@@ -435,6 +440,10 @@ const settingsResource = createResource({
 		if (data) {
 			Object.assign(settings.value, data)
 			settings.value.pos_profile = props.posProfile
+			// Store original value
+			originalAllowNegativeStock.value = data.allow_negative_stock
+			// Update event system snapshot
+			updateSettingsSnapshot(settings.value)
 		}
 		loading.value = false
 	},
@@ -524,6 +533,13 @@ async function saveSettings() {
 	saving.value = true
 	const oldWarehouse = props.currentWarehouse
 	const warehouseChanged = selectedWarehouse.value !== oldWarehouse
+	const negativeStockChanged = originalAllowNegativeStock.value !== settings.value.allow_negative_stock
+
+	// Capture old settings for change detection
+	const oldSettings = {
+		...settings.value,
+		warehouse: oldWarehouse // Include warehouse in change detection
+	}
 
 	try {
 		// Save POS Settings (without warehouse)
@@ -538,6 +554,8 @@ async function saveSettings() {
 		if (result) {
 			Object.assign(settings.value, result)
 			settings.value.pos_profile = props.posProfile
+			// Update original value after successful save
+			originalAllowNegativeStock.value = result.allow_negative_stock
 		}
 
 		// Update warehouse in POS Profile if changed
@@ -551,16 +569,41 @@ async function saveSettings() {
 			)
 
 			if (warehouseResult && warehouseResult.success) {
+				// Add warehouse to new settings for change detection
+				settings.value.warehouse = selectedWarehouse.value
+
 				// Emit event to parent to reload stock with new warehouse
 				emit("warehouse-changed", selectedWarehouse.value)
 			}
 		}
 
+		// Detect and emit settings changes through event system
+		// This will notify all listeners (POSSale, stock store, cart store, etc.)
+		detectSettingsChanges(settings.value, oldSettings)
+
+		// IMPORTANT: Page reload for critical stock policy change
+		// The allow_negative_stock setting affects deep stock validation logic
+		// throughout the app, including:
+		// - Stock validation in cart operations (posCart.js:59)
+		// - Stock enforcement checks (posSettings.js:268)
+		// - Item addition logic and error handling
+		// A page reload ensures all components get the fresh setting and
+		// prevents inconsistent state. Event listeners are still notified
+		// before reload for any cleanup needed.
+		if (negativeStockChanged) {
+			log.info("Stock policy changed, reloading page for consistency...")
+			window.location.reload()
+			return
+		}
+
+		// Show success toast for other changes
+		const successMessage = warehouseChanged
+			? "Settings saved and warehouse updated. Reloading stock..."
+			: "Settings saved successfully"
+
 		toast.create({
 			title: "Success",
-			text: warehouseChanged
-				? "Settings saved and warehouse updated. Reloading stock..."
-				: "Settings saved successfully",
+			text: successMessage,
 			icon: "check",
 			iconClasses: "text-green-600",
 		})
@@ -638,6 +681,12 @@ async function applyStockSyncConfig() {
 
 		// Save to localStorage
 		saveStockSyncSettings()
+
+		// Emit sync configuration change event
+		emitStockSyncConfigured({
+			enabled: stockSyncEnabled.value,
+			intervalMs: intervalMs
+		})
 	} catch (error) {
 		log.error('Failed to apply stock sync config:', error)
 	}
