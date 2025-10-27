@@ -92,35 +92,72 @@
 
 						<!-- Tab Content -->
 						<div class="p-6">
-							<!-- Partial Payments Tab -->
+							<!-- Unpaid Tab -->
 							<div v-if="activeTab === 'partial'" class="space-y-4">
+								<!-- Filter Buttons -->
+								<div class="flex items-center space-x-2 mb-4">
+									<button
+										@click="unpaidFilter = 'all'"
+										:class="[
+											'px-4 py-2 rounded-lg font-medium text-sm transition-all',
+											unpaidFilter === 'all'
+												? 'bg-orange-500 text-white shadow-md'
+												: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+										]"
+									>
+										All ({{ unpaidInvoices.length }})
+									</button>
+									<button
+										@click="unpaidFilter = 'partial'"
+										:class="[
+											'px-4 py-2 rounded-lg font-medium text-sm transition-all',
+											unpaidFilter === 'partial'
+												? 'bg-orange-500 text-white shadow-md'
+												: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+										]"
+									>
+										Partially Paid ({{ unpaidInvoices.filter(inv => inv.status === 'Partly Paid').length }})
+									</button>
+									<button
+										@click="unpaidFilter = 'unpaid'"
+										:class="[
+											'px-4 py-2 rounded-lg font-medium text-sm transition-all',
+											unpaidFilter === 'unpaid'
+												? 'bg-orange-500 text-white shadow-md'
+												: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+										]"
+									>
+										Totally Unpaid ({{ unpaidInvoices.filter(inv => inv.status === 'Unpaid').length }})
+									</button>
+								</div>
+
 								<!-- Summary -->
-								<div v-if="partialSummary.count > 0" class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
+								<div v-if="filteredUnpaidSummary.count > 0" class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
 									<div class="flex items-center justify-between">
 										<div>
 											<div class="text-sm text-orange-600 font-medium">Outstanding Payments</div>
-											<div class="text-2xl font-bold text-gray-900 mt-1">{{ formatCurrency(partialSummary.total_outstanding) }}</div>
+											<div class="text-2xl font-bold text-gray-900 mt-1">{{ formatCurrency(filteredUnpaidSummary.total_outstanding) }}</div>
 										</div>
 										<div class="text-right">
-											<div class="text-xs text-gray-600">{{ partialSummary.count }} invoices</div>
-											<div class="text-sm text-gray-800 font-semibold mt-1">{{ formatCurrency(partialSummary.total_paid) }} paid</div>
+											<div class="text-xs text-gray-600">{{ filteredUnpaidSummary.count }} invoices</div>
+											<div class="text-sm text-gray-800 font-semibold mt-1">{{ formatCurrency(filteredUnpaidSummary.total_paid) }} paid</div>
 										</div>
 									</div>
 								</div>
 
 								<!-- Empty State -->
-								<div v-if="partialInvoices.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+								<div v-if="filteredUnpaidInvoices.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
 									<svg class="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
 									</svg>
-									<p class="text-gray-600 font-medium">No Partial Payments</p>
-									<p class="text-gray-500 text-sm mt-1">All invoices are either fully paid or unpaid</p>
+									<p class="text-gray-600 font-medium">No Unpaid Invoices</p>
+									<p class="text-gray-500 text-sm mt-1">All invoices are fully paid</p>
 								</div>
 
 								<!-- Invoices List -->
 								<div v-else class="space-y-4">
 									<div
-										v-for="invoice in partialInvoices"
+										v-for="invoice in filteredUnpaidInvoices"
 										:key="invoice.name"
 										class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
 									>
@@ -130,8 +167,15 @@
 												<div>
 													<div class="flex items-center space-x-2">
 														<h3 class="text-lg font-bold text-gray-900">{{ invoice.name }}</h3>
-														<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-700">
-															Partial
+														<span
+															:class="[
+																'px-2 py-0.5 text-xs font-semibold rounded-full',
+																invoice.status === 'Partly Paid'
+																	? 'bg-orange-100 text-orange-700'
+																	: 'bg-red-100 text-red-700'
+															]"
+														>
+															{{ invoice.status === 'Partly Paid' ? 'Partially Paid' : 'Unpaid' }}
 														</span>
 													</div>
 													<div class="flex items-center space-x-4 mt-1 text-sm text-gray-600">
@@ -204,19 +248,13 @@
 
 							<!-- Invoice History Tab -->
 							<div v-if="activeTab === 'history'">
-								<!-- Search Bar -->
+								<!-- Filters Component -->
 								<div class="mb-6">
-									<Input
-										v-model="searchTerm"
-										type="text"
-										placeholder="Search by invoice number or customer..."
-									>
-										<template #prefix>
-											<svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-											</svg>
-										</template>
-									</Input>
+									<InvoiceFilters
+										:unique-customers="invoiceFilters.uniqueCustomers.value"
+										:unique-products="invoiceFilters.uniqueProducts.value"
+										:filter-stats="invoiceFilters.filterStats.value"
+									/>
 								</div>
 
 								<!-- Empty State -->
@@ -475,9 +513,12 @@
 </template>
 
 <script setup>
-import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import InvoiceFilters from "@/components/invoices/InvoiceFilters.vue"
 import PaymentDialog from "@/components/sale/PaymentDialog.vue"
-import { Button, call, Input, toast } from "frappe-ui"
+import { useInvoiceFilters } from "@/composables/useInvoiceFilters"
+import { useInvoiceFiltersStore } from "@/stores/invoiceFilters"
+import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { Button, call, toast } from "frappe-ui"
 import { computed, onMounted, ref, watch } from "vue"
 
 const props = defineProps({
@@ -510,11 +551,18 @@ const emit = defineEmits([
 const show = ref(props.modelValue)
 const loading = ref(false)
 const activeTab = ref("partial")
-const searchTerm = ref("")
 
-// Partial payments data
-const partialInvoices = ref([])
-const partialSummary = ref({
+// Initialize filter store and composable
+const filterStore = useInvoiceFiltersStore()
+
+// Create a computed ref for history invoices to use with filter composable
+const historyInvoicesRef = computed(() => props.historyInvoices)
+const invoiceFilters = useInvoiceFilters(historyInvoicesRef)
+
+// Unpaid invoices data
+const unpaidInvoices = ref([])
+const unpaidFilter = ref("all") // "all", "partial", "unpaid"
+const unpaidSummary = ref({
 	count: 0,
 	total_outstanding: 0,
 	total_paid: 0,
@@ -522,39 +570,63 @@ const partialSummary = ref({
 const selectedInvoice = ref(null)
 const showPaymentDialog = ref(false)
 
-// Return invoices (filtered from history)
-const returnInvoices = computed(() => {
-	const allInvoices = Array.isArray(props.historyInvoices) ? props.historyInvoices : []
-	return allInvoices.filter(inv => inv.is_return)
+// Filtered unpaid invoices based on status filter
+const filteredUnpaidInvoices = computed(() => {
+	if (unpaidFilter.value === "partial") {
+		return unpaidInvoices.value.filter((inv) => inv.status === "Partly Paid")
+	}
+	if (unpaidFilter.value === "unpaid") {
+		return unpaidInvoices.value.filter((inv) => inv.status === "Unpaid")
+	}
+	return unpaidInvoices.value // "all"
 })
 
-// Filtered history (exclude returns, show in separate tab)
-const filteredHistoryInvoices = computed(() => {
-	// Ensure we have an array
-	const allInvoices = Array.isArray(props.historyInvoices) ? props.historyInvoices : []
-	let invoices = allInvoices.filter(inv => !inv.is_return)
+// Filtered summary based on selected filter
+const filteredUnpaidSummary = computed(() => {
+	const filtered = filteredUnpaidInvoices.value
 
-	if (searchTerm.value) {
-		const search = searchTerm.value.toLowerCase()
-		invoices = invoices.filter(inv =>
-			inv.name.toLowerCase().includes(search) ||
-			(inv.customer_name || "").toLowerCase().includes(search) ||
-			(inv.customer || "").toLowerCase().includes(search)
-		)
+	return {
+		count: filtered.length,
+		total_outstanding: filtered.reduce(
+			(sum, inv) => sum + (inv.outstanding_amount || 0),
+			0,
+		),
+		total_paid: filtered.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0),
 	}
+})
 
-	return invoices
+// Return invoices (filtered from history)
+const returnInvoices = computed(() => {
+	const allInvoices = Array.isArray(props.historyInvoices)
+		? props.historyInvoices
+		: []
+	return allInvoices.filter((inv) => inv.is_return)
+})
+
+// Filtered history using the composable (exclude returns, show in separate tab)
+const filteredHistoryInvoices = computed(() => {
+	// Filter out return invoices, then apply all filters from the store
+	const allInvoices = Array.isArray(props.historyInvoices)
+		? props.historyInvoices
+		: []
+	const nonReturnInvoices = allInvoices.filter((inv) => !inv.is_return)
+
+	// Use the filter composable with non-return invoices
+	const tempInvoicesRef = computed(() => nonReturnInvoices)
+	const tempFilters = useInvoiceFilters(tempInvoicesRef)
+
+	return tempFilters.filteredInvoices.value
 })
 
 // Tabs configuration
 const tabs = computed(() => [
 	{
 		id: "partial",
-		label: "Partial Payments",
+		label: "Unpaid",
 		icon: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z",
 		color: "orange",
 		activeClass: "text-orange-600",
-		badge: () => partialSummary.value.count,
+		badge: () => unpaidInvoices.value.length,
 	},
 	{
 		id: "history",
@@ -583,7 +655,7 @@ const tabs = computed(() => [
 ])
 
 const currentTabLabel = computed(() => {
-	return tabs.value.find(t => t.id === activeTab.value)?.label || ""
+	return tabs.value.find((t) => t.id === activeTab.value)?.label || ""
 })
 
 // Tab class helpers
@@ -639,11 +711,11 @@ watch(
 	(val) => {
 		show.value = val
 		if (val) {
-			loadPartialInvoices()
-			loadPartialSummary()
+			loadUnpaidInvoices()
+			loadUnpaidSummary()
 			// Also request history refresh if we don't have data
 			if (props.historyInvoices.length === 0) {
-				emit('refresh-history')
+				emit("refresh-history")
 			}
 		}
 	},
@@ -656,8 +728,11 @@ watch(show, (val) => {
 // Watch for tab changes to emit refresh event for history/returns tabs
 watch(activeTab, (newTab) => {
 	// Emit refresh event when switching to history or returns tabs if data is empty
-	if ((newTab === 'history' || newTab === 'returns') && props.historyInvoices.length === 0) {
-		emit('refresh-history')
+	if (
+		(newTab === "history" || newTab === "returns") &&
+		props.historyInvoices.length === 0
+	) {
+		emit("refresh-history")
 	}
 })
 
@@ -668,28 +743,31 @@ function handleClose() {
 
 async function refreshCurrentTab() {
 	if (activeTab.value === "partial") {
-		await Promise.all([loadPartialInvoices(), loadPartialSummary()])
+		await Promise.all([loadUnpaidInvoices(), loadUnpaidSummary()])
 	}
 	// Other tabs use data from parent, so emit refresh event if needed
 }
 
-async function loadPartialInvoices() {
+async function loadUnpaidInvoices() {
 	if (!props.posProfile) return
 
 	loading.value = true
 
 	try {
-		const result = await call("pos_next.api.partial_payments.get_partial_paid_invoices", {
-			pos_profile: props.posProfile,
-			limit: 50,
-		})
+		const result = await call(
+			"pos_next.api.partial_payments.get_unpaid_invoices",
+			{
+				pos_profile: props.posProfile,
+				limit: 100,
+			},
+		)
 
-		partialInvoices.value = result || []
+		unpaidInvoices.value = result || []
 	} catch (error) {
-		console.error("Error loading partial payments:", error)
+		console.error("Error loading unpaid invoices:", error)
 		toast.create({
 			title: "Error",
-			text: error.message || "Failed to load partial payments",
+			text: error.message || "Failed to load unpaid invoices",
 			icon: "alert-circle",
 			iconClasses: "text-red-600",
 		})
@@ -698,15 +776,22 @@ async function loadPartialInvoices() {
 	}
 }
 
-async function loadPartialSummary() {
+async function loadUnpaidSummary() {
 	if (!props.posProfile) return
 
 	try {
-		const result = await call("pos_next.api.partial_payments.get_partial_payment_summary", {
-			pos_profile: props.posProfile,
-		})
+		const result = await call(
+			"pos_next.api.partial_payments.get_unpaid_summary",
+			{
+				pos_profile: props.posProfile,
+			},
+		)
 
-		partialSummary.value = result || { count: 0, total_outstanding: 0, total_paid: 0 }
+		unpaidSummary.value = result || {
+			count: 0,
+			total_outstanding: 0,
+			total_paid: 0,
+		}
 	} catch (error) {
 		console.error("Error loading summary:", error)
 	}
@@ -734,8 +819,8 @@ async function handlePaymentCompleted(paymentData) {
 		})
 
 		// Reload invoices and summary
-		await loadPartialInvoices()
-		await loadPartialSummary()
+		await loadUnpaidInvoices()
+		await loadUnpaidSummary()
 
 		selectedInvoice.value = null
 	} catch (error) {
@@ -767,14 +852,20 @@ function formatDateTime(datetime) {
 
 function calculateDraftTotal(items) {
 	if (!items || items.length === 0) return 0
-	return items.reduce((sum, item) => sum + ((item.quantity || item.qty || 0) * (item.rate || 0)), 0)
+	return items.reduce(
+		(sum, item) => sum + (item.quantity || item.qty || 0) * (item.rate || 0),
+		0,
+	)
 }
 
 // Lifecycle
 onMounted(() => {
+	// Load saved filter presets from localStorage
+	filterStore.loadSavedFiltersFromStorage()
+
 	if (show.value) {
-		loadPartialInvoices()
-		loadPartialSummary()
+		loadUnpaidInvoices()
+		loadUnpaidSummary()
 	}
 })
 </script>
@@ -789,5 +880,27 @@ onMounted(() => {
 .fade-enter-from,
 .fade-leave-to {
 	opacity: 0;
+}
+
+/* Slide down transition for filter panel */
+.slide-down-enter-active,
+.slide-down-leave-active {
+	transition: all 0.3s ease-in-out;
+	max-height: 600px;
+	overflow: hidden;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+	max-height: 0;
+	opacity: 0;
+	transform: translateY(-10px);
+}
+
+.slide-down-enter-to,
+.slide-down-leave-from {
+	max-height: 600px;
+	opacity: 1;
+	transform: translateY(0);
 }
 </style>

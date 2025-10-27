@@ -255,3 +255,121 @@ def get_partial_payment_summary(pos_profile):
 		"total_outstanding": 0,
 		"total_paid": 0
 	}
+
+
+@frappe.whitelist()
+def get_unpaid_invoices(pos_profile, limit=100):
+	"""
+	Get list of unpaid invoices (both partial and totally unpaid) for a POS Profile
+
+	Args:
+		pos_profile: POS Profile name
+		limit: Maximum number of invoices to return (default 100)
+
+	Returns:
+		List of unpaid invoices with payment details
+	"""
+	if not pos_profile:
+		frappe.throw(_("POS Profile is required"))
+
+	# Check if user has access to this POS Profile
+	has_access = frappe.db.exists(
+		"POS Profile User",
+		{"parent": pos_profile, "user": frappe.session.user}
+	)
+
+	if not has_access and not frappe.has_permission("Sales Invoice", "read"):
+		frappe.throw(_("You don't have access to this POS Profile"))
+
+	# Query for all unpaid invoices (partial + totally unpaid)
+	invoices = frappe.db.sql("""
+		SELECT
+			pi.name,
+			pi.customer,
+			pi.customer_name,
+			pi.posting_date,
+			pi.posting_time,
+			pi.grand_total,
+			pi.paid_amount,
+			pi.outstanding_amount,
+			pi.status,
+			pi.is_return,
+			pi.docstatus
+		FROM
+			`tabSales Invoice` pi
+		WHERE
+			pi.pos_profile = %(pos_profile)s
+			AND pi.docstatus = 1
+			AND pi.is_pos = 1
+			AND pi.outstanding_amount > 0
+			AND pi.is_return = 0
+		ORDER BY
+			pi.posting_date DESC,
+			pi.posting_time DESC
+		LIMIT %(limit)s
+	""", {
+		"pos_profile": pos_profile,
+		"limit": limit
+	}, as_dict=True)
+
+	# Get payment entries for each invoice
+	for invoice in invoices:
+		invoice.payments = frappe.db.sql("""
+			SELECT
+				mode_of_payment,
+				amount,
+				type
+			FROM
+				`tabSales Invoice Payment`
+			WHERE
+				parent = %(invoice)s
+			ORDER BY
+				idx
+		""", {"invoice": invoice.name}, as_dict=True)
+
+	return invoices
+
+
+@frappe.whitelist()
+def get_unpaid_summary(pos_profile):
+	"""
+	Get summary statistics for all unpaid invoices
+
+	Args:
+		pos_profile: POS Profile name
+
+	Returns:
+		Summary with count and total outstanding amount
+	"""
+	if not pos_profile:
+		frappe.throw(_("POS Profile is required"))
+
+	# Check if user has access to this POS Profile
+	has_access = frappe.db.exists(
+		"POS Profile User",
+		{"parent": pos_profile, "user": frappe.session.user}
+	)
+
+	if not has_access and not frappe.has_permission("Sales Invoice", "read"):
+		frappe.throw(_("You don't have access to this POS Profile"))
+
+	summary = frappe.db.sql("""
+		SELECT
+			COUNT(*) as count,
+			SUM(outstanding_amount) as total_outstanding,
+			SUM(paid_amount) as total_paid
+		FROM
+			`tabSales Invoice`
+		WHERE
+			pos_profile = %(pos_profile)s
+			AND docstatus = 1
+			AND is_pos = 1
+			AND outstanding_amount > 0
+			AND is_return = 0
+	""", {"pos_profile": pos_profile}, as_dict=True)
+
+	return summary[0] if summary else {
+		"count": 0,
+		"total_outstanding": 0,
+		"total_paid": 0
+	}

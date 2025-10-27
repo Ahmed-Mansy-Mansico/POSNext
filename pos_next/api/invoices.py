@@ -598,6 +598,26 @@ def submit_invoice(invoice=None, data=None):
             # Re-raise the original submission error
             raise submit_error
 
+        # Handle credit redemption after successful submission
+        customer_credit_dict = data.get("customer_credit_dict") or invoice.get("customer_credit_dict")
+        redeemed_customer_credit = data.get("redeemed_customer_credit") or invoice.get("redeemed_customer_credit")
+
+        if redeemed_customer_credit and customer_credit_dict:
+            try:
+                from pos_next.api.credit_sales import redeem_customer_credit
+                redeem_customer_credit(invoice_doc.name, customer_credit_dict)
+            except Exception as credit_error:
+                frappe.log_error(
+                    title="Credit Redemption Error",
+                    message=f"Invoice: {invoice_doc.name}, Error: {str(credit_error)}\n{frappe.get_traceback()}"
+                )
+                # Don't fail the entire transaction, just log the error
+                frappe.msgprint(
+                    _("Invoice submitted successfully but credit redemption failed. Please contact administrator."),
+                    alert=True,
+                    indicator="orange"
+                )
+
         # Return complete invoice details
         return {
             "name": invoice_doc.name,
@@ -672,6 +692,26 @@ def get_invoices(pos_profile, limit=100):
 		"pos_profile": pos_profile,
 		"limit": limit
 	}, as_dict=True)
+
+	# Load items for each invoice for filtering purposes
+	for invoice in invoices:
+		items = frappe.db.sql("""
+			SELECT
+				item_code,
+				item_name,
+				qty,
+				rate,
+				amount
+			FROM
+				`tabSales Invoice Item`
+			WHERE
+				parent = %(invoice_name)s
+			ORDER BY
+				idx
+		""", {
+			"invoice_name": invoice.name
+		}, as_dict=True)
+		invoice.items = items
 
 	return invoices
 
