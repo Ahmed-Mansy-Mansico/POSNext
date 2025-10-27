@@ -1,13 +1,51 @@
 import path from "node:path"
+import { promises as fs } from "node:fs"
 import vue from "@vitejs/plugin-vue"
 import frappeui from "frappe-ui/vite"
 import { defineConfig } from "vite"
 import { VitePWA } from "vite-plugin-pwa"
 import { viteStaticCopy } from "vite-plugin-static-copy"
 
+// Get build version from environment or use timestamp
+const buildVersion = process.env.POS_NEXT_BUILD_VERSION || Date.now().toString()
+
+/**
+ * Vite plugin to write build version to version.json file
+ * This enables cache busting and version tracking
+ */
+function posNextBuildVersionPlugin(version) {
+	return {
+		name: "pos-next-build-version",
+		apply: "build",
+		async writeBundle() {
+			const versionFile = path.resolve(__dirname, "../pos_next/public/pos/version.json")
+			await fs.mkdir(path.dirname(versionFile), { recursive: true })
+			await fs.writeFile(
+				versionFile,
+				JSON.stringify(
+					{
+						version,
+						timestamp: new Date().toISOString(),
+						buildDate: new Date().toLocaleDateString("en-US", {
+							year: "numeric",
+							month: "long",
+							day: "numeric",
+						}),
+					},
+					null,
+					2
+				),
+				"utf8"
+			)
+			console.log(`\n✓ Build version written: ${version}`)
+		},
+	}
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
 	plugins: [
+		posNextBuildVersionPlugin(buildVersion),
 		frappeui({
 			frappeProxy: true,
 			jinjaBootData: true,
@@ -187,6 +225,9 @@ export default defineConfig({
 			"@": path.resolve(__dirname, "src"),
 			"tailwind.config.js": path.resolve(__dirname, "tailwind.config.js"),
 		},
+	},
+	define: {
+		__BUILD_VERSION__: JSON.stringify(buildVersion),
 	},
 	optimizeDeps: {
 		include: [

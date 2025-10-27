@@ -1,3 +1,5 @@
+from pos_next.utils import get_build_version
+
 app_name = "pos_next"
 app_title = "POS Next"
 app_publisher = "BrainWise"
@@ -24,9 +26,12 @@ app_license = "agpl-3.0"
 # Includes in <head>
 # ------------------
 
+# Get unique build version for cache busting
+_asset_version = get_build_version()
+
 # include js, css files in header of desk.html
-# app_include_css = "/assets/pos_next/css/pos_next.css"
-# app_include_js = "/assets/pos_next/js/pos_next.js"
+# app_include_css = f"/assets/pos_next/css/pos_next.css?v={_asset_version}"
+# app_include_js = f"/assets/pos_next/js/pos_next.js?v={_asset_version}"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/pos_next/css/pos_next.css"
