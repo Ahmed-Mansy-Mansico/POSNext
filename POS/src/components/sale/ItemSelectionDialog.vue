@@ -317,7 +317,7 @@ function buildUomOptions() {
 		conversion_factor: 1,
 		label: props.item.stock_uom,
 		description: "Stock unit",
-		rate: getUomPrice(props.item.stock_uom),
+		rate: getUomPrice(props.item.stock_uom, 1),
 		priceLabel: `per ${props.item.stock_uom}`,
 	})
 
@@ -330,7 +330,7 @@ function buildUomOptions() {
 				conversion_factor: uomData.conversion_factor,
 				label: uomData.uom,
 				description: `1 ${uomData.uom} = ${uomData.conversion_factor} ${props.item.stock_uom}`,
-				rate: getUomPrice(uomData.uom),
+				rate: getUomPrice(uomData.uom, uomData.conversion_factor),
 				priceLabel: `per ${uomData.uom}`,
 			})
 		})
@@ -339,7 +339,7 @@ function buildUomOptions() {
 	return uomOptions
 }
 
-function getUomPrice(uom) {
+function getUomPrice(uom, conversionFactor) {
 	if (!props.item) return 0
 
 	// Check if we have UOM-specific prices
@@ -347,8 +347,10 @@ function getUomPrice(uom) {
 		return props.item.uom_prices[uom]
 	}
 
-	// Fallback to base rate
-	return props.item.rate || 0
+	// Calculate price based on conversion factor
+	// If 1 Gram = 0.001 Kg, then price per Gram = price per Kg * 0.001
+	const baseRate = props.item.rate || 0
+	return baseRate * conversionFactor
 }
 
 function selectAttribute(attributeName, value) {
