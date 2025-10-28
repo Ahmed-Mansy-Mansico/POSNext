@@ -21,8 +21,14 @@
 				<!-- Left Side: Brand Info -->
 				<div class="flex items-center space-x-1 sm:space-x-4 min-w-0 flex-1">
 					<div class="min-w-0">
-						<h1 class="text-xs sm:text-base font-bold text-gray-900 truncate">POS Next</h1>
-						<p v-if="profileName" class="text-[9px] sm:text-xs text-gray-500 truncate hidden sm:block">{{ profileName }}</p>
+						<div class="flex items-center gap-2">
+							<h1 class="text-xs sm:text-base font-bold text-gray-900 truncate">POS Next</h1>
+							<span class="relative inline-flex items-center px-2 py-0.5 text-[9px] sm:text-[10px] font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-md shadow-sm hover:shadow-md transition-shadow">
+								<span class="absolute inset-0 bg-white/20 rounded-md animate-pulse"></span>
+								<span class="relative">v{{ appVersion }}</span>
+							</span>
+						</div>
+						<p v-if="profileName" class="text-[9px] sm:text-xs text-gray-500 truncate hidden sm:block mt-0.5">{{ profileName }}</p>
 					</div>
 
 					<!-- Time and Shift Duration - Compact on mobile -->
@@ -234,9 +240,11 @@
 import ActionButton from "@/components/common/ActionButton.vue"
 import StatusBadge from "@/components/common/StatusBadge.vue"
 import UserMenu from "@/components/common/UserMenu.vue"
-import { computed, ref } from "vue"
+import { ref } from "vue"
+import { version } from "../../../package.json"
 
 const showCacheTooltip = ref(false)
+const appVersion = version
 
 const emit = defineEmits([
 	"sync-click",
