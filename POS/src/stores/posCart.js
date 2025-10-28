@@ -6,7 +6,7 @@ import {
 	checkStockAvailability,
 	formatStockError,
 } from "@/utils/stockValidator"
-import { toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
 import { defineStore } from "pinia"
 import { computed, nextTick, ref, watch } from "vue"
 
@@ -22,6 +22,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		posProfile,
 		posOpeningShift,
 		payments,
+		additionalDiscount,
 		addItem: addItemToInvoice,
 		removeItem,
 		updateItemQuantity,
@@ -46,6 +47,9 @@ export const usePOSCartStore = defineStore("posCart", () => {
 	const appliedCoupon = ref(null)
 	const selectionMode = ref("uom") // 'uom' or 'variant'
 	const suppressOfferReapply = ref(false)
+
+	// Toast composable
+	const { showSuccess, showError, showWarning } = useToast()
 
 	// Computed
 	const itemCount = computed(() => invoiceItems.value.length)
@@ -113,12 +117,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 	function applyDiscountToCart(discount) {
 		applyDiscount(discount)
 		appliedCoupon.value = discount
-		toast.create({
-			title: "Coupon Applied",
-			text: `${discount.name} applied successfully`,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess(`${discount.name} applied successfully`)
 	}
 
 	function removeDiscountFromCart() {
@@ -126,12 +125,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		appliedOffers.value = []
 		removeDiscount()
 		appliedCoupon.value = null
-		toast.create({
-			title: "Discount Removed",
-			text: "Discount has been removed from cart",
-			icon: "check",
-			iconClasses: "text-blue-600",
-		})
+		showSuccess("Discount has been removed from cart")
 	}
 
 	function buildInvoiceDataForOffers(currentProfile) {
@@ -143,6 +137,8 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			company: currentProfile?.company,
 			selling_price_list: currentProfile?.selling_price_list,
 			currency: currentProfile?.currency,
+			discount_amount: additionalDiscount.value || 0,
+			coupon_code: couponCode.value || "",
 			items: invoiceItems.value.map((item) => ({
 				item_code: item.item_code,
 				item_name: item.item_name,
@@ -152,6 +148,8 @@ export const usePOSCartStore = defineStore("posCart", () => {
 				warehouse: item.warehouse,
 				conversion_factor: item.conversion_factor || 1,
 				price_list_rate: item.price_list_rate || item.rate,
+				discount_percentage: item.discount_percentage || 0,
+				discount_amount: item.discount_amount || 0,
 			})),
 		}
 	}
@@ -161,26 +159,32 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			return false
 		}
 
-		const discountMap = new Map()
-		serverItems.forEach((serverItem) => {
-			if (serverItem?.item_code) {
-				discountMap.set(serverItem.item_code, serverItem)
-			}
-		})
-
+		// Server returns items in same order as sent - match by array index
+		// This correctly handles duplicate SKUs (same item_code in cart multiple times)
 		let hasDiscounts = false
 
-		invoiceItems.value.forEach((item) => {
-			const serverItem = discountMap.get(item.item_code) || {}
-			const discountPercentage =
+		invoiceItems.value.forEach((item, index) => {
+			const serverItem = serverItems[index] || {}
+			const serverDiscountPercentage =
 				Number.parseFloat(serverItem.discount_percentage) || 0
-			const discountAmount = Number.parseFloat(serverItem.discount_amount) || 0
+			const serverDiscountAmount = Number.parseFloat(serverItem.discount_amount) || 0
+			const hasServerDiscount = serverDiscountPercentage > 0 || serverDiscountAmount > 0
 
-			item.discount_percentage = discountPercentage
-			item.discount_amount = discountAmount
+			// Check if server applied pricing rules to this item
+			const hasPricingRules = serverItem.pricing_rules &&
+				Array.isArray(serverItem.pricing_rules) &&
+				serverItem.pricing_rules.length > 0
 
-			if (discountPercentage || discountAmount) {
-				hasDiscounts = true
+			if (hasPricingRules || hasServerDiscount) {
+				// Server found a pricing rule - apply server discount
+				item.discount_percentage = serverDiscountPercentage
+				item.discount_amount = serverDiscountAmount
+				item.pricing_rules = serverItem.pricing_rules
+				hasDiscounts = hasServerDiscount
+			} else {
+				// No pricing rules matched for this item
+				// Preserve existing manual discount (don't overwrite with server's 0)
+				// This fixes the bug where manual discounts are lost when customer changes
 			}
 
 			// Recalculate item (from useInvoice)
@@ -224,12 +228,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		}
 
 		if (!posProfile.value || invoiceItems.value.length === 0) {
-			toast.create({
-				title: "Offer Unavailable",
-				text: "Add items to the cart before applying an offer.",
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning("Add items to the cart before applying an offer.")
 			offersDialogRef?.resetApplyingState()
 			return false
 		}
@@ -292,12 +291,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 					}
 				}
 
-				toast.create({
-					title: "Offer Not Eligible",
-					text: "Your cart doesn't meet the requirements for this offer.",
-					icon: "alert-circle",
-					iconClasses: "text-orange-600",
-				})
+				showWarning("Your cart doesn't meet the requirements for this offer.")
 				offersDialogRef?.resetApplyingState()
 				return false
 			}
@@ -319,22 +313,12 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			})
 			appliedOffers.value = updatedEntries
 
-			toast.create({
-				title: "Offer Applied",
-				text: `${offer.title || offer.name} applied successfully`,
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
+			showSuccess(`${offer.title || offer.name} applied successfully`)
 
 			return true
 		} catch (error) {
 			console.error("Error applying offer:", error)
-			toast.create({
-				title: "Error",
-				text: "Failed to apply offer. Please try again.",
-				icon: "x",
-				iconClasses: "text-red-600",
-			})
+			showError("Failed to apply offer. Please try again.")
 			offersDialogRef?.resetApplyingState()
 			return false
 		}
@@ -353,12 +337,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			suppressOfferReapply.value = true
 			appliedOffers.value = []
 			removeDiscount()
-			toast.create({
-				title: "Offer Removed",
-				text: "Offer has been removed from cart",
-				icon: "check",
-				iconClasses: "text-blue-600",
-			})
+			showSuccess("Offer has been removed from cart")
 			offersDialogRef?.resetApplyingState()
 			return true
 		}
@@ -372,12 +351,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			suppressOfferReapply.value = true
 			appliedOffers.value = []
 			removeDiscount()
-			toast.create({
-				title: "Offer Removed",
-				text: "Offer has been removed from cart",
-				icon: "check",
-				iconClasses: "text-blue-600",
-			})
+			showSuccess("Offer has been removed from cart")
 			offersDialogRef?.resetApplyingState()
 			return true
 		}
@@ -406,22 +380,12 @@ export const usePOSCartStore = defineStore("posCart", () => {
 				remainingCodes.includes(entry.code),
 			)
 
-			toast.create({
-				title: "Offer Removed",
-				text: "Offer has been removed from cart",
-				icon: "check",
-				iconClasses: "text-blue-600",
-			})
+			showSuccess("Offer has been removed from cart")
 			offersDialogRef?.resetApplyingState()
 			return true
 		} catch (error) {
 			console.error("Error removing offer:", error)
-			toast.create({
-				title: "Error",
-				text: "Failed to update cart after removing offer.",
-				icon: "x",
-				iconClasses: "text-red-600",
-			})
+			showError("Failed to update cart after removing offer.")
 			offersDialogRef?.resetApplyingState()
 			return false
 		}
@@ -491,20 +455,10 @@ export const usePOSCartStore = defineStore("posCart", () => {
 
 			recalculateItem(cartItem)
 
-			toast.create({
-				title: "UOM Updated",
-				text: `Unit changed to ${newUom}`,
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
+			showSuccess(`Unit changed to ${newUom}`)
 		} catch (error) {
 			console.error("Error changing UOM:", error)
-			toast.create({
-				title: "Error",
-				text: "Failed to update UOM. Please try again.",
-				icon: "alert-circle",
-				iconClasses: "text-red-600",
-			})
+			showError("Failed to update UOM. Please try again.")
 		}
 	}
 
@@ -550,9 +504,10 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			if (updatedDetails.quantity !== undefined) {
 				cartItem.quantity = updatedDetails.quantity
 			}
-			if (updatedDetails.rate !== undefined) {
-				cartItem.rate = updatedDetails.rate
-			}
+			// Don't update rate directly - let recalculateItem compute it from price_list_rate and discount
+			// if (updatedDetails.rate !== undefined) {
+			// 	cartItem.rate = updatedDetails.rate
+			// }
 			if (updatedDetails.warehouse !== undefined) {
 				cartItem.warehouse = updatedDetails.warehouse
 			}
@@ -562,26 +517,23 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			if (updatedDetails.discount_amount !== undefined) {
 				cartItem.discount_amount = updatedDetails.discount_amount
 			}
+			// Update price_list_rate if provided (for UOM changes)
+			if (updatedDetails.price_list_rate !== undefined) {
+				cartItem.price_list_rate = updatedDetails.price_list_rate
+			}
 
-			// Recalculate item totals
+			// Recalculate item totals (this will compute the correct rate from price_list_rate and discount)
 			recalculateItem(cartItem)
 
-			toast.create({
-				title: "Item Updated",
-				text: `${cartItem.item_name} updated successfully`,
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
+			// Rebuild cache after item update to ensure totals are accurate
+			rebuildIncrementalCache()
+
+			showSuccess(`${cartItem.item_name} updated successfully`)
 
 			return true
 		} catch (error) {
 			console.error("Error updating item details:", error)
-			toast.create({
-				title: "Error",
-				text: parseError(error) || "Failed to update item. Please try again.",
-				icon: "alert-circle",
-				iconClasses: "text-red-600",
-			})
+			showError(parseError(error) || "Failed to update item. Please try again.")
 			return false
 		}
 	}
@@ -650,6 +602,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		posProfile,
 		posOpeningShift,
 		payments,
+		additionalDiscount,
 		pendingItem,
 		pendingItemQty,
 		appliedOffers,

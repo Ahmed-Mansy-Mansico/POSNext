@@ -141,7 +141,7 @@ export function useInvoice() {
 				item_code: item.item_code,
 				item_name: item.item_name,
 				rate: item.rate || item.price_list_rate || 0,
-				price_list_rate: item.price_list_rate || 0,
+				price_list_rate: item.price_list_rate || item.rate || 0,
 				quantity: quantity,
 				discount_amount: 0,
 				discount_percentage: 0,
@@ -293,9 +293,22 @@ export function useInvoice() {
 		// Store coupon code for tracking
 		couponCode.value = discount.code || discount.name
 
+		// Use centralized calculation to handle percentage/amount and clamping
+		let discountAmount = calculateDiscountAmount(discount, subtotal.value)
+
+		// Clamp discount to subtotal (cannot exceed total)
+		if (discountAmount > subtotal.value) {
+			discountAmount = subtotal.value
+		}
+
+		// Ensure non-negative
+		if (discountAmount < 0) {
+			discountAmount = 0
+		}
+
 		// Apply discount as Additional Discount on grand total
 		// This preserves item-level pricing rules while applying coupon discount
-		additionalDiscount.value = discount.amount || 0
+		additionalDiscount.value = discountAmount
 
 		// Rebuild cache after applying additional discount
 		rebuildIncrementalCache()
@@ -370,8 +383,10 @@ export function useInvoice() {
 	}
 
 	function recalculateItem(item) {
-		// Step 1: Calculate base amount (rate * quantity)
-		const baseAmount = item.quantity * item.rate
+		// Step 1: Calculate base amount using price_list_rate (original price before discount)
+		// Use price_list_rate if available, otherwise fall back to rate
+		const priceListRate = item.price_list_rate || item.rate
+		const baseAmount = item.quantity * priceListRate
 
 		// Step 2: Calculate discount amount
 		let discountAmount = 0
@@ -386,15 +401,18 @@ export function useInvoice() {
 		}
 		item.discount_amount = discountAmount
 
-		// Step 3: Calculate net amount (after discount, before tax)
+		// Step 3: Calculate final rate (price after discount per unit)
+		item.rate = item.quantity > 0 ? (baseAmount - discountAmount) / item.quantity : priceListRate
+
+		// Step 4: Calculate net amount (after discount, before tax)
 		const netAmount = baseAmount - discountAmount
 
-		// Step 4: Calculate tax on net amount (optimized with cached tax rate)
+		// Step 5: Calculate tax on net amount (optimized with cached tax rate)
 		const totalTaxRate = calculateTotalTaxRate()
 		const taxAmount = (netAmount * totalTaxRate) / 100
 		item.tax_amount = taxAmount
 
-		// Step 5: Calculate final item amount (net amount + tax)
+		// Step 6: Calculate final item amount (net amount + tax)
 		item.amount = netAmount + taxAmount
 
 		// Vue 3 reactivity tracks mutations automatically - no need to replace array
@@ -473,6 +491,7 @@ export function useInvoice() {
 				item_name: item.item_name,
 				qty: item.quantity,
 				rate: item.rate,
+				price_list_rate: item.price_list_rate || item.rate,
 				uom: item.uom,
 				warehouse: item.warehouse,
 				batch_no: item.batch_no,

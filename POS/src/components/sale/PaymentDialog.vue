@@ -48,6 +48,59 @@
 					</div>
 				</div>
 
+				<!-- Additional Discount Section (Compact) -->
+				<div v-if="settingsStore.allowAdditionalDiscount" class="bg-gradient-to-r from-orange-50 to-red-50 border border-orange-300 rounded-lg p-2">
+					<div class="flex items-center justify-between mb-1.5">
+						<div class="flex items-center space-x-1.5">
+							<div class="w-5 h-5 rounded-full bg-orange-200 flex items-center justify-center">
+								<svg class="w-3 h-3 text-orange-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+								</svg>
+							</div>
+							<span class="text-[11px] font-bold text-orange-900">Additional Discount</span>
+							<span v-if="localAdditionalDiscount > 0" class="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+								-{{ formatCurrency(additionalDiscountType === 'percentage' ? (subtotal * localAdditionalDiscount / 100) : localAdditionalDiscount) }}
+							</span>
+						</div>
+						<button
+							v-if="localAdditionalDiscount > 0"
+							@click="clearAdditionalDiscount"
+							class="text-[10px] text-orange-700 hover:text-orange-900 font-semibold px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 rounded transition-colors"
+						>
+							Clear
+						</button>
+					</div>
+					<div class="grid grid-cols-[100px_1fr] gap-1.5">
+						<!-- Discount Type Selector (Compact) -->
+						<select
+							v-model="additionalDiscountType"
+							@change="handleAdditionalDiscountTypeChange"
+							class="w-full px-1.5 py-1.5 text-[11px] font-medium border border-orange-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-transparent bg-white"
+						>
+							<option value="percentage">% Percent</option>
+							<option value="amount">{{ currency }} Amount</option>
+						</select>
+						<!-- Discount Value Input (Compact) -->
+						<div class="relative">
+							<span v-if="additionalDiscountType === 'amount'" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 text-[11px] font-medium">{{ currency }}</span>
+							<input
+								type="number"
+								v-model.number="localAdditionalDiscount"
+								@input="handleAdditionalDiscountChange"
+								placeholder="0.00"
+								min="0"
+								:max="additionalDiscountType === 'percentage' ? 100 : subtotal"
+								step="0.01"
+								:class="[
+									'w-full py-1.5 text-[11px] font-semibold border border-orange-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-transparent bg-white placeholder-gray-400',
+									additionalDiscountType === 'amount' ? 'pl-9 pr-2' : 'px-2 pr-6'
+								]"
+							/>
+							<span v-if="additionalDiscountType === 'percentage'" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 text-[11px] font-medium">%</span>
+						</div>
+					</div>
+				</div>
+
 				<!-- Payment Methods Grid -->
 				<div>
 					<div class="flex items-center justify-between mb-3">
@@ -204,14 +257,23 @@
 </template>
 
 <script setup>
+import { usePOSSettingsStore } from "@/stores/posSettings"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { Button, Dialog, Input, createResource } from "frappe-ui"
 import { computed, ref, watch } from "vue"
+import { useToast } from "@/composables/useToast"
+
+const settingsStore = usePOSSettingsStore()
+const { showWarning } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
 	grandTotal: {
+		type: Number,
+		default: 0,
+	},
+	subtotal: {
 		type: Number,
 		default: 0,
 	},
@@ -228,9 +290,13 @@ const props = defineProps({
 		type: Boolean,
 		default: false,
 	},
+	additionalDiscount: {
+		type: Number,
+		default: 0,
+	},
 })
 
-const emit = defineEmits(["update:modelValue", "payment-completed"])
+const emit = defineEmits(["update:modelValue", "payment-completed", "update-additional-discount"])
 
 const show = computed({
 	get: () => props.modelValue,
@@ -241,6 +307,13 @@ const paymentMethods = ref([])
 const lastSelectedMethod = ref(null)
 const customAmount = ref("")
 const paymentEntries = ref([])
+
+// Additional discount state
+const localAdditionalDiscount = ref(0)
+// Initialize discount type from settings (default to percentage if enabled, otherwise amount)
+const additionalDiscountType = ref(
+	settingsStore.usePercentageDiscount ? 'percentage' : 'amount'
+)
 
 const paymentMethodsResource = createResource({
 	url: "pos_next.api.pos_profile.get_payment_methods",
@@ -503,4 +576,83 @@ function getPaymentIcon(type) {
 	}
 	return iconMap[type] || "💰"
 }
+
+// Additional discount handlers
+function handleAdditionalDiscountChange() {
+	let discountValue = localAdditionalDiscount.value
+	let discountAmount = 0
+
+	// If percentage mode, calculate amount
+	if (additionalDiscountType.value === 'percentage') {
+		// Validate against max_discount_allowed if configured
+		if (settingsStore.maxDiscountAllowed > 0 && discountValue > settingsStore.maxDiscountAllowed) {
+			localAdditionalDiscount.value = settingsStore.maxDiscountAllowed
+			discountValue = settingsStore.maxDiscountAllowed
+			// Show warning toast
+			showWarning(`Maximum allowed discount is ${settingsStore.maxDiscountAllowed}%`)
+		}
+
+		// Ensure percentage is between 0-100
+		if (discountValue > 100) {
+			localAdditionalDiscount.value = 100
+			discountValue = 100
+		}
+
+		// Convert percentage to amount
+		discountAmount = (props.subtotal * discountValue) / 100
+	} else {
+		// Amount mode
+		discountAmount = discountValue
+
+		// For amount mode, check if it exceeds percentage limit when converted
+		if (settingsStore.maxDiscountAllowed > 0 && props.subtotal > 0) {
+			const percentageEquivalent = (discountAmount / props.subtotal) * 100
+			if (percentageEquivalent > settingsStore.maxDiscountAllowed) {
+				const maxAmount = (props.subtotal * settingsStore.maxDiscountAllowed) / 100
+				localAdditionalDiscount.value = maxAmount
+				discountAmount = maxAmount
+				// Show warning toast
+				showWarning(`Maximum allowed discount is ${settingsStore.maxDiscountAllowed}% (${props.currency} ${maxAmount.toFixed(2)})`)
+			}
+		}
+	}
+
+	// Ensure discount doesn't exceed subtotal
+	if (discountAmount > props.subtotal) {
+		if (additionalDiscountType.value === 'amount') {
+			localAdditionalDiscount.value = props.subtotal
+		}
+		discountAmount = props.subtotal
+	}
+
+	// Ensure non-negative
+	if (discountAmount < 0) {
+		localAdditionalDiscount.value = 0
+		discountAmount = 0
+	}
+
+	emit("update-additional-discount", discountAmount)
+}
+
+function handleAdditionalDiscountTypeChange() {
+	// Don't reset - preserve last value when toggling type
+	// Just recalculate to ensure it's within limits
+	handleAdditionalDiscountChange()
+}
+
+function clearAdditionalDiscount() {
+	localAdditionalDiscount.value = 0
+	emit("update-additional-discount", 0)
+}
+
+// Watch for dialog open to sync additional discount from parent
+watch(
+	() => props.modelValue,
+	(isOpen) => {
+		if (isOpen) {
+			// Only sync when dialog opens, not continuously
+			localAdditionalDiscount.value = props.additionalDiscount || 0
+		}
+	},
+)
 </script>

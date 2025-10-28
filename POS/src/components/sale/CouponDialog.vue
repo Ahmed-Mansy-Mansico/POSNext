@@ -146,8 +146,14 @@
 
 <script setup>
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
-import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
+import { Button, Dialog, Input, createResource } from "frappe-ui"
 import { ref, watch } from "vue"
+import { useInvoice } from "@/composables/useInvoice"
+import { useToast } from "@/composables/useToast"
+
+// Get calculateDiscountAmount helper from composable
+const { calculateDiscountAmount } = useInvoice()
+const { showSuccess, showError, showWarning } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -271,12 +277,7 @@ async function applyCoupon() {
 		if (!validationData || !validationData.valid) {
 			errorMessage.value =
 				validationData?.message || "The coupon code you entered is not valid"
-			toast.create({
-				title: "Invalid Coupon",
-				text: errorMessage.value,
-				icon: "x",
-				iconClasses: "text-red-600",
-			})
+			showError(errorMessage.value)
 			return
 		}
 
@@ -285,22 +286,18 @@ async function applyCoupon() {
 		// Check minimum amount (on subtotal before tax)
 		if (coupon.min_amount && props.subtotal < coupon.min_amount) {
 			errorMessage.value = `This coupon requires a minimum purchase of ${formatCurrency(coupon.min_amount)}`
-			toast.create({
-				title: "Minimum Amount Required",
-				text: errorMessage.value,
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning(errorMessage.value)
 			return
 		}
 
-		// Calculate discount on subtotal (before tax)
-		let discountAmount = 0
-		if (coupon.discount_type === "Percentage") {
-			discountAmount = (props.subtotal * coupon.discount_percentage) / 100
-		} else if (coupon.discount_type === "Amount") {
-			discountAmount = coupon.discount_amount
+		// Calculate discount on subtotal (before tax) using centralized helper
+		// Transform server coupon format to discount object format
+		const discountObj = {
+			percentage: coupon.discount_type === "Percentage" ? coupon.discount_percentage : 0,
+			amount: coupon.discount_type === "Amount" ? coupon.discount_amount : 0,
 		}
+
+		let discountAmount = calculateDiscountAmount(discountObj, props.subtotal)
 
 		// Apply maximum discount limit if specified
 		if (coupon.max_amount && discountAmount > coupon.max_amount) {
@@ -322,23 +319,13 @@ async function applyCoupon() {
 
 		emit("discount-applied", appliedDiscount.value)
 
-		toast.create({
-			title: "Coupon Applied!",
-			text: `${couponCode.value.toUpperCase()} applied successfully`,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess(`${couponCode.value.toUpperCase()} applied successfully`)
 
 		errorMessage.value = ""
 	} catch (error) {
 		console.error("Error applying coupon:", error)
 		errorMessage.value = "Failed to apply coupon. Please try again."
-		toast.create({
-			title: "Error",
-			text: errorMessage.value,
-			icon: "x",
-			iconClasses: "text-red-600",
-		})
+		showError(errorMessage.value)
 	} finally {
 		applying.value = false
 	}
@@ -347,12 +334,7 @@ async function applyCoupon() {
 function removeDiscount() {
 	appliedDiscount.value = null
 	emit("discount-removed")
-	toast.create({
-		title: "Removed",
-		text: "Discount has been removed",
-		icon: "info",
-		iconClasses: "text-blue-600",
-	})
+	showSuccess("Discount has been removed")
 }
 
 function formatCurrency(amount) {

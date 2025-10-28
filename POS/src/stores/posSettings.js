@@ -11,6 +11,8 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 		max_discount_allowed: 0,
 		use_percentage_discount: 0,
 		allow_user_to_edit_additional_discount: 0,
+		allow_user_to_edit_item_discount: 1, // Allow item-level discounts
+		disable_rounded_total: 1, // Disable rounding for accurate totals
 		allow_credit_sale: 0,
 		allow_return: 0,
 		allow_write_off_change: 0,
@@ -65,6 +67,12 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 	)
 	const allowAdditionalDiscount = computed(() =>
 		Boolean(settings.value.allow_user_to_edit_additional_discount),
+	)
+	const allowItemDiscount = computed(() =>
+		Boolean(settings.value.allow_user_to_edit_item_discount),
+	)
+	const disableRoundedTotal = computed(() =>
+		Boolean(settings.value.disable_rounded_total),
 	)
 	const allowCreditSale = computed(() =>
 		Boolean(settings.value.allow_credit_sale),
@@ -213,6 +221,8 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 			max_discount_allowed: 0,
 			use_percentage_discount: 0,
 			allow_user_to_edit_additional_discount: 0,
+			allow_user_to_edit_item_discount: 1,
+			disable_rounded_total: 1,
 			allow_credit_sale: 0,
 			allow_return: 0,
 			allow_write_off_change: 0,
@@ -277,6 +287,28 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 		return isEnabled.value && !Boolean(settings.value.allow_negative_stock)
 	}
 
+	/**
+	 * Force reload settings from server
+	 * This is called when settings are changed in the settings dialog
+	 * to ensure all components have the latest settings immediately
+	 */
+	async function reloadSettings() {
+		if (!settings.value.pos_profile) {
+			console.warn("Cannot reload POS Settings: POS Profile not set")
+			return false
+		}
+
+		isLoading.value = true
+
+		try {
+			await settingsResource.reload()
+			return true
+		} catch (error) {
+			console.error("Error reloading POS Settings:", error)
+			return false
+		}
+	}
+
 	return {
 		// State
 		settings,
@@ -288,6 +320,8 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 		maxDiscountAllowed,
 		usePercentageDiscount,
 		allowAdditionalDiscount,
+		allowItemDiscount,
+		disableRoundedTotal,
 		allowCreditSale,
 		allowReturn,
 		allowWriteOffChange,
@@ -338,6 +372,7 @@ export const usePOSSettingsStore = defineStore("posSettings", () => {
 
 		// Actions
 		loadSettings,
+		reloadSettings,
 		resetSettings,
 		validateDiscount,
 		isNegativeStockAllowed,

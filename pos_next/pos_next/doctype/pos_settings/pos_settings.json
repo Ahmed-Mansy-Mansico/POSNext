@@ -8,8 +8,10 @@
   "enabled",
   "section_break_general",
   "allow_user_to_edit_additional_discount",
+  "allow_user_to_edit_item_discount",
   "use_percentage_discount",
   "max_discount_allowed",
+  "disable_rounded_total",
   "column_break_general",
   "allow_credit_sale",
   "allow_return",
@@ -85,6 +87,13 @@
    "description": "Enable cart-wide discount"
   },
   {
+   "default": "1",
+   "fieldname": "allow_user_to_edit_item_discount",
+   "fieldtype": "Check",
+   "label": "Allow Item Discount",
+   "description": "Enable item-level discount in edit dialog"
+  },
+  {
    "default": "0",
    "fieldname": "use_percentage_discount",
    "fieldtype": "Check",
@@ -98,6 +107,13 @@
    "label": "Max Discount Percentage Allowed",
    "precision": "2",
    "description": "Maximum discount percentage (enforced in UI)"
+  },
+  {
+   "default": "1",
+   "fieldname": "disable_rounded_total",
+   "fieldtype": "Check",
+   "label": "Disable Rounded Total",
+   "description": "Show exact totals without rounding"
   },
   {
    "fieldname": "column_break_general",

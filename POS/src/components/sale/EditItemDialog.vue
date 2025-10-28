@@ -143,8 +143,8 @@
 					</div>
 				</div>
 
-				<!-- Item Discount Section -->
-				<div class="border-t border-gray-200 pt-4">
+				<!-- Item Discount Section (only if allowed by POS Profile) -->
+				<div v-if="settingsStore.allowItemDiscount" class="border-t border-gray-200 pt-4">
 					<label class="block text-sm font-medium text-gray-700 mb-3">Item Discount</label>
 					<div class="grid grid-cols-2 gap-3">
 						<!-- Discount Type -->
@@ -217,11 +217,13 @@
 
 <script setup>
 import { useToast } from "@/composables/useToast"
+import { usePOSSettingsStore } from "@/stores/posSettings"
 import { getItemStock } from "@/utils/stockValidator"
 import { Button, Dialog } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
 const { showSuccess, showError, showWarning } = useToast()
+const settingsStore = usePOSSettingsStore()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -401,10 +403,7 @@ function updateItem() {
 		discount_percentage:
 			discountType.value === "percentage" ? discountValue.value : 0,
 		discount_amount:
-			discountType.value === "amount"
-				? discountValue.value
-				: calculatedDiscount.value,
-		amount: calculatedTotal.value,
+			discountType.value === "amount" ? discountValue.value : 0,
 	}
 
 	emit("update-item", updatedItem)

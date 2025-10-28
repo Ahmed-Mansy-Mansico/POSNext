@@ -372,8 +372,8 @@
 			</div>
 		</div>
 
-		<!-- Coupons & Offers Buttons -->
-		<div v-if="items.length > 0" class="px-1.5 sm:px-2.5 pt-1.5 sm:pt-2.5 pb-1 bg-gray-50">
+		<!-- Coupons, Offers & Discount Section -->
+		<div v-if="items.length > 0" class="px-1.5 sm:px-2.5 pt-1.5 sm:pt-2.5 pb-1 bg-gray-50 space-y-2">
 			<div class="flex gap-1.5 sm:gap-2">
 				<!-- View All Offers Button -->
 				<button
@@ -436,11 +436,14 @@
 					<span>Total Quantity</span>
 					<span class="font-medium text-gray-900">{{ totalQuantity }}</span>
 				</div>
-				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
+				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
 					<span>Subtotal</span>
 					<span class="font-medium text-gray-900">{{ formatCurrency(subtotal) }}</span>
 				</div>
+			</div>
 
+			<!-- Summary Details (continued) -->
+			<div v-if="items.length > 0" class="mb-2.5">
 				<!-- Discount Display - Highlighted -->
 				<div v-if="discountAmount > 0" class="flex items-center justify-between mb-1 bg-red-50 rounded px-1.5 py-1 -mx-0.5">
 					<div class="flex items-center space-x-1">
@@ -521,6 +524,7 @@
 <script setup>
 import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSOffersStore } from "@/stores/posOffers"
+import { usePOSSettingsStore } from "@/stores/posSettings"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { isOffline } from "@/utils/offline"
 import { offlineWorker } from "@/utils/offline/workerClient"
@@ -531,6 +535,7 @@ import EditItemDialog from "./EditItemDialog.vue"
 // Use Pinia store
 const cartStore = usePOSCartStore()
 const offersStore = usePOSOffersStore()
+const settingsStore = usePOSSettingsStore()
 
 const props = defineProps({
 	items: {

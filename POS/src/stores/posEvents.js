@@ -206,7 +206,9 @@ export const usePOSEventsStore = defineStore('posEvents', () => {
 		const pricingFields = [
 			'max_discount_allowed',
 			'use_percentage_discount',
-			'allow_user_to_edit_additional_discount'
+			'allow_user_to_edit_additional_discount',
+			'allow_user_to_edit_item_discount',
+			'disable_rounded_total'
 		]
 		const pricingChanges = pricingFields.filter(field => field in changes)
 		if (pricingChanges.length > 0) {
@@ -226,6 +228,7 @@ export const usePOSEventsStore = defineStore('posEvents', () => {
 			'allow_credit_sale',
 			'allow_return',
 			'allow_write_off_change',
+			'allow_partial_payment',
 			'silent_print'
 		]
 		const salesChanges = salesFields.filter(field => field in changes)
@@ -234,6 +237,28 @@ export const usePOSEventsStore = defineStore('posEvents', () => {
 				type: 'settings:sales-operations-changed',
 				payload: {
 					changes: salesChanges.reduce((acc, field) => {
+						acc[field] = changes[field]
+						return acc
+					}, {})
+				}
+			})
+		}
+
+		// Display settings changes
+		const displayFields = [
+			'default_card_view',
+			'display_item_code',
+			'show_customer_balance',
+			'hide_expected_amount',
+			'display_discount_percentage',
+			'display_discount_amount'
+		]
+		const displayChanges = displayFields.filter(field => field in changes)
+		if (displayChanges.length > 0) {
+			events.push({
+				type: 'settings:display-changed',
+				payload: {
+					changes: displayChanges.reduce((acc, field) => {
 						acc[field] = changes[field]
 						return acc
 					}, {})

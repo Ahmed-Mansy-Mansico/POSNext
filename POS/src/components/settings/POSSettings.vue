@@ -272,7 +272,17 @@
 											<CheckboxField
 												v-model="settings.allow_user_to_edit_additional_discount"
 												label="Allow Additional Discount"
-												description="Enable cart-wide discount"
+												description="Enable invoice-level discount"
+											/>
+											<CheckboxField
+												v-model="settings.allow_user_to_edit_item_discount"
+												label="Allow Item Discount"
+												description="Enable item-level discount in edit dialog"
+											/>
+											<CheckboxField
+												v-model="settings.disable_rounded_total"
+												label="Disable Rounded Total"
+												description="Show exact totals without rounding"
 											/>
 										</div>
 									</div>
@@ -374,6 +384,8 @@ const settings = ref({
 	max_discount_allowed: 0,
 	use_percentage_discount: 0,
 	allow_user_to_edit_additional_discount: 0,
+	allow_user_to_edit_item_discount: 1,
+	disable_rounded_total: 1,
 	allow_credit_sale: 0,
 	allow_return: 0,
 	allow_write_off_change: 0,

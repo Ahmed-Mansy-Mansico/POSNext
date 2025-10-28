@@ -390,16 +390,38 @@ def update_invoice(data):
             except Exception as e:
                 frappe.log_error(f"Failed to create customer {customer_name}: {e}")
 
-        # Set missing values
+        # Disable automatic pricing rules (we handle discounts manually from POS)
         invoice_doc.ignore_pricing_rule = 1
         invoice_doc.flags.ignore_pricing_rule = True
+
+        # Prepare items for ERPNext's discount calculation
+        # ERPNext requires: price_list_rate and rate=0 to calculate discount
+        for item in invoice_doc.get("items", []):
+            # Set price_list_rate (original price before discount)
+            if not item.get("price_list_rate"):
+                item.price_list_rate = item.rate
+
+            # For items with discount, set rate=0 to trigger ERPNext's calculation:
+            # rate = price_list_rate * (1 - discount_percentage/100)
+            if item.discount_percentage or item.discount_amount:
+                item.rate = 0
+
+        # Set invoice flags BEFORE calculations
+        invoice_doc.is_pos = 1
+        invoice_doc.update_stock = 1
+
+        # Use rounding setting from POS Profile
+        if pos_profile_doc and hasattr(pos_profile_doc, 'disable_rounded_total'):
+            invoice_doc.disable_rounded_total = pos_profile_doc.disable_rounded_total
+        else:
+            # Default to disable rounding for POS to prevent issues with discounts
+            invoice_doc.disable_rounded_total = 1
+
+        # Populate missing fields (company, currency, accounts, etc.)
         invoice_doc.set_missing_values()
 
-        # Set as POS invoice
-        invoice_doc.is_pos = 1
-
-        # Important: Set update_stock flag for stock updates
-        invoice_doc.update_stock = 1
+        # Calculate totals and apply discounts (with rounding disabled)
+        invoice_doc.calculate_taxes_and_totals()
 
         # Set accounts for payment methods before saving
         for payment in invoice_doc.payments:

@@ -278,11 +278,14 @@
 		<PaymentDialog
 			v-model="uiStore.showPaymentDialog"
 			:grand-total="cartStore.grandTotal"
+			:subtotal="cartStore.subtotal"
 			:pos-profile="shiftStore.profileName"
 			:currency="shiftStore.profileCurrency"
 			:is-offline="offlineStore.isOffline"
 			:allow-partial-payment="posSettingsStore.allowPartialPayment"
+			:additional-discount="cartStore.additionalDiscount"
 			@payment-completed="handlePaymentCompleted"
+			@update-additional-discount="handleAdditionalDiscountUpdate"
 		/>
 
 		<!-- Customer Selection Dialog -->
@@ -696,7 +699,7 @@ const settingsStore = usePOSSettingsStore()
 const { onStockUpdate } = useRealtimeStock()
 
 // POS Events system
-const { onWarehouseChanged, onPricingChanged, onStockPolicyChanged } = usePOSEvents()
+const { onWarehouseChanged, onPricingChanged, onStockPolicyChanged, onSettingsChanged, onSalesOperationsChanged } = usePOSEvents()
 
 // Initialize toast
 const { showError } = useToast()
@@ -872,6 +875,45 @@ onMounted(async () => {
 				iconClasses: 'text-blue-600'
 			})
 		}
+	})
+
+	// Listen to sales operations changes
+	onSalesOperationsChanged(({ changes }) => {
+		log.info('Event: Sales operations settings changed', changes)
+
+		// Reload settings in the store to get fresh values
+		posSettingsStore.reloadSettings()
+
+		// Show notification for specific important changes
+		const changeLabels = {
+			allow_credit_sale: 'Credit Sale',
+			allow_return: 'Returns',
+			allow_write_off_change: 'Write Off Change',
+			allow_partial_payment: 'Partial Payment',
+			silent_print: 'Silent Print'
+		}
+
+		const changedSettings = Object.keys(changes)
+			.map(key => changeLabels[key])
+			.filter(Boolean)
+			.join(', ')
+
+		if (changedSettings) {
+			toast.create({
+				title: 'Settings Updated',
+				text: `${changedSettings} settings applied immediately`,
+				icon: 'check',
+				iconClasses: 'text-green-600'
+			})
+		}
+	})
+
+	// Listen to general settings changes (catch-all for any setting change)
+	onSettingsChanged(async ({ changes }) => {
+		log.info('Event: Settings changed', changes)
+
+		// Reload settings to ensure all computed properties are fresh
+		await posSettingsStore.reloadSettings()
 	})
 
 	// Store cleanup function for unmount
@@ -1304,6 +1346,14 @@ function handleItemSelected(item, autoAdd = false) {
 
 async function handleEditItem(updatedItem) {
 	await cartStore.updateItemDetails(updatedItem.item_code, updatedItem)
+}
+
+function handleAdditionalDiscountUpdate(discountAmount) {
+	// Update the additional discount value in the cart store
+	cartStore.additionalDiscount = discountAmount
+
+	// Rebuild the cache to recalculate totals
+	cartStore.rebuildIncrementalCache()
 }
 
 function handleCustomerSelected(selectedCustomer) {

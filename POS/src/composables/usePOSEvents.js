@@ -100,6 +100,15 @@ export function usePOSEvents() {
 	}
 
 	/**
+	 * Listen to display setting changes
+	 * @param {Function} callback - Callback({ changes })
+	 * @returns {Function} - Unsubscribe function
+	 */
+	function onDisplayChanged(callback) {
+		return on('settings:display-changed', callback)
+	}
+
+	/**
 	 * Listen to stock sync configuration changes
 	 * @param {Function} callback - Callback({ enabled, intervalMs })
 	 * @returns {Function} - Unsubscribe function
@@ -219,6 +228,7 @@ export function usePOSEvents() {
 		onStockPolicyChanged,
 		onPricingChanged,
 		onSalesOperationsChanged,
+		onDisplayChanged,
 		onStockSyncConfigured,
 		onStockSyncUpdate,
 		onAny,
