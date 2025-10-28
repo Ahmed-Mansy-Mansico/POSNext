@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-10-28
+
 ### Added
 - Real-time settings updates without page reload using Pinia event system
 - Event-driven architecture for settings changes (pricing, sales operations, display)
@@ -14,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings event listeners in POSSale component for immediate UI updates
 - Display settings change detection and event emission
 - Toast notifications for settings changes to provide user feedback
+- Comprehensive CHANGELOG.md following Keep a Changelog format
 
 ### Changed
 - Settings now update immediately in all components without requiring page refresh
@@ -73,7 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shift management
 - Stock tracking
 
-[Unreleased]: https://github.com/yourusername/pos_next/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/yourusername/pos_next/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/yourusername/pos_next/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/yourusername/pos_next/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/yourusername/pos_next/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/yourusername/pos_next/releases/tag/v1.0.0
