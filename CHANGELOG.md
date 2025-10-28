@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Critical: Double discount bug** - Discounts were being applied twice (once in item rate, once in total calculation)
+  - Frontend now correctly uses `price_list_rate` for subtotal calculations
+  - Backend reverse-calculates `price_list_rate` from discounted rate to prevent double application
+  - Example: Item with 10% discount now correctly shows 90.00 instead of 81.00
+- **"Disable Rounded Total" setting not working** - Backend was checking POS Profile instead of POS Settings
+- Subtotal calculation now uses original price before discount (fixes display inconsistency)
+
+### Changed
+- Improved discount calculation logic with comprehensive documentation
+- Added validation to prevent invalid discount percentages (now clamped to 0-100%)
+- Enhanced error handling for rounding setting retrieval
+- Added data integrity checks (price_list_rate must be >= rate)
+
+### Improved
+- Added detailed inline documentation for discount calculation flow
+- Code cleanup with better comments explaining critical logic
+- Separated discount calculation into clearly documented sections
+
 ## [1.1.0] - 2025-10-28
 
 ### Added

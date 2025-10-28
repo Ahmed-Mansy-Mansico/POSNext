@@ -394,28 +394,66 @@ def update_invoice(data):
         invoice_doc.ignore_pricing_rule = 1
         invoice_doc.flags.ignore_pricing_rule = True
 
-        # Prepare items for ERPNext's discount calculation
-        # ERPNext requires: price_list_rate and rate=0 to calculate discount
+        # ========================================================================
+        # DISCOUNT CALCULATION - CRITICAL LOGIC
+        # ========================================================================
+        # Problem: Frontend sends rate (discounted) and discount_percentage
+        # Solution: Reverse-calculate price_list_rate (original price) to avoid double discount
+        #
+        # Formula: rate = price_list_rate * (1 - discount_percentage/100)
+        # Reverse: price_list_rate = rate / (1 - discount_percentage/100)
+        # ========================================================================
         for item in invoice_doc.get("items", []):
-            # Set price_list_rate (original price before discount)
-            if not item.get("price_list_rate"):
-                item.price_list_rate = item.rate
+            item_rate = flt(item.rate or 0)
+            discount_pct = flt(item.discount_percentage or 0)
 
-            # For items with discount, set rate=0 to trigger ERPNext's calculation:
-            # rate = price_list_rate * (1 - discount_percentage/100)
-            if item.discount_percentage or item.discount_amount:
-                item.rate = 0
+            # If item has a discount, reverse-calculate the original price_list_rate
+            if discount_pct > 0 and discount_pct < 100:
+                if item_rate > 0:
+                    # Reverse calculation to get original price
+                    item.price_list_rate = item_rate / (1 - discount_pct / 100)
+                elif not item.get("price_list_rate"):
+                    # Fallback: if rate is 0 but discount exists (edge case)
+                    item.price_list_rate = item_rate
+            elif not item.get("price_list_rate"):
+                # No discount or price_list_rate not set - use rate as is
+                item.price_list_rate = item_rate
+
+            # Ensure price_list_rate is never less than rate (data integrity)
+            if flt(item.price_list_rate) < item_rate:
+                item.price_list_rate = item_rate
+
+            # IMPORTANT: Keep the rate from frontend (do NOT set to 0)
+            # ERPNext will recalculate if needed, but preserving frontend rate
+            # prevents rounding issues and ensures UI matches invoice
 
         # Set invoice flags BEFORE calculations
         invoice_doc.is_pos = 1
         invoice_doc.update_stock = 1
 
-        # Use rounding setting from POS Profile
-        if pos_profile_doc and hasattr(pos_profile_doc, 'disable_rounded_total'):
-            invoice_doc.disable_rounded_total = pos_profile_doc.disable_rounded_total
-        else:
-            # Default to disable rounding for POS to prevent issues with discounts
-            invoice_doc.disable_rounded_total = 1
+        # ========================================================================
+        # ROUNDING CONFIGURATION
+        # ========================================================================
+        # Load rounding preference from POS Settings
+        # When disabled (0): ERPNext rounds to nearest whole number
+        # When enabled (1): Shows exact amount without rounding
+        # ========================================================================
+        disable_rounded = 1  # Default: disable rounding for POS (show exact amounts)
+
+        if pos_profile:
+            try:
+                pos_settings_value = frappe.db.get_value(
+                    "POS Settings",
+                    {"pos_profile": pos_profile},
+                    "disable_rounded_total"
+                )
+                if pos_settings_value is not None:
+                    disable_rounded = cint(pos_settings_value)
+            except Exception as e:
+                # Log error but continue with default
+                frappe.log_error(f"Error loading rounding setting: {str(e)}", "POS Invoice Creation")
+
+        invoice_doc.disable_rounded_total = disable_rounded
 
         # Populate missing fields (company, currency, accounts, etc.)
         invoice_doc.set_missing_values()
