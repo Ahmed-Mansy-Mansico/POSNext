@@ -463,8 +463,9 @@ export function useInvoice() {
 		const taxAmount = (netAmount * totalTaxRate) / 100
 		item.tax_amount = taxAmount
 
-		// Step 6: Calculate final item amount (net amount + tax)
-		item.amount = netAmount + taxAmount
+		// Step 6: Calculate final item amount (net amount without tax)
+		// Note: Tax is stored separately in item.tax_amount and added at invoice level
+		item.amount = netAmount
 
 		// Vue 3 reactivity tracks mutations automatically - no need to replace array
 	}
