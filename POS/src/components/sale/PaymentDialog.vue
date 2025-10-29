@@ -1,40 +1,42 @@
 <template>
 	<Dialog v-model="show" :options="{ title: 'Complete Payment', size: '2xl' }">
 		<template #body-content>
-			<div class="space-y-6">
+			<div class="space-y-4">
+				<!-- INFORMATION SECTION (TOP) -->
+
 				<!-- Payment Summary Card -->
-				<div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-					<div class="flex justify-between items-start mb-4">
+				<div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+					<div class="flex justify-between items-start mb-3">
 						<div>
-							<div class="text-sm font-medium text-gray-600 mb-1">Total Amount</div>
-							<div class="text-4xl font-bold text-gray-900">
+							<div class="text-xs font-medium text-gray-600 mb-1">Total Amount</div>
+							<div class="text-3xl font-bold text-gray-900">
 								{{ formatCurrency(grandTotal) }}
 							</div>
 						</div>
 						<div class="text-right">
 							<div v-if="remainingAmount > 0" class="mb-2">
 								<div class="text-xs font-medium text-orange-600 mb-1">Remaining</div>
-								<div class="text-2xl font-bold text-orange-600">
+								<div class="text-xl font-bold text-orange-600">
 									{{ formatCurrency(remainingAmount) }}
 								</div>
 							</div>
 							<div v-if="changeAmount > 0">
 								<div class="text-xs font-medium text-green-600 mb-1">Change</div>
-								<div class="text-2xl font-bold text-green-600">
+								<div class="text-xl font-bold text-green-600">
 									{{ formatCurrency(changeAmount) }}
 								</div>
 							</div>
 							<div v-if="totalPaid >= grandTotal && changeAmount === 0" class="flex items-center text-green-600">
-								<svg class="w-6 h-6 mr-1" fill="currentColor" viewBox="0 0 20 20">
+								<svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20">
 									<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
 								</svg>
-								<span class="text-sm font-semibold">Paid in Full</span>
+								<span class="text-xs font-semibold">Paid in Full</span>
 							</div>
 						</div>
 					</div>
 
 					<!-- Progress Bar -->
-					<div class="w-full bg-white rounded-full h-3 overflow-hidden shadow-inner">
+					<div class="w-full bg-white rounded-full h-2.5 overflow-hidden shadow-inner">
 						<div
 							:class="[
 								'h-full transition-all duration-300',
@@ -45,6 +47,103 @@
 					</div>
 					<div class="text-xs text-gray-600 mt-1">
 						{{ formatCurrency(totalPaid) }} paid of {{ formatCurrency(grandTotal) }}
+					</div>
+				</div>
+
+				<!-- Customer Credit Display -->
+				<div
+					v-if="allowCreditSale"
+					:class="[
+						'rounded-lg p-3 border-2',
+						totalAvailableCredit > 0
+							? 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200'
+							: totalAvailableCredit < 0
+							? 'bg-gradient-to-br from-red-50 to-rose-50 border-red-300'
+							: 'bg-gradient-to-br from-gray-50 to-slate-50 border-gray-200'
+					]"
+				>
+					<div class="flex items-center justify-between">
+						<div class="flex items-center space-x-2">
+							<div
+								:class="[
+									'w-8 h-8 rounded-full flex items-center justify-center',
+									totalAvailableCredit > 0
+										? 'bg-emerald-200'
+										: totalAvailableCredit < 0
+										? 'bg-red-200'
+										: 'bg-gray-200'
+								]"
+							>
+								<svg
+									:class="[
+										'w-5 h-5',
+										totalAvailableCredit > 0
+											? 'text-emerald-700'
+											: totalAvailableCredit < 0
+											? 'text-red-700'
+											: 'text-gray-700'
+									]"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										v-if="totalAvailableCredit >= 0"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+									/>
+									<path
+										v-else
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+									/>
+								</svg>
+							</div>
+							<div>
+								<div class="text-xs font-semibold text-gray-800">
+									{{ totalAvailableCredit >= 0 ? 'Customer Credit Available' : 'Customer Outstanding Balance' }}
+								</div>
+								<div v-if="totalAvailableCredit > 0" class="text-xs text-emerald-700">
+									Credit can be applied to invoice
+								</div>
+								<div v-else-if="totalAvailableCredit < 0" class="text-xs text-red-700">
+									Amount owed by customer
+								</div>
+								<div v-else class="text-xs text-gray-600">
+									No outstanding balance
+								</div>
+							</div>
+						</div>
+						<div class="text-right">
+							<div
+								:class="[
+									'text-xs font-medium',
+									totalAvailableCredit > 0
+										? 'text-emerald-700'
+										: totalAvailableCredit < 0
+										? 'text-red-700'
+										: 'text-gray-700'
+								]"
+							>
+								{{ totalAvailableCredit >= 0 ? 'Available' : 'Outstanding' }}
+							</div>
+							<div
+								:class="[
+									'text-2xl font-bold',
+									totalAvailableCredit > 0
+										? 'text-emerald-700'
+										: totalAvailableCredit < 0
+										? 'text-red-700'
+										: 'text-gray-700'
+								]"
+							>
+								{{ formatCurrency(Math.abs(totalAvailableCredit)) }}
+							</div>
+						</div>
 					</div>
 				</div>
 
@@ -103,11 +202,9 @@
 
 				<!-- Payment Methods Grid -->
 				<div>
-					<div class="flex items-center justify-between mb-3">
-						<h3 class="text-sm font-semibold text-gray-700">Payment Methods</h3>
-						<div v-if="remainingAmount > 0" class="text-xs text-gray-500">
-							Click to add payment
-						</div>
+					<h3 class="text-sm font-semibold text-gray-700 mb-3">Payment Methods</h3>
+					<div class="text-xs text-gray-500 mb-2">
+						Select payment method to add
 					</div>
 					<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
 						<button
@@ -231,12 +328,57 @@
 		</template>
 
 		<template #actions>
-			<div class="flex justify-between items-center w-full">
-				<Button variant="subtle" @click="clearAll" v-if="paymentEntries.length > 0" theme="red">
-					Clear All
-				</Button>
-				<div class="flex space-x-2 ml-auto">
-					<Button variant="subtle" @click="show = false">Cancel</Button>
+			<div class="flex flex-col w-full space-y-2">
+				<!-- Top Row: Clear All -->
+				<div v-if="paymentEntries.length > 0" class="flex justify-start">
+					<Button
+						variant="subtle"
+						@click="clearAll"
+						theme="red"
+					>
+						Clear All
+					</Button>
+				</div>
+
+				<!-- Bottom Row: Main Action Buttons -->
+				<div class="flex justify-end items-center w-full space-x-2">
+					<Button variant="subtle" @click="show = false">
+						Cancel
+					</Button>
+
+					<!-- Apply Credit Button (if available) -->
+					<Button
+						v-if="allowCreditSale && totalAvailableCredit > 0 && remainingAmount > 0"
+						variant="solid"
+						@click="applyCustomerCredit"
+					>
+						<template #prefix>
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+							</svg>
+						</template>
+						Apply Credit
+					</Button>
+
+					<!-- Pay on Account Button (if credit sales enabled) -->
+					<button
+						v-if="allowCreditSale"
+						@click="addCreditAccountPayment"
+						:disabled="paymentEntries.length > 0"
+						:class="[
+							'inline-flex items-center justify-center gap-2 transition-colors focus:outline-none shrink-0 h-7 text-base px-2 rounded',
+							paymentEntries.length > 0
+								? 'bg-orange-400 text-ink-white cursor-not-allowed'
+								: 'bg-orange-600 text-ink-white focus-visible:ring focus-visible:ring-orange-400 hover:bg-orange-700 active:bg-orange-800'
+						]"
+					>
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+						</svg>
+						<span class="truncate">Pay on Account</span>
+					</button>
+
+					<!-- Complete/Partial Payment Button -->
 					<Button
 						variant="solid"
 						theme="blue"
@@ -290,6 +432,18 @@ const props = defineProps({
 		type: Boolean,
 		default: false,
 	},
+	allowCreditSale: {
+		type: Boolean,
+		default: false,
+	},
+	customer: {
+		type: [String, Object],
+		default: null,
+	},
+	company: {
+		type: String,
+		default: "",
+	},
 	additionalDiscount: {
 		type: Number,
 		default: 0,
@@ -307,6 +461,9 @@ const paymentMethods = ref([])
 const lastSelectedMethod = ref(null)
 const customAmount = ref("")
 const paymentEntries = ref([])
+const customerCredit = ref([])
+const customerBalance = ref({ total_outstanding: 0, total_credit: 0, net_balance: 0 })
+const loadingCredit = ref(false)
 
 // Additional discount state
 const localAdditionalDiscount = ref(0)
@@ -330,6 +487,53 @@ const paymentMethodsResource = createResource({
 			const defaultMethod = paymentMethods.value.find((m) => m.default)
 			lastSelectedMethod.value = defaultMethod || paymentMethods.value[0]
 		}
+	},
+})
+
+const customerCreditResource = createResource({
+	url: "pos_next.api.credit_sales.get_available_credit",
+	makeParams() {
+		const customerName = props.customer?.name || props.customer
+		console.log('[PaymentDialog] Fetching credit for customer:', customerName)
+		return {
+			customer: customerName,
+			company: props.company,
+			pos_profile: props.posProfile,
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		console.log('[PaymentDialog] Customer credit loaded:', data)
+		customerCredit.value = data || []
+		loadingCredit.value = false
+		console.log('[PaymentDialog] Total available credit:', totalAvailableCredit.value)
+	},
+	onError(error) {
+		console.error("[PaymentDialog] Error loading customer credit:", error)
+		customerCredit.value = []
+		loadingCredit.value = false
+	},
+})
+
+const customerBalanceResource = createResource({
+	url: "pos_next.api.credit_sales.get_customer_balance",
+	makeParams() {
+		const customerName = props.customer?.name || props.customer
+		console.log('[PaymentDialog] Fetching balance for customer:', customerName)
+		return {
+			customer: customerName,
+			company: props.company,
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		console.log('[PaymentDialog] Customer balance loaded:', data)
+		customerBalance.value = data || { total_outstanding: 0, total_credit: 0, net_balance: 0 }
+		console.log('[PaymentDialog] Net balance:', customerBalance.value.net_balance)
+	},
+	onError(error) {
+		console.error("[PaymentDialog] Error loading customer balance:", error)
+		customerBalance.value = { total_outstanding: 0, total_credit: 0, net_balance: 0 }
 	},
 })
 
@@ -369,6 +573,12 @@ const totalPaid = computed(() => {
 		(sum, entry) => sum + (entry.amount || 0),
 		0,
 	)
+})
+
+const totalAvailableCredit = computed(() => {
+	// Use net_balance: negative means customer has credit, positive means they owe
+	// Return negative of net_balance so positive = credit available, negative = outstanding
+	return -customerBalance.value.net_balance
 })
 
 const remainingAmount = computed(() => {
@@ -451,10 +661,34 @@ watch(show, (newVal) => {
 		paymentEntries.value = []
 		customAmount.value = ""
 		lastSelectedMethod.value = null
+		customerCredit.value = []
+		customerBalance.value = { total_outstanding: 0, total_credit: 0, net_balance: 0 }
+
+		// Debug logging
+		console.log('[PaymentDialog] Dialog opened with props:', {
+			allowCreditSale: props.allowCreditSale,
+			customer: props.customer,
+			company: props.company,
+			posProfile: props.posProfile
+		})
 
 		// Load payment methods
 		if (props.posProfile) {
 			loadPaymentMethods()
+		}
+
+		// Load customer credit and balance if enabled and customer is selected
+		if (props.allowCreditSale && props.customer && props.company) {
+			console.log('[PaymentDialog] Loading customer credit and balance...')
+			loadingCredit.value = true
+			customerCreditResource.fetch()
+			customerBalanceResource.fetch()
+		} else {
+			console.log('[PaymentDialog] Not loading credit because:', {
+				allowCreditSale: props.allowCreditSale,
+				hasCustomer: !!props.customer,
+				hasCompany: !!props.company
+			})
 		}
 	}
 })
@@ -500,6 +734,58 @@ function addCustomPayment(method, amount) {
 
 	console.log('[PaymentDialog] Payment added, new entries:', paymentEntries.value)
 	customAmount.value = ""
+}
+
+// Apply existing customer credit to payment
+function applyCustomerCredit() {
+	console.log('[PaymentDialog] Apply customer credit:', {
+		totalCredit: totalAvailableCredit.value,
+		remainingAmount: remainingAmount.value,
+		currentEntries: paymentEntries.value.length
+	})
+
+	if (remainingAmount.value === 0 || totalAvailableCredit.value === 0) return
+
+	// Calculate how much credit to apply (min of remaining amount and available credit)
+	const creditToApply = Math.min(remainingAmount.value, totalAvailableCredit.value)
+
+	// Add credit as a payment entry
+	paymentEntries.value.push({
+		mode_of_payment: "Customer Credit",
+		amount: Number.parseFloat(creditToApply.toFixed(2)),
+		type: "Credit",
+		is_customer_credit: true,
+		credit_details: customerCredit.value.map(credit => ({
+			...credit,
+			credit_to_redeem: 0  // Will be calculated on backend
+		}))
+	})
+
+	console.log('[PaymentDialog] Existing credit applied, new entries:', paymentEntries.value)
+}
+
+// Add "Pay on Account" - Credit Sale (invoice with outstanding amount)
+function addCreditAccountPayment() {
+	console.log('[PaymentDialog] Add credit account payment (Pay Later):', {
+		grandTotal: props.grandTotal,
+		currentPaid: totalPaid.value,
+		remainingAmount: remainingAmount.value
+	})
+
+	// Close dialog and complete as credit sale (0 payment)
+	// The backend will create an invoice with outstanding amount
+	const paymentData = {
+		payments: [],  // No payments - full amount on credit
+		change_amount: 0,
+		is_partial_payment: false,
+		is_credit_sale: true,  // Mark as credit sale
+		paid_amount: 0,
+		outstanding_amount: props.grandTotal,
+	}
+
+	console.log('[PaymentDialog] Emitting credit sale payment-completed:', paymentData)
+	emit("payment-completed", paymentData)
+	show.value = false
 }
 
 function removePaymentEntry(index) {
@@ -568,6 +854,7 @@ function getPaymentIcon(type) {
 		Bank: "🏦",
 		Phone: "📱",
 		Wallet: "👛",
+		Credit: "💚",
 		"Credit Card": "💳",
 		"Debit Card": "💳",
 		"Mobile Money": "📱",

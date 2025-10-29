@@ -138,7 +138,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			selling_price_list: currentProfile?.selling_price_list,
 			currency: currentProfile?.currency,
 			discount_amount: additionalDiscount.value || 0,
-			coupon_code: couponCode.value || "",
+			coupon_code: appliedCoupon.value?.name || "",
 			items: invoiceItems.value.map((item) => ({
 				item_code: item.item_code,
 				item_name: item.item_name,

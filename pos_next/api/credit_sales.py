@@ -17,42 +17,92 @@ from frappe.utils import flt, nowdate, today, cint, get_datetime
 @frappe.whitelist()
 def get_customer_balance(customer, company=None):
 	"""
-	Get customer outstanding balance from GL Entries.
+	Get customer outstanding balance from Sales Invoices.
 
 	Args:
 		customer: Customer ID
 		company: Company (optional filter)
 
 	Returns:
-		float: Outstanding balance (positive = customer owes, negative = customer has credit)
+		dict: {
+			'total_outstanding': float (positive = customer owes),
+			'total_credit': float (positive = customer has credit),
+			'net_balance': float (positive = customer owes, negative = customer has credit)
+		}
 	"""
 	if not customer:
 		frappe.throw(_("Customer is required"))
 
 	filters = {
-		"party_type": "Customer",
-		"party": customer,
+		"customer": customer,
 		"docstatus": 1
 	}
 
 	if company:
 		filters["company"] = company
 
-	balance = frappe.db.sql("""
-		SELECT SUM(debit - credit) AS balance
-		FROM `tabGL Entry`
-		WHERE party_type = %(party_type)s
-			AND party = %(party)s
+	# Get total outstanding (positive outstanding = customer owes)
+	total_outstanding = frappe.db.sql("""
+		SELECT SUM(outstanding_amount) AS total
+		FROM `tabSales Invoice`
+		WHERE customer = %(customer)s
 			AND docstatus = %(docstatus)s
+			AND outstanding_amount > 0
 			{company_condition}
 	""".format(
 		company_condition="AND company = %(company)s" if company else ""
 	), filters, as_dict=True)
 
-	if balance and len(balance) > 0:
-		return flt(balance[0].get("balance", 0))
+	outstanding = flt(total_outstanding[0].get("total", 0) if total_outstanding else 0)
 
-	return 0.0
+	# Get total credit (negative outstanding = customer has credit)
+	total_credit = frappe.db.sql("""
+		SELECT SUM(ABS(outstanding_amount)) AS total
+		FROM `tabSales Invoice`
+		WHERE customer = %(customer)s
+			AND docstatus = %(docstatus)s
+			AND outstanding_amount < 0
+			{company_condition}
+	""".format(
+		company_condition="AND company = %(company)s" if company else ""
+	), filters, as_dict=True)
+
+	credit = flt(total_credit[0].get("total", 0) if total_credit else 0)
+
+	# Get unallocated advances
+	advance_filters = {
+		"party": customer,
+		"docstatus": 1,
+		"payment_type": "Receive"
+	}
+	if company:
+		advance_filters["company"] = company
+
+	advances = frappe.db.sql("""
+		SELECT SUM(unallocated_amount) AS total
+		FROM `tabPayment Entry`
+		WHERE party = %(party)s
+			AND docstatus = %(docstatus)s
+			AND payment_type = %(payment_type)s
+			AND unallocated_amount > 0
+			{company_condition}
+	""".format(
+		company_condition="AND company = %(company)s" if company else ""
+	), advance_filters, as_dict=True)
+
+	advance_credit = flt(advances[0].get("total", 0) if advances else 0)
+
+	# Total credit includes both negative outstanding and advances
+	total_credit_available = credit + advance_credit
+
+	# Net balance: positive = owes, negative = has credit
+	net_balance = outstanding - total_credit_available
+
+	return {
+		"total_outstanding": outstanding,
+		"total_credit": total_credit_available,
+		"net_balance": net_balance
+	}
 
 
 def check_credit_sale_enabled(pos_profile):
