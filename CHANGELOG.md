@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2025-10-29
+
 ### Added
 - **Payment Dialog: Customer Credit/Outstanding Balance Display**
   - Real-time customer balance display with color-coded indicators
