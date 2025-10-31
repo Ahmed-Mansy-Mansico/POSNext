@@ -427,7 +427,10 @@ def get_item_variants(template_item, pos_profile):
 			for attr in attributes:
 				if attr["parent"] not in attributes_map:
 					attributes_map[attr["parent"]] = {}
-				attributes_map[attr["parent"]][attr["attribute"]] = attr["attribute_value"]
+				attributes_map[attr["parent"]][attr["attribute"]] = {
+					"title": frappe.db.get_value(attr["attribute"], attr["attribute_value"], "title"),
+					"value": attr["attribute_value"]
+				}
 
 		# Batch query stock for all variants at once (performance optimization)
 		stock_map = {}

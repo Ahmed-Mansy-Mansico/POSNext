@@ -32,21 +32,22 @@
 					</div>
 
 					<!-- Group variants by attributes -->
+					<!-- Group variants by attributes -->
 					<div v-for="(values, attrName) in variantAttributesMap" :key="attrName" class="space-y-2">
 						<label class="text-sm font-semibold text-gray-900">{{ attrName }}</label>
 						<div class="flex flex-wrap gap-2">
 							<button
-								v-for="value in values"
-								:key="value"
-								@click="selectAttribute(attrName, value)"
+								v-for="valueObj in values"
+								:key="valueObj.value"
+								@click="selectAttribute(attrName, valueObj.value)"
 								:class="[
 									'px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all',
-									selectedAttributes[attrName] === value
+									selectedAttributes[attrName] === valueObj.value
 										? 'border-blue-500 bg-blue-500 text-white'
 										: 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
 								]"
 							>
-								{{ value }}
+								{{ valueObj.title || valueObj.value }}
 							</button>
 						</div>
 					</div>
@@ -200,14 +201,25 @@ const variantAttributesMap = computed(() => {
 			if (!attrMap[key]) {
 				attrMap[key] = new Set()
 			}
-			attrMap[key].add(value)
+			// Handle both object format {title, value} and string format
+			if (typeof value === 'object' && value !== null) {
+				attrMap[key].add(JSON.stringify(value))
+			} else {
+				attrMap[key].add(value)
+			}
 		})
 	})
 
-	// Convert Sets to sorted Arrays
+	// Convert Sets to sorted Arrays and parse objects
 	const result = {}
 	Object.keys(attrMap).forEach((key) => {
-		result[key] = Array.from(attrMap[key]).sort()
+		result[key] = Array.from(attrMap[key]).map(item => {
+			try {
+				return JSON.parse(item)
+			} catch {
+				return { title: item, value: item }
+			}
+		}).sort((a, b) => (a.title || a.value).localeCompare(b.title || b.value))
 	})
 
 	return result
@@ -228,7 +240,12 @@ const matchedVariant = computed(() => {
 
 	return options.value.find((option) => {
 		return Object.entries(selectedAttributes.value).every(([key, value]) => {
-			return option.attributes[key] === value
+			const optionAttr = option.attributes[key]
+			// Handle both object format {title, value} and string format
+			if (typeof optionAttr === 'object' && optionAttr !== null) {
+				return optionAttr.value === value
+			}
+			return optionAttr === value
 		})
 	})
 })

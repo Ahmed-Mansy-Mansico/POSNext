@@ -512,7 +512,8 @@ def get_credit_invoices(pos_profile, limit=100):
 	# Check if user has access to this POS Profile
 	has_access = frappe.db.exists(
 		"POS Profile User",
-		{"parent": pos_profile, "user": frappe.session.user}
+		{"parent": pos_profile, "user": frappe.session.user},
+
 	)
 
 	if not has_access and not frappe.has_permission("Sales Invoice", "read"):

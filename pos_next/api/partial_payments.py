@@ -23,7 +23,7 @@ def get_partial_paid_invoices(pos_profile, limit=50):
 	# Check if user has access to this POS Profile
 	has_access = frappe.db.exists(
 		"POS Profile User",
-		{"parent": pos_profile, "user": frappe.session.user}
+		{"parent": pos_profile, "user": frappe.session.user},
 	)
 
 	if not has_access and not frappe.has_permission("Sales Invoice", "read"):
@@ -228,7 +228,8 @@ def get_partial_payment_summary(pos_profile):
 	# Check if user has access to this POS Profile
 	has_access = frappe.db.exists(
 		"POS Profile User",
-		{"parent": pos_profile, "user": frappe.session.user}
+		{"parent": pos_profile, "user": frappe.session.user},
+
 	)
 
 	if not has_access and not frappe.has_permission("Sales Invoice", "read"):
@@ -275,7 +276,8 @@ def get_unpaid_invoices(pos_profile, limit=100):
 	# Check if user has access to this POS Profile
 	has_access = frappe.db.exists(
 		"POS Profile User",
-		{"parent": pos_profile, "user": frappe.session.user}
+		{"parent": pos_profile, "user": frappe.session.user},
+
 	)
 
 	if not has_access and not frappe.has_permission("Sales Invoice", "read"):
@@ -347,7 +349,8 @@ def get_unpaid_summary(pos_profile):
 	# Check if user has access to this POS Profile
 	has_access = frappe.db.exists(
 		"POS Profile User",
-		{"parent": pos_profile, "user": frappe.session.user}
+		{"parent": pos_profile, "user": frappe.session.user},
+
 	)
 
 	if not has_access and not frappe.has_permission("Sales Invoice", "read"):

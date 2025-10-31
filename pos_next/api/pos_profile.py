@@ -35,7 +35,7 @@ def get_pos_profile_data(pos_profile):
 	# Check if user has access to this POS Profile
 	has_access = frappe.db.exists(
 		"POS Profile User",
-		{"parent": pos_profile, "user": frappe.session.user}
+		{"parent": pos_profile, "user": frappe.session.user},
 	)
 
 	if not has_access:
@@ -168,7 +168,7 @@ def update_warehouse(pos_profile, warehouse):
 		# Check if user has access to this POS Profile
 		has_access = frappe.db.exists(
 			"POS Profile User",
-			{"parent": pos_profile, "user": frappe.session.user}
+			{"parent": pos_profile, "user": frappe.session.user},
 		)
 
 		if not has_access and not frappe.has_permission("POS Profile", "write"):

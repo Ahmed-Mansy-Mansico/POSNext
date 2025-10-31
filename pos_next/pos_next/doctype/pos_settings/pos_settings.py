@@ -86,7 +86,7 @@ def get_pos_settings(pos_profile):
 	# Check if user has access to this POS Profile
 	has_access = frappe.db.exists(
 		"POS Profile User",
-		{"parent": pos_profile, "user": frappe.session.user}
+		{"parent": pos_profile, "user": frappe.session.user},
 	)
 
 	if not has_access and not frappe.has_permission("POS Settings", "read"):
@@ -134,7 +134,7 @@ def update_pos_settings(pos_profile, settings):
 	# Check if user has access to this POS Profile
 	has_access = frappe.db.exists(
 		"POS Profile User",
-		{"parent": pos_profile, "user": frappe.session.user}
+		{"parent": pos_profile, "user": frappe.session.user},
 	)
 
 	if not has_access and not frappe.has_permission("POS Settings", "write"):
