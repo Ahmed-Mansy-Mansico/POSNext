@@ -262,10 +262,30 @@
 							<h3 class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
 								{{ item.item_name }}
 							</h3>
-                                                        <p class="text-[9px] sm:text-[10px] text-gray-500 leading-tight">
-                                                                <span class="font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</span>
-                                                                <span class="text-gray-400">/ {{ item.uom || item.stock_uom || 'Nos' }}</span>
-                                                        </p>
+							<div class="text-[8px] sm:text-[9px] text-gray-500 leading-tight space-y-0.5">
+								<!-- List Price -->
+								<div v-if="item.price_list_rate" class="flex items-center justify-between">
+									<span class="text-gray-400">List:</span>
+									<span class="font-medium text-gray-600">{{ formatCurrency(item.price_list_rate) }}</span>
+								</div>
+								
+								<!-- Discount Amount -->
+								<div v-if="item.discount_amount && item.discount_amount > 0" class="flex items-center justify-between">
+									<span class="text-red-500">Discount:</span>
+									<span class="font-medium text-red-600">-{{ formatCurrency(item.discount_amount) }}</span>
+								</div>
+								
+								<!-- Final Rate -->
+								<div class="flex items-center justify-between border-t border-gray-200 pt-0.5">
+									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Rate:</span>
+									<div class="text-right">
+										<div class="font-bold text-blue-600 text-[10px] sm:text-xs">
+											{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
+										</div>
+										<div class="text-gray-400 text-[8px]">/ {{ item.uom || item.stock_uom || 'Nos' }}</div>
+									</div>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -393,7 +413,24 @@
 							</td>
 							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{{ item.item_name }}</div></td>
 							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.item_code }}</div></td>
-							<td class="px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</div></td>
+							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
+								<div class="text-xs space-y-1">
+									<!-- List Price -->
+									<div v-if="item.price_list_rate" class="text-gray-500">
+										List: <span class="font-medium">{{ formatCurrency(item.price_list_rate) }}</span>
+									</div>
+									
+									<!-- Discount Amount -->
+									<div v-if="item.discount_amount && item.discount_amount > 0" class="text-red-600">
+										Discount: <span class="font-medium">-{{ formatCurrency(item.discount_amount) }}</span>
+									</div>
+									
+									<!-- Final Rate -->
+									<div class="font-semibold text-blue-600 text-sm">
+										Rate: {{ formatCurrency(item.rate || item.price_list_rate || 0) }}
+									</div>
+								</div>
+							</td>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
 								<span
 									:class="[

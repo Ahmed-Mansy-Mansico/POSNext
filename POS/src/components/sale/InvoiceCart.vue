@@ -207,26 +207,47 @@
 							</div>
 
 							<!-- Price & UOM Row -->
-							<div class="flex items-center flex-wrap gap-1.5 mb-1.5">
-								<div class="flex items-center gap-1">
-									<span class="text-[11px] sm:text-xs font-bold text-gray-900">
+							<div class="mb-1.5">
+								<!-- Pricing Details -->
+								<div class="text-[9px] sm:text-[10px] text-gray-500 space-y-0.5 mb-1">
+									<!-- List Price -->
+									<div v-if="item.price_list_rate" class="flex items-center justify-between">
+										<span class="text-gray-400">List:</span>
+										<span class="font-medium text-gray-600">{{ formatCurrency(item.price_list_rate) }}</span>
+									</div>
+									
+									<!-- Discount Amount - Check multiple possible fields -->
+									<div v-if="getDiscountAmount(item) > 0" class="flex items-center justify-between">
+										<span class="text-red-500">Discount:</span>
+										<span class="font-medium text-red-600">-{{ formatCurrency(getDiscountAmount(item)) }}</span>
+									</div>
+								</div>
+
+								<!-- Final Rate & UOM -->
+								<div class="flex items-center gap-1 border-t border-gray-200 pt-1">
+									<span class="text-[11px] sm:text-xs font-bold text-blue-600">
 										{{ formatCurrency(item.rate) }}
 									</span>
 									<span class="text-[10px] text-gray-500">/</span>
 									<span class="inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] sm:text-xs font-semibold">
 										{{ item.uom || item.stock_uom || 'Nos' }}
 									</span>
-								</div>
 
-								<!-- Discount Badge if any -->
-								<div
-									v-if="item.discount_amount && item.discount_amount > 0"
-									class="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-red-50 to-orange-50 text-red-700 rounded-full text-[9px] font-bold border border-red-200"
-								>
-									<svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-										<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
-									</svg>
-									{{ item.discount_percentage }}% OFF
+									<!-- Discount Badge if any -->
+									<div
+										v-if="getDiscountAmount(item) > 0"
+										class="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-red-50 to-orange-50 text-red-700 rounded-full text-[8px] font-bold border border-red-200 ml-1"
+									>
+										<svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+											<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+										</svg>
+										<span v-if="item.discount_percentage && item.discount_percentage > 0">
+											{{ item.discount_percentage }}% OFF
+										</span>
+										<span v-else>
+											{{ formatCurrency(getDiscountAmount(item)) }} OFF
+										</span>
+									</div>
 								</div>
 							</div>
 
@@ -537,6 +558,41 @@ const cartStore = usePOSCartStore()
 const offersStore = usePOSOffersStore()
 const settingsStore = usePOSSettingsStore()
 
+// Helper method to extract discount amount from various possible fields
+const getDiscountAmount = (item) => {
+	// Check various fields where discount might be stored
+	const discountAmount = item.discount_amount || 
+						   item.discount || 
+						   item.pricing_rule_discount || 
+						   item.margin_rate_or_amount || 
+						   (item.pricing_rules && item.pricing_rules.length > 0 ? item.pricing_rules[0].discount_amount : 0) ||
+						   0
+	
+	// Debug logging to help identify discount sources
+	if (discountAmount > 0) {
+		console.log(`Discount found for ${item.item_code}:`, {
+			discount_amount: item.discount_amount,
+			discount: item.discount,
+			pricing_rule_discount: item.pricing_rule_discount,
+			margin_rate_or_amount: item.margin_rate_or_amount,
+			pricing_rules: item.pricing_rules,
+			discount_percentage: item.discount_percentage,
+			final_discount: discountAmount
+		})
+	} else {
+		// Also log when no discount is found to see the structure
+		console.log(`No discount for ${item.item_code}:`, {
+			discount_amount: item.discount_amount,
+			discount: item.discount,
+			pricing_rule_discount: item.pricing_rule_discount,
+			discount_percentage: item.discount_percentage,
+			full_item: item
+		})
+	}
+	
+	return discountAmount
+}
+
 const props = defineProps({
 	items: {
 		type: Array,
@@ -588,6 +644,7 @@ const emit = defineEmits([
 	"remove-offer",
 	"update-uom",
 	"edit-item",
+	"refresh-pricing",
 ])
 
 const customerSearch = ref("")
@@ -736,6 +793,20 @@ watch(customerResults, () => {
 	selectedIndex.value = -1
 })
 
+// Debug watch for items to see their structure
+watch(() => props.items, (newItems) => {
+	if (newItems && newItems.length > 0) {
+		console.log("Cart items updated:", newItems.map(item => ({
+			item_code: item.item_code,
+			item_name: item.item_name,
+			rate: item.rate,
+			price_list_rate: item.price_list_rate,
+			discount_amount: item.discount_amount,
+			discount_percentage: item.discount_percentage
+		})))
+	}
+}, { deep: true })
+
 const totalQuantity = computed(() => {
 	return props.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
 })
@@ -838,8 +909,22 @@ function selectUom(item, uom) {
 	handleUomChange(item, uom)
 }
 
-function openEditDialog(item) {
-	selectedItem.value = { ...item }
+async function openEditDialog(item) {
+	// Fetch latest pricing information including discount from pricing rules
+	try {
+		// Check if the refreshItemPricing method exists in the store
+		if (typeof cartStore.refreshItemPricing === 'function') {
+			const updatedItem = await cartStore.refreshItemPricing(item.item_code)
+			selectedItem.value = { ...item, ...updatedItem }
+		} else {
+			// Fallback: Use the existing item data
+			console.warn("cartStore.refreshItemPricing method not implemented")
+			selectedItem.value = { ...item }
+		}
+	} catch (error) {
+		console.error("Error fetching pricing information:", error)
+		selectedItem.value = { ...item }
+	}
 	showEditDialog.value = true
 }
 
@@ -873,9 +958,25 @@ function handleOutsideClick(event) {
 	}
 }
 
-onMounted(() => {
+onMounted(async () => {
 	if (typeof document === "undefined") return
 	document.addEventListener("click", handleOutsideClick)
+	
+	// Refresh pricing information for all items in cart to ensure discount amounts are up to date
+	if (props.items.length > 0) {
+		try {
+			// Check if the refreshAllItemsPricing method exists in the store
+			if (typeof cartStore.refreshAllItemsPricing === 'function') {
+				await cartStore.refreshAllItemsPricing()
+			} else {
+				console.warn("cartStore.refreshAllItemsPricing method not implemented")
+				// Emit event to parent to refresh pricing
+				emit('refresh-pricing')
+			}
+		} catch (error) {
+			console.error("Error refreshing cart items pricing:", error)
+		}
+	}
 })
 
 onBeforeUnmount(() => {

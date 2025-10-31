@@ -155,8 +155,8 @@ export function useInvoice() {
 				rate: item.rate || item.price_list_rate || 0,
 				price_list_rate: item.price_list_rate || item.rate || 0,
 				quantity: quantity,
-				discount_amount: 0,
-				discount_percentage: 0,
+				discount_amount: item.discount_amount || 0,
+				discount_percentage: item.discount_percentage || 0,
 				tax_amount: 0,
 				amount: quantity * (item.rate || item.price_list_rate || 0),
 				stock_qty: item.stock_qty || 0,
@@ -174,6 +174,10 @@ export function useInvoice() {
 				// Add item_group and brand for offer eligibility checking
 				item_group: item.item_group,
 				brand: item.brand,
+				// Preserve pricing rule information
+				pricing_rules: item.pricing_rules || [],
+				margin_rate_or_amount: item.margin_rate_or_amount || 0,
+				pricing_rule_discount: item.pricing_rule_discount || 0,
 			}
 			invoiceItems.value.push(newItem)
 			// Recalculate the newly added item to apply taxes

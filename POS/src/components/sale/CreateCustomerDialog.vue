@@ -144,8 +144,8 @@ const customerData = ref({
 	customer_name: "",
 	mobile_no: "",
 	email_id: "",
-	customer_group: "Individual",
-	territory: "All Territories",
+	customer_group: "",
+	territory: "",
 })
 
 // Watch for dialog open and populate initial name
@@ -160,8 +160,8 @@ watch(
 				customer_name: "",
 				mobile_no: "",
 				email_id: "",
-				customer_group: "Individual",
-				territory: "All Territories",
+				customer_group: "",
+				territory: "",
 			}
 		}
 	},
@@ -176,8 +176,8 @@ const createCustomerResource = createResource({
 				doctype: "Customer",
 				customer_name: customerData.value.customer_name,
 				customer_type: "Individual",
-				customer_group: customerData.value.customer_group || "Individual",
-				territory: customerData.value.territory || "All Territories",
+				customer_group: customerData.value.customer_group,
+				territory: customerData.value.territory,
 				mobile_no: customerData.value.mobile_no || "",
 				email_id: customerData.value.email_id || "",
 			},
@@ -307,8 +307,8 @@ function resetForm() {
 		customer_name: "",
 		mobile_no: "",
 		email_id: "",
-		customer_group: "Individual",
-		territory: "All Territories",
+		customer_group: "",
+		territory: "",
 	}
 }
 </script>

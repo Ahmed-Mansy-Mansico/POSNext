@@ -1288,7 +1288,7 @@ function handleShiftClosed() {
 	}
 }
 
-function handleItemSelected(item, autoAdd = false) {
+async function handleItemSelected(item, autoAdd = false) {
 	// Auto-add mode
 	if (autoAdd) {
 		try {
@@ -1335,15 +1335,45 @@ function handleItemSelected(item, autoAdd = false) {
 		return
 	}
 
-	// Add to cart
+	// Fetch item details with pricing rules before adding to cart
 	try {
-		cartStore.addItem(item, 1, false, shiftStore.currentProfile)
+		const itemDetails = await cartStore.getItemDetailsResource.submit({
+			item_code: item.item_code,
+			pos_profile: shiftStore.currentProfile?.name || cartStore.posProfile,
+			customer: cartStore.customer?.name || cartStore.customer,
+			qty: 1,
+			uom: item.uom || item.stock_uom,
+		})
+
+		// Merge the fetched pricing details with the original item
+		const itemWithPricing = {
+			...item,
+			...itemDetails,
+			// Preserve essential fields from original item
+			item_name: item.item_name,
+			image: item.image,
+			item_uoms: item.item_uoms,
+			has_batch_no: item.has_batch_no,
+			has_serial_no: item.has_serial_no,
+			warehouse: item.warehouse,
+			actual_qty: item.actual_qty,
+			stock_qty: item.stock_qty,
+		}
+
+		// Add to cart with pricing information
+		cartStore.addItem(itemWithPricing, 1, false, shiftStore.currentProfile)
 	} catch (error) {
-		uiStore.showError(
-			"Insufficient Stock",
-			error.message,
-			`Item: ${item.item_code}`,
-		)
+		// Fallback: add item without pricing details if API fails
+		console.warn("Failed to fetch pricing details, adding item without discounts:", error)
+		try {
+			cartStore.addItem(item, 1, false, shiftStore.currentProfile)
+		} catch (stockError) {
+			uiStore.showError(
+				"Insufficient Stock",
+				stockError.message,
+				`Item: ${item.item_code}`,
+			)
+		}
 	}
 }
 
