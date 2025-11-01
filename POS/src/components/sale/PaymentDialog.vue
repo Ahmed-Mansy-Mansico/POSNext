@@ -568,6 +568,20 @@ async function loadPaymentMethods() {
 	}
 }
 
+// Helper function to compare amounts with tolerance for floating-point precision
+function isAmountPaid(greaterThanOrEqual, paid, total) {
+	// Round both amounts to 2 decimal places (standard currency precision)
+	// This handles cases like 399.456 or 329.00005 by normalizing to 2 decimal places
+	const roundedPaid = Math.round(paid * 100) / 100
+	const roundedTotal = Math.round(total * 100) / 100
+	
+	// Use a small tolerance (0.01) to handle any remaining floating-point precision issues
+	// If the difference is less than 0.01, consider them equal
+	const tolerance = 0.01
+	const difference = Math.abs(roundedPaid - roundedTotal)
+	return greaterThanOrEqual ? roundedPaid >= roundedTotal || difference < tolerance : roundedPaid < roundedTotal && difference >= tolerance
+}
+
 const totalPaid = computed(() => {
 	return paymentEntries.value.reduce(
 		(sum, entry) => sum + (entry.amount || 0),
@@ -596,8 +610,8 @@ const canComplete = computed(() => {
 	if (props.allowPartialPayment) {
 		return totalPaid.value > 0 && paymentEntries.value.length > 0
 	}
-	// Otherwise require full payment
-	return totalPaid.value >= props.grandTotal && paymentEntries.value.length > 0
+	// Otherwise require full payment (use tolerance-based comparison)
+	return isAmountPaid(true, totalPaid.value, props.grandTotal) && paymentEntries.value.length > 0
 })
 
 const paymentButtonText = computed(() => {
@@ -605,10 +619,12 @@ const paymentButtonText = computed(() => {
 		totalPaid: totalPaid.value,
 		grandTotal: props.grandTotal,
 		allowPartialPayment: props.allowPartialPayment,
-		canComplete: canComplete.value
+		canComplete: canComplete.value,
+		difference: Math.abs(totalPaid.value - props.grandTotal)
 	})
 
-	if (totalPaid.value >= props.grandTotal) {
+	// Use tolerance-based comparison to handle floating-point precision
+	if (isAmountPaid(true, totalPaid.value, props.grandTotal)) {
 		return "Complete Payment"
 	}
 	if (props.allowPartialPayment && totalPaid.value > 0) {
@@ -818,7 +834,8 @@ function completePayment() {
 		return
 	}
 
-	const isPartial = totalPaid.value < props.grandTotal
+	// Use tolerance-based comparison to handle floating-point precision
+	const isPartial = !isAmountPaid(true, totalPaid.value, props.grandTotal)
 
 	const paymentData = {
 		payments: paymentEntries.value,
