@@ -568,6 +568,33 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			params.extend(score_params)
 			params.extend([limit, start])
 			items = frappe.db.sql(query, tuple(params), as_dict=1)
+			
+			# When searching for template items, also include their variants in results
+			# Check if any of the search results are template items (has_variants=1)
+			template_items = [item for item in items if item.get("has_variants")]
+			if template_items:
+				# Get all variants for template items that match the search
+				template_codes = [item["item_code"] for item in template_items]
+				variant_filters = {
+					"variant_of": ["in", template_codes],
+					"disabled": 0,
+					"is_sales_item": 1,
+				}
+				
+				# Add company filter for variants
+				if pos_profile_doc.company:
+					variant_filters["ifnull(custom_company, '')"] = ["in", [pos_profile_doc.company, ""]]
+				
+				variants = frappe.get_all(
+					"Item",
+					filters=variant_filters,
+					fields=ITEM_RESULT_FIELDS,
+					order_by="item_name asc",
+				)
+				
+				# Add variants to the search results
+				if variants:
+					items.extend(variants)
 		else:
 			# No search term - return all items with base filters
 			items = frappe.get_list(

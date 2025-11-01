@@ -131,12 +131,23 @@
 								v-model="customerData.mobile_no"
 								type="text"
 								placeholder="Enter mobile number"
-								class="w-full"
+								:class="[
+									'w-full',
+									mobileValidationError ? 'border-red-500 focus:ring-red-500' : ''
+								]"
+								@input="validateMobileNumber"
 							/>
 						</div>
 					</div>
+					<!-- Mobile Validation Error -->
+					<p v-if="mobileValidationError" class="mt-1 text-xs text-red-600 flex items-center">
+						<svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+						</svg>
+						{{ mobileValidationError }}
+					</p>
 					<!-- Selected Country Info (optional helper text) -->
-					<p v-if="getSelectedCountryName()" class="mt-1 text-xs text-gray-500 flex items-center">
+					<p v-if="getSelectedCountryName() && !mobileValidationError" class="mt-1 text-xs text-gray-500 flex items-center">
 						<span>Selected:</span>
 						<!-- Flag Image with Emoji Fallback -->
 						<img 
@@ -321,12 +332,234 @@ const customerData = ref({
 	territory: "",
 })
 
+// Mobile number validation error message
+const mobileValidationError = ref("")
+
+// Phone number validation patterns by country code
+// Format: { countryCode: { pattern: regex, message: error message, example: example format } }
+const phoneValidationPatterns = {
+	"+966": {
+		// Saudi Arabia: Mobile numbers only
+		// Mobile: 5X XXXXXXX (50-59 followed by 7 digits = 9 digits, or 05X + 7 digits = 10 digits with leading 0)
+		// Examples: 540562793, 551552999, 570851040, 0501234567, 501234567
+		pattern: /^0?5[0-9]\d{7}$/,
+		message: "Saudi Arabia mobile numbers must start with 5 (50-59) followed by 7 digits (e.g., 0501234567 or 501234567)",
+		example: "0501234567"
+	},
+	"+20": {
+		// Egypt: Mobile numbers start with 01 followed by 9 digits (11 digits total)
+		// Format: 01XXXXXXXXX (e.g., 01012345678, 01091710358)
+		// Second digit after 0 can be 0, 1, 2, or 5
+		pattern: /^0?1[0125]\d{8}$/,
+		message: "Egypt mobile numbers must start with 01 followed by 9 digits (e.g., 01012345678). The second digit must be 0, 1, 2, or 5.",
+		example: "01012345678"
+	},
+	"+971": {
+		// UAE: Mobile numbers only
+		// Mobile: 050, 052, 054, 055, 056, 058 (5X where X is even or 5) followed by 7 digits (9 digits total, or 10 with leading 0)
+		// Examples: 501234567, 551234567, 0501234567
+		pattern: /^0?5[024568]\d{7}$/,
+		message: "UAE mobile numbers must start with 50, 52, 54, 55, 56, or 58 followed by 7 digits (e.g., 0501234567 or 501234567)",
+		example: "0501234567"
+	},
+	"+965": {
+		// Kuwait: Mobile numbers only
+		// Mobile: 5, 6, 9 followed by 7 digits (8 digits total, or 9 with leading 0)
+		// Examples: 51234567, 61234567, 91234567, 051234567
+		pattern: /^0?[569]\d{7}$/,
+		message: "Kuwait mobile numbers must start with 5, 6, or 9 followed by 7 digits (e.g., 51234567 or 051234567)",
+		example: "51234567"
+	},
+	"+974": {
+		// Qatar: Mobile numbers only
+		// Mobile: 3, 5, 6, 7 followed by 7 digits (8 digits total, or 9 with leading 0)
+		// Examples: 33123456, 55123456, 033123456
+		pattern: /^0?[3567]\d{7}$/,
+		message: "Qatar mobile numbers must start with 3, 5, 6, or 7 followed by 7 digits (e.g., 33123456 or 033123456)",
+		example: "33123456"
+	},
+	"+968": {
+		// Oman: Mobile numbers only
+		// Mobile: 9 followed by 7 digits (8 digits total, or 9 with leading 0)
+		// Examples: 91234567, 091234567
+		pattern: /^0?9\d{7}$/,
+		message: "Oman mobile numbers must start with 9 followed by 7 digits (e.g., 91234567 or 091234567)",
+		example: "91234567"
+	},
+	"+973": {
+		// Bahrain: Mobile numbers only
+		// Mobile: 3 followed by 7 digits (8 digits total, or 9 with leading 0)
+		// Examples: 31234567, 031234567
+		pattern: /^0?3\d{7}$/,
+		message: "Bahrain mobile numbers must start with 3 followed by 7 digits (e.g., 31234567 or 031234567)",
+		example: "31234567"
+	},
+	"+961": {
+		// Lebanon: Mobile numbers only
+		// Mobile: 3, 7, 70, 71, 76, 78, 79, 81 followed by 6-7 digits
+		// Examples: 3123456, 70123456, 703123456
+		pattern: /^0?([37]\d{6,7}|70\d{6}|71\d{6}|76\d{6}|78\d{6}|79\d{6}|81\d{6})$/,
+		message: "Lebanon mobile numbers must start with 3, 7, 70, 71, 76, 78, 79, or 81 followed by 6-7 digits (e.g., 3123456 or 70123456)",
+		example: "3123456"
+	},
+	"+962": {
+		// Jordan: Mobile numbers only
+		// Mobile: 7 followed by 8 digits (9 digits total, or 10 with leading 0)
+		// Examples: 712345678, 0712345678
+		pattern: /^0?7\d{8}$/,
+		message: "Jordan mobile numbers must start with 7 followed by 8 digits (e.g., 712345678 or 0712345678)",
+		example: "712345678"
+	},
+	"+212": {
+		// Morocco: Mobile numbers only
+		// Mobile: 6, 7 followed by 8 digits (9 digits total, or 10 with leading 0)
+		// Examples: 612345678, 712345678, 0612345678
+		pattern: /^0?[67]\d{8}$/,
+		message: "Morocco mobile numbers must start with 6 or 7 followed by 8 digits (e.g., 612345678 or 0612345678)",
+		example: "612345678"
+	},
+	"+1": {
+		// USA/Canada: 10 digits total (no leading 0)
+		// Area code: 2-9 followed by 2 digits, exchange: 2-9 followed by 6 digits
+		// Format: NXX-NXX-XXXX where N=2-9, X=0-9
+		// Examples: 2125551234, 4161234567, 6041234567
+		pattern: /^[2-9]\d{2}[2-9]\d{6}$/,
+		message: "USA/Canada: 10 digits (XXX-XXX-XXXX). Area code and exchange cannot start with 0 or 1.",
+		example: "2125551234"
+	},
+	"+44": {
+		// UK: Mobile numbers only
+		// Mobile: 7 followed by 9 digits (10 digits total with leading 0, or 9 without)
+		// Examples: 7123456789, 07123456789
+		pattern: /^0?7\d{9}$/,
+		message: "UK mobile numbers must start with 7 followed by 9 digits (e.g., 7123456789 or 07123456789)",
+		example: "7123456789"
+	},
+	"+33": {
+		// France: Mobile numbers only
+		// Mobile: 6, 7 followed by 8 digits (9 digits total, or 10 with leading 0)
+		// Examples: 612345678, 712345678, 0612345678
+		pattern: /^0?[67]\d{8}$/,
+		message: "France mobile numbers must start with 6 or 7 followed by 8 digits (e.g., 612345678 or 0612345678)",
+		example: "612345678"
+	},
+	"+49": {
+		// Germany: Mobile numbers only
+		// Mobile: 15, 16, 17 followed by 8-9 digits (11-12 digits total, or 12-13 with leading 0)
+		// Examples: 15123456789, 16123456789, 17123456789, 015123456789
+		pattern: /^0?1[567]\d{8,9}$/,
+		message: "Germany mobile numbers must start with 15, 16, or 17 followed by 8-9 digits (e.g., 15123456789 or 015123456789)",
+		example: "15123456789"
+	},
+	"+39": {
+		// Italy: Mobile numbers only
+		// Mobile: 3 followed by 9 digits (10 digits total, or 11 with leading 0)
+		// Examples: 3123456789, 03123456789
+		pattern: /^0?3\d{9}$/,
+		message: "Italy mobile numbers must start with 3 followed by 9 digits (e.g., 3123456789 or 03123456789)",
+		example: "3123456789"
+	},
+	"+34": {
+		// Spain: Mobile numbers only
+		// Mobile: 6, 7 followed by 8 digits (9 digits total, or 10 with leading 0)
+		// Examples: 612345678, 712345678, 0612345678
+		pattern: /^0?[67]\d{8}$/,
+		message: "Spain mobile numbers must start with 6 or 7 followed by 8 digits (e.g., 612345678 or 0612345678)",
+		example: "612345678"
+	},
+	"+91": {
+		// India: Mobile numbers start with 6, 7, 8, or 9 followed by 9 digits (10 digits total)
+		pattern: /^0?[6789]\d{9}$/,
+		message: "India mobile numbers must start with 6, 7, 8, or 9 followed by 9 digits (e.g., 9123456789)",
+		example: "9123456789"
+	},
+	"+86": {
+		// China: Mobile numbers start with 1 followed by 10 digits (11 digits total, first digit after 1 is 3-9)
+		pattern: /^0?1[3-9]\d{9}$/,
+		message: "China mobile numbers must start with 1 followed by 10 digits (e.g., 13812345678)",
+		example: "13812345678"
+	},
+	"+81": {
+		// Japan: Mobile numbers only
+		// Mobile: 70, 80, 90 followed by 8 digits (10 digits total, or 11 with leading 0)
+		// Examples: 7012345678, 8012345678, 9012345678, 09012345678
+		pattern: /^0?[789]0\d{8}$/,
+		message: "Japan mobile numbers must start with 70, 80, or 90 followed by 8 digits (e.g., 9012345678 or 09012345678)",
+		example: "9012345678"
+	},
+	"+82": {
+		// South Korea: Mobile numbers only
+		// Mobile: 10X (where X=0-9) followed by 7-8 digits (10-11 digits total, or 11-12 with leading 0)
+		// Examples: 1012345678, 10212345678, 01012345678
+		pattern: /^0?10\d{7,8}$/,
+		message: "South Korea mobile numbers must start with 10 followed by 7-8 digits (e.g., 1012345678 or 01012345678)",
+		example: "1012345678"
+	},
+	"+61": {
+		// Australia: Mobile numbers only
+		// Mobile: 4 followed by 8 digits (9 digits total, or 10 with leading 0)
+		// Examples: 412345678, 0412345678
+		pattern: /^0?4\d{8}$/,
+		message: "Australia mobile numbers must start with 4 followed by 8 digits (e.g., 412345678 or 0412345678)",
+		example: "412345678"
+	},
+	"+27": {
+		// South Africa: Mobile numbers only
+		// Mobile: 6, 7, 8 followed by 8 digits (9 digits total, or 10 with leading 0)
+		// Examples: 612345678, 712345678, 812345678, 0612345678
+		pattern: /^0?[678]\d{8}$/,
+		message: "South Africa mobile numbers must start with 6, 7, or 8 followed by 8 digits (e.g., 612345678 or 0612345678)",
+		example: "612345678"
+	},
+}
+
+// Validate mobile number based on selected country code
+function validateMobileNumber() {
+	const mobileNo = customerData.value.mobile_no.trim()
+	const countryCode = customerData.value.country_code
+	
+	// Clear error if mobile number is empty
+	if (!mobileNo) {
+		mobileValidationError.value = ""
+		return true
+	}
+	
+	// Get validation pattern for the selected country
+	const validation = phoneValidationPatterns[countryCode]
+	
+	if (!validation) {
+		// No validation pattern for this country - allow it
+		mobileValidationError.value = ""
+		return true
+	}
+	
+	// Remove spaces and special characters except digits
+	let cleanNumber = mobileNo.replace(/\s+/g, "").replace(/[^\d]/g, "")
+	
+	// Remove leading 0 if present (common in many countries)
+	if (cleanNumber.startsWith("0")) {
+		cleanNumber = cleanNumber.substring(1)
+	}
+	
+	// Test against pattern
+	if (!validation.pattern.test(cleanNumber)) {
+		mobileValidationError.value = validation.message
+		return false
+	}
+	
+	// Valid number
+	mobileValidationError.value = ""
+	return true
+}
+
 // Reset flag image error state when country code changes
 watch(
 	() => customerData.value.country_code,
 	() => {
 		// Reset the error state when country changes, try loading image again
 		flagImageFailed.value = false
+		// Re-validate mobile number when country code changes
+		validateMobileNumber()
 	}
 )
 
@@ -556,6 +789,17 @@ async function handleCreate() {
 		toast.create({
 			title: "Required Field",
 			text: "Customer Name is required",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+		return
+	}
+
+	// Validate mobile number if provided
+	if (customerData.value.mobile_no && !validateMobileNumber()) {
+		toast.create({
+			title: "Invalid Mobile Number",
+			text: mobileValidationError.value || "The entered mobile number does not match the format for the selected country code.",
 			icon: "alert-circle",
 			iconClasses: "text-red-600",
 		})
