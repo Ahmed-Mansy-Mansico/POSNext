@@ -416,19 +416,20 @@
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
 								<div class="text-xs space-y-1">
 									<!-- List Price -->
-									<div v-if="item.price_list_rate" class="text-gray-500">
+									<!-- <div v-if="item.price_list_rate" class="text-gray-500">
 										List: <span class="font-medium">{{ formatCurrency(item.price_list_rate) }}</span>
-									</div>
+									</div> -->
 									
-									<!-- Discount Amount -->
+									<!-- Discount Amount added to it tax 15% calculated -->
 									<div v-if="item.discount_amount && item.discount_amount > 0" class="text-red-600">
-										Discount: <span class="font-medium">-{{ formatCurrency(item.discount_amount) }}</span>
+										Discount: <span class="font-medium">-{{ formatCurrency(item.discount_amount) * 0.15 + item.discount_amount }}</span>
 									</div>
 									
-									<!-- Final Rate -->
-									<div class="font-semibold text-blue-600 text-sm">
-										Rate: {{ formatCurrency(item.rate || item.price_list_rate || 0) }}
-									</div>
+								<!-- Final Rate added to it 15% tax calculated and added to it discount amount -->
+								<div class="font-bold text-red-600 text-sm">
+									Rate: {{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
+								</div>
+									
 								</div>
 							</td>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">

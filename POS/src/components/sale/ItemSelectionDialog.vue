@@ -47,7 +47,7 @@
 										: 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
 								]"
 							>
-								{{ valueObj.title || valueObj.value }}
+								{{ attrName === "Color Code" && valueObj.displayName ? valueObj.displayName : (valueObj.title || valueObj.value) }}
 							</button>
 						</div>
 					</div>
@@ -191,6 +191,18 @@ const confirmButtonText = computed(() => {
 	return props.mode === "variant" ? "Add to Cart" : "Add to Cart"
 })
 
+// Helper function to extract color name from title (e.g., "ROSE 212" -> "ROSE")
+function extractColorName(title) {
+	if (!title) return title
+	// Split by space and remove the last part (code number), return the rest
+	const parts = title.trim().split(/\s+/)
+	if (parts.length > 1) {
+		// Remove last part (code) and join the rest (color name)
+		return parts.slice(0, -1).join(' ')
+	}
+	return title
+}
+
 // Computed: Build a map of all available attribute values
 const variantAttributesMap = computed(() => {
 	if (props.mode !== "variant" || options.value.length === 0) return {}
@@ -215,11 +227,25 @@ const variantAttributesMap = computed(() => {
 	Object.keys(attrMap).forEach((key) => {
 		result[key] = Array.from(attrMap[key]).map(item => {
 			try {
-				return JSON.parse(item)
+				const parsed = JSON.parse(item)
+				// For Color Code attribute, extract color name from title
+				if (key === "Color Code" && parsed.title) {
+					return { ...parsed, displayName: extractColorName(parsed.title) }
+				}
+				return parsed
 			} catch {
-				return { title: item, value: item }
+				const obj = { title: item, value: item }
+				// For Color Code attribute, extract color name from title
+				if (key === "Color Code") {
+					obj.displayName = extractColorName(item)
+				}
+				return obj
 			}
-		}).sort((a, b) => (a.title || a.value).localeCompare(b.title || b.value))
+		}).sort((a, b) => {
+			const aTitle = a.title || a.value
+			const bTitle = b.title || b.value
+			return aTitle.localeCompare(bTitle)
+		})
 	})
 
 	return result
@@ -268,7 +294,7 @@ const variantsResource = createResource({
 			label: v.item_name,
 			description: v.item_code,
 			attributes: v.attributes || {},
-			rate: v.rate || 0,
+			rate: ( v.rate + v.rate * 0.15 ) || 0,
 			priceLabel: `per ${v.stock_uom}`,
 			stock: v.actual_qty,
 			data: v, // Full variant data

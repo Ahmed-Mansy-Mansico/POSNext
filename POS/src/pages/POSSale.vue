@@ -1321,28 +1321,28 @@ async function handleItemSelected(item, autoAdd = false) {
 		return
 	}
 
-	// Check for UOMs
-	if (item.item_uoms && item.item_uoms.length > 0) {
-		cartStore.setPendingItem(item, 1, "uom")
-		uiStore.showItemSelectionDialog = true
-		return
-	}
-
+	// Skip UOM dialog - automatically use stock UOM and add to cart directly
 	// Check for batch/serial
 	if (item.has_batch_no || item.has_serial_no) {
 		cartStore.setPendingItem(item, 1)
 		uiStore.showBatchSerialDialog = true
 		return
 	}
-
+	// Check for UOMs
+    // if (item.item_uoms && item.item_uoms.length > 0) {
+    //     cartStore.setPendingItem(item, 1, "uom")
+    //     uiStore.showItemSelectionDialog = true
+    //     return
+    // }
 	// Fetch item details with pricing rules before adding to cart
+	// Use stock UOM by default (bypass UOM selection dialog)
 	try {
 		const itemDetails = await cartStore.getItemDetailsResource.submit({
 			item_code: item.item_code,
 			pos_profile: shiftStore.currentProfile?.name || cartStore.posProfile,
 			customer: cartStore.customer?.name || cartStore.customer,
 			qty: 1,
-			uom: item.uom || item.stock_uom,
+			uom: item.uom || item.stock_uom, // Use stock UOM by default
 		})
 
 		// Merge the fetched pricing details with the original item

@@ -213,20 +213,20 @@
 									<!-- List Price -->
 									<div v-if="item.price_list_rate" class="flex items-center justify-between">
 										<span class="text-gray-400">List:</span>
-										<span class="font-medium text-gray-600">{{ formatCurrency(item.price_list_rate) }}</span>
+										<span class="font-medium text-gray-600">{{ formatCurrency(item.price_list_rate + item.price_list_rate * 0.15)  }}</span>
 									</div>
 									
 									<!-- Discount Amount - Check multiple possible fields -->
 									<div v-if="getDiscountAmount(item) > 0" class="flex items-center justify-between">
 										<span class="text-red-500">Discount:</span>
-										<span class="font-medium text-red-600">-{{ formatCurrency(getDiscountAmount(item)) }}</span>
+										<span class="font-medium text-red-600">-{{ formatCurrency(getDiscountAmount(item) + getDiscountAmount(item) * 0.15) }}</span>
 									</div>
 								</div>
 
 								<!-- Final Rate & UOM -->
 								<div class="flex items-center gap-1 border-t border-gray-200 pt-1">
 									<span class="text-[11px] sm:text-xs font-bold text-blue-600">
-										{{ formatCurrency(item.rate) }}
+										{{ formatCurrency(item.rate + (item.rate * 0.15) ) }}
 									</span>
 									<span class="text-[10px] text-gray-500">/</span>
 									<span class="inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] sm:text-xs font-semibold">
@@ -242,10 +242,13 @@
 											<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
 										</svg>
 										<span v-if="item.discount_percentage && item.discount_percentage > 0">
-											{{ item.discount_percentage }}% OFF
+											<!-- show the precentage rounded to 2 decimal places -->
+											{{ Math.round(item.discount_percentage,2) }}% OFF
+											
+											<!-- {{ item.discount_percentage }}% OFF -->
 										</span>
 										<span v-else>
-											{{ formatCurrency(getDiscountAmount(item)) }} OFF
+											{{ formatCurrency(getDiscountAmount(item) + getDiscountAmount(item) * 0.15 ) }} OFF
 										</span>
 									</div>
 								</div>
@@ -383,7 +386,7 @@
 								<div class="text-right">
 									<div class="text-[9px] text-gray-500 leading-none mb-0.5">Total</div>
 									<div class="text-xs sm:text-sm font-bold text-blue-600 leading-none">
-										{{ formatCurrency(item.amount || item.rate * item.quantity) }}
+										{{ formatCurrency(item.amount + (item.amount * 0.15) || item.rate * item.quantity + (item.rate * item.quantity * 0.15) ) }}
 									</div>
 								</div>
 							</div>

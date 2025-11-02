@@ -446,7 +446,9 @@ export function useInvoice() {
 		let discountAmount = 0
 		if (item.discount_percentage > 0) {
 			// Calculate from percentage
-			discountAmount = (baseAmount * item.discount_percentage) / 100
+			// discountAmount = (baseAmount * item.discount_percentage) / 100
+			// show a fixed discount amount based on the discount percentage not the base amount ( as amount is always calculated from qty = 1)
+			discountAmount = (baseAmount/item.quantity * item.discount_percentage) / 100
 		} else if (item.discount_amount > 0) {
 			// If discount_amount is set directly, use it and calculate percentage
 			discountAmount = item.discount_amount

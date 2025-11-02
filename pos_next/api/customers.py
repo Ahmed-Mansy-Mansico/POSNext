@@ -25,21 +25,17 @@ def get_customers(search_term="", pos_profile=None, limit=20):
 
 		filters = {}
 
-		# Filter by POS Profile customer group if specified
-		if pos_profile:
-			frappe.logger().debug(f"Loading POS Profile: {pos_profile}")
-			profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
-			# Check if customer_group field exists (it may not exist in all versions)
-			if hasattr(profile_doc, 'customer_group') and profile_doc.customer_group:
-				filters["customer_group"] = profile_doc.customer_group
-				frappe.logger().debug(f"Filtering by customer_group: {profile_doc.customer_group}")
+		# Note: We don't filter by POS Profile customer_group anymore
+		# This allows customers created through POS with different groups to be searchable
+		# If a customer_group filter is needed, it should be applied on the POS Profile settings
+		# or handled at the business logic level, not here
 
-		# Return all customers (for client-side filtering)
+		# Return all enabled customers (for client-side filtering)
 		filters["disabled"] = 0
 		result = frappe.get_all(
 			"Customer",
 			filters=filters,
-			fields=["name", "customer_name", "mobile_no", "email_id"],
+			fields=["name", "customer_name", "mobile_no", "email_id", "customer_group"],
 			limit=limit,
 			order_by="customer_name asc"
 		)
