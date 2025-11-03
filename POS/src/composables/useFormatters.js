@@ -8,7 +8,7 @@
  * @param {number} amount - The amount to format
  * @returns {string} Formatted amount with 2 decimal places
  */
-export function formatCurrency(amount) {
+function formatCurrency(amount) {
 	if (amount === null || amount === undefined) return "0.00"
 	return Number.parseFloat(amount).toFixed(2)
 }
@@ -19,11 +19,11 @@ export function formatCurrency(amount) {
  * @param {number} quantity - The quantity to format
  * @returns {string} Formatted quantity
  */
-export function formatQuantity(quantity) {
+function formatQuantity(quantity) {
 	if (quantity === null || quantity === undefined) return "0"
 	const num = Number.parseFloat(quantity)
-	// Round to 2 decimal places and remove trailing zeros
-	return num.toFixed(2).replace(/\.?0+$/, '')
+	// Round to 4 decimal places and remove trailing zeros
+	return num.toFixed(4).replace(/\.?0+$/, '')
 }
 
 /**
@@ -31,7 +31,7 @@ export function formatQuantity(quantity) {
  * @param {string|Date} datetime - The datetime to format
  * @returns {string} Formatted date and time string
  */
-export function formatDateTime(datetime) {
+function formatDateTime(datetime) {
 	if (!datetime) return ""
 	return new Date(datetime).toLocaleString()
 }
@@ -41,7 +41,7 @@ export function formatDateTime(datetime) {
  * @param {string|Date} datetime - The datetime to format
  * @returns {string} Formatted time string (HH:MM)
  */
-export function formatTime(datetime) {
+function formatTime(datetime) {
 	if (!datetime) return ""
 	return new Date(datetime).toLocaleTimeString([], {
 		hour: "2-digit",
@@ -54,7 +54,7 @@ export function formatTime(datetime) {
  * @param {string|Date} date - The date to format
  * @returns {string} Formatted date string
  */
-export function formatDate(date) {
+function formatDate(date) {
 	if (!date) return ""
 	return new Date(date).toLocaleDateString()
 }
@@ -65,7 +65,7 @@ export function formatDate(date) {
  * @param {number} decimals - Number of decimal places (default: 2)
  * @returns {string} Formatted percentage
  */
-export function formatPercentage(value, decimals = 2) {
+function formatPercentage(value, decimals = 2) {
 	if (value === null || value === undefined) return "0%"
 	return `${Number.parseFloat(value).toFixed(decimals).replace(/\.?0+$/, '')}%`
 }
