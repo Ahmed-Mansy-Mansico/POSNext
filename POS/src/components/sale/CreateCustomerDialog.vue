@@ -111,8 +111,11 @@
 
 <script setup>
 import { usePOSPermissions } from "@/composables/usePermissions"
-import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
+import { Button, Dialog, Input, createResource } from "frappe-ui"
 import { computed, onMounted, ref, watch } from "vue"
+
+const { showSuccess, showError } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -184,24 +187,14 @@ const createCustomerResource = createResource({
 		}
 	},
 	onSuccess(data) {
-		toast.create({
-			title: "Success",
-			text: `Customer ${data.customer_name} created successfully`,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess(`Customer ${data.customer_name} created successfully`)
 
 		emit("customer-created", data)
 		show.value = false
 	},
 	onError(error) {
 		console.error("Error creating customer:", error)
-		toast.create({
-			title: "Error",
-			text: error.message || "Failed to create customer",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError(error.message || "Failed to create customer")
 	},
 })
 
@@ -289,12 +282,7 @@ async function checkPermissions() {
 
 async function handleCreate() {
 	if (!customerData.value.customer_name) {
-		toast.create({
-			title: "Required Field",
-			text: "Customer Name is required",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Customer Name is required")
 		return
 	}
 

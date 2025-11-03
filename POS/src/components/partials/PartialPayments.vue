@@ -177,10 +177,12 @@
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import PaymentDialog from "@/components/sale/PaymentDialog.vue"
 import { usePOSSettingsStore } from "@/stores/posSettings"
-import { Button, call, toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
+import { Button, call } from "frappe-ui"
 import { onMounted, ref, watch } from "vue"
 
 const posSettingsStore = usePOSSettingsStore()
+const { showSuccess, showError } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -239,12 +241,7 @@ async function loadInvoices() {
 		invoices.value = result || []
 	} catch (error) {
 		console.error("Error loading partial payments:", error)
-		toast.create({
-			title: "Error",
-			text: error.message || "Failed to load partial payments",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError(error.message || "Failed to load partial payments")
 	} finally {
 		loading.value = false
 	}
@@ -294,12 +291,7 @@ async function handlePaymentCompleted(paymentData) {
 
 		console.log('[PartialPayments] API response:', result)
 
-		toast.create({
-			title: "Success",
-			text: "Payment added successfully",
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess("Payment added successfully")
 
 		// Reload invoices and summary
 		console.log('[PartialPayments] Reloading invoices and summary...')
@@ -309,12 +301,7 @@ async function handlePaymentCompleted(paymentData) {
 		selectedInvoice.value = null
 	} catch (error) {
 		console.error("[PartialPayments] Error adding payment:", error)
-		toast.create({
-			title: "Error",
-			text: error.message || "Failed to add payment",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError(error.message || "Failed to add payment")
 	}
 }
 

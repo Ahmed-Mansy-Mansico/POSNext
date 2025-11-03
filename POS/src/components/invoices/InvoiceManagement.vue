@@ -518,8 +518,11 @@ import PaymentDialog from "@/components/sale/PaymentDialog.vue"
 import { useInvoiceFilters } from "@/composables/useInvoiceFilters"
 import { useInvoiceFiltersStore } from "@/stores/invoiceFilters"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
-import { Button, call, toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
+import { Button, call } from "frappe-ui"
 import { computed, onMounted, ref, watch } from "vue"
+
+const { showSuccess, showError } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -765,12 +768,7 @@ async function loadUnpaidInvoices() {
 		unpaidInvoices.value = result || []
 	} catch (error) {
 		console.error("Error loading unpaid invoices:", error)
-		toast.create({
-			title: "Error",
-			text: error.message || "Failed to load unpaid invoices",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError(error.message || "Failed to load unpaid invoices")
 	} finally {
 		loading.value = false
 	}
@@ -811,12 +809,7 @@ async function handlePaymentCompleted(paymentData) {
 			payments: paymentData.payments,
 		})
 
-		toast.create({
-			title: "Success",
-			text: "Payment added successfully",
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess("Payment added successfully")
 
 		// Reload invoices and summary
 		await loadUnpaidInvoices()
@@ -825,12 +818,7 @@ async function handlePaymentCompleted(paymentData) {
 		selectedInvoice.value = null
 	} catch (error) {
 		console.error("Error adding payment:", error)
-		toast.create({
-			title: "Error",
-			text: error.message || "Failed to add payment",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError(error.message || "Failed to add payment")
 	}
 }
 

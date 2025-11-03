@@ -353,7 +353,8 @@
 import CheckboxField from "@/components/settings/CheckboxField.vue"
 import NumberField from "@/components/settings/NumberField.vue"
 import SelectField from "@/components/settings/SelectField.vue"
-import { Button, call, createResource, toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
+import { Button, call, createResource } from "frappe-ui"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import {
 	getSectionHeaderClasses,
@@ -366,6 +367,7 @@ import { usePOSEvents } from "@/composables/usePOSEvents"
 
 const log = logger.create('POSSettings')
 const { detectSettingsChanges, updateSettingsSnapshot, emitStockSyncConfigured } = usePOSEvents()
+const { showSuccess, showError } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -473,12 +475,7 @@ const settingsResource = createResource({
 	},
 	onError(error) {
 		loading.value = false
-		toast.create({
-			title: "Error",
-			text: "Failed to load settings",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to load settings")
 	},
 })
 
@@ -563,12 +560,7 @@ async function loadSettings() {
 
 async function saveSettings() {
 	if (!props.posProfile) {
-		toast.create({
-			title: "Error",
-			text: "POS Profile not found",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("POS Profile not found")
 		return
 	}
 
@@ -651,20 +643,10 @@ async function saveSettings() {
 			successMessage = `Settings saved. Tax mode is now ${mode}. Cart will be recalculated.`
 		}
 
-		toast.create({
-			title: "Success",
-			text: successMessage,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess(successMessage)
 	} catch (error) {
 		log.error("Error saving settings:", error)
-		toast.create({
-			title: "Error",
-			text: error.message || "Failed to save settings",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError(error.message || "Failed to save settings")
 	} finally {
 		saving.value = false
 	}

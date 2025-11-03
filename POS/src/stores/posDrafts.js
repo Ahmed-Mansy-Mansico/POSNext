@@ -1,9 +1,12 @@
 import { deleteDraft, getDraftsCount, saveDraft } from "@/utils/draftManager"
-import { toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
 import { defineStore } from "pinia"
 import { ref } from "vue"
 
 export const usePOSDraftsStore = defineStore("posDrafts", () => {
+	// Use custom toast
+	const { showSuccess, showError, showWarning } = useToast()
+
 	// State
 	const draftsCount = ref(0)
 
@@ -23,12 +26,7 @@ export const usePOSDraftsStore = defineStore("posDrafts", () => {
 		appliedOffers = [],
 	) {
 		if (invoiceItems.length === 0) {
-			toast.create({
-				title: "Empty Cart",
-				text: "Cannot save an empty cart as draft",
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning("Cannot save an empty cart as draft")
 			return false
 		}
 
@@ -43,22 +41,12 @@ export const usePOSDraftsStore = defineStore("posDrafts", () => {
 			await saveDraft(draftData)
 			await updateDraftsCount()
 
-			toast.create({
-				title: "Draft Saved",
-				text: "Invoice saved as draft successfully",
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
+			showSuccess("Invoice saved as draft successfully")
 
 			return true
 		} catch (error) {
 			console.error("Error saving draft:", error)
-			toast.create({
-				title: "Error",
-				text: "Failed to save draft",
-				icon: "alert-circle",
-				iconClasses: "text-red-600",
-			})
+			showError("Failed to save draft")
 			return false
 		}
 	}
@@ -69,12 +57,7 @@ export const usePOSDraftsStore = defineStore("posDrafts", () => {
 			await deleteDraft(draft.draft_id)
 			await updateDraftsCount()
 
-			toast.create({
-				title: "Draft Loaded",
-				text: "Draft invoice loaded successfully",
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
+			showSuccess("Draft invoice loaded successfully")
 
 			return {
 				items: draft.items || [],
@@ -83,12 +66,7 @@ export const usePOSDraftsStore = defineStore("posDrafts", () => {
 			}
 		} catch (error) {
 			console.error("Error loading draft:", error)
-			toast.create({
-				title: "Error",
-				text: "Failed to load draft",
-				icon: "alert-circle",
-				iconClasses: "text-red-600",
-			})
+			showError("Failed to load draft")
 			throw error
 		}
 	}

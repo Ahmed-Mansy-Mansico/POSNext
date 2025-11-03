@@ -671,7 +671,7 @@ import { session } from "@/data/session"
 import { parseError } from "@/utils/errorHandler"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { printInvoiceByName } from "@/utils/printInvoice"
-import { Button, Dialog, createResource, toast } from "frappe-ui"
+import { Button, Dialog, createResource } from "frappe-ui"
 import { call } from "@/utils/apiWrapper"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import { useToast } from "@/composables/useToast"
@@ -705,7 +705,7 @@ const { onStockUpdate } = useRealtimeStock()
 const { onWarehouseChanged, onPricingChanged, onStockPolicyChanged, onSettingsChanged, onSalesOperationsChanged } = usePOSEvents()
 
 // Initialize toast
-const { showError } = useToast()
+const { showSuccess, showError, showWarning } = useToast()
 
 // Initialize logger
 const log = logger.create('POSSale')
@@ -877,21 +877,11 @@ onMounted(async () => {
 				? 'Tax mode updated. Cart recalculated with new tax settings.'
 				: 'Discount settings changed. Cart recalculated.'
 
-			toast.create({
-				title: 'Pricing Updated',
-				text: message,
-				icon: 'check',
-				iconClasses: 'text-green-600'
-			})
+			showSuccess(message)
 		} else if (changes.hasOwnProperty('tax_inclusive')) {
 			// Show feedback even if cart is empty
 			const mode = changes.tax_inclusive.new ? 'inclusive' : 'exclusive'
-			toast.create({
-				title: 'Tax Mode Updated',
-				text: `Prices are now ${mode} of tax. This will apply to new items added to cart.`,
-				icon: 'info',
-				iconClasses: 'text-blue-600'
-			})
+			showSuccess(`Prices are now ${mode} of tax. This will apply to new items added to cart.`)
 		}
 	})
 
@@ -906,12 +896,7 @@ onMounted(async () => {
 				? 'Negative stock sales are now allowed'
 				: 'Negative stock sales are now restricted'
 
-			toast.create({
-				title: 'Stock Policy Updated',
-				text: message,
-				icon: 'info',
-				iconClasses: 'text-blue-600'
-			})
+			showSuccess(message)
 		}
 	})
 
@@ -937,12 +922,7 @@ onMounted(async () => {
 			.join(', ')
 
 		if (changedSettings) {
-			toast.create({
-				title: 'Settings Updated',
-				text: `${changedSettings} settings applied immediately`,
-				icon: 'check',
-				iconClasses: 'text-green-600'
-			})
+			showSuccess(`${changedSettings} settings applied immediately`)
 		}
 	})
 
@@ -1297,22 +1277,12 @@ async function handleShiftOpened() {
 		// Load tax rules with tax_inclusive setting
 		await cartStore.loadTaxRules(shiftStore.profileName, posSettingsStore.settings)
 	}
-	toast.create({
-		title: "Shift Opened",
-		text: "You can now start making sales",
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	showSuccess("You can now start making sales")
 }
 
 function handleShiftClosed() {
 	uiStore.showCloseShiftDialog = false
-	toast.create({
-		title: "Shift Closed",
-		text: "Shift closed successfully",
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	showSuccess("Shift closed successfully")
 
 	// Check if logout should happen after closing shift
 	if (logoutAfterClose.value) {
@@ -1402,12 +1372,7 @@ function handleCustomerSelected(selectedCustomer) {
 	if (selectedCustomer) {
 		cartStore.setCustomer(selectedCustomer)
 		uiStore.showCustomerDialog = false
-		toast.create({
-			title: "Customer Selected",
-			text: `${selectedCustomer.customer_name} selected`,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess(`${selectedCustomer.customer_name} selected`)
 
 		if (pendingPaymentAfterCustomer.value) {
 			pendingPaymentAfterCustomer.value = false
@@ -1425,23 +1390,13 @@ function handleCreateCustomer(searchValue) {
 
 function handleProceedToPayment() {
 	if (cartStore.isEmpty) {
-		toast.create({
-			title: "Empty Cart",
-			text: "Please add items to cart before proceeding to payment",
-			icon: "alert-circle",
-			iconClasses: "text-orange-600",
-		})
+		showWarning("Please add items to cart before proceeding to payment")
 		return
 	}
 
 	const customerValue = cartStore.customer?.name || cartStore.customer
 	if (!customerValue && !shiftStore.profileCustomer) {
-		toast.create({
-			title: "Customer Required",
-			text: "Please select a customer before proceeding",
-			icon: "alert-circle",
-			iconClasses: "text-orange-600",
-		})
+		showWarning("Please select a customer before proceeding")
 		uiStore.showCustomerDialog = true
 		pendingPaymentAfterCustomer.value = true
 		return
@@ -1481,12 +1436,7 @@ async function handlePaymentCompleted(paymentData) {
 	try {
 		const customerValue = cartStore.customer?.name || cartStore.customer
 		if (!customerValue && !shiftStore.profileCustomer) {
-			toast.create({
-				title: "Customer Required",
-				text: "Please select a customer before proceeding",
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning("Please select a customer before proceeding")
 			uiStore.showPaymentDialog = false
 			uiStore.showCustomerDialog = true
 			return
@@ -1522,12 +1472,7 @@ async function handlePaymentCompleted(paymentData) {
 			// Reset cart hash after successful payment
 			previousCartHash = ""
 
-			toast.create({
-				title: "Saved Offline",
-				text: "Invoice saved and will sync when online",
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning("Invoice saved and will sync when online")
 		} else {
 			// Get item codes from cart before clearing
 			const soldItemCodes = cartStore.invoiceItems.map(item => item.item_code)
@@ -1549,29 +1494,14 @@ async function handlePaymentCompleted(paymentData) {
 				if (shiftStore.autoPrintEnabled) {
 					try {
 						await printInvoiceByName(invoiceName)
-						toast.create({
-							title: "Success",
-							text: `Invoice ${invoiceName} created and sent to printer`,
-							icon: "check",
-							iconClasses: "text-green-600",
-						})
+						showSuccess(`Invoice ${invoiceName} created and sent to printer`)
 					} catch (error) {
 						log.error("Auto-print error:", error)
-						toast.create({
-							title: "Invoice Created",
-							text: `Invoice ${invoiceName} created but print failed`,
-							icon: "alert-circle",
-							iconClasses: "text-orange-600",
-						})
+						showWarning(`Invoice ${invoiceName} created but print failed`)
 					}
 				} else {
 					uiStore.showSuccess(invoiceName, invoiceTotal)
-					toast.create({
-						title: "Success",
-						text: `Invoice ${invoiceName} created successfully`,
-						icon: "check",
-						iconClasses: "text-green-600",
-					})
+					showSuccess(`Invoice ${invoiceName} created successfully`)
 				}
 			}
 		}
@@ -1587,20 +1517,13 @@ async function handlePaymentCompleted(paymentData) {
 			errorContext.retryable ? "payment" : null,
 		)
 
-		const toastIconClass =
-			errorContext.type === "error"
-				? "text-red-600"
-				: errorContext.type === "warning"
-					? "text-orange-600"
-					: "text-yellow-600"
-
-		toast.create({
-			title: errorContext.title,
-			text: errorContext.message,
-			icon: "alert-circle",
-			iconClasses: toastIconClass,
-			timeout: 6000,
-		})
+		if (errorContext.type === "error") {
+			showError(errorContext.message)
+		} else if (errorContext.type === "warning") {
+			showWarning(errorContext.message)
+		} else {
+			showWarning(errorContext.message)
+		}
 	}
 }
 
@@ -1614,12 +1537,7 @@ function confirmClearCart() {
 	// Reset cart hash when cart is cleared
 	previousCartHash = ""
 	uiStore.showClearCartDialog = false
-	toast.create({
-		title: "Cart Cleared",
-		text: "All items removed from cart",
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	showSuccess("All items removed from cart")
 }
 
 async function handleOptionSelected(option) {
@@ -1642,12 +1560,7 @@ async function handleOptionSelected(option) {
 				cartStore.addItem(variant, cartStore.pendingItemQty)
 				uiStore.showItemSelectionDialog = false
 				cartStore.clearPendingItem()
-				toast.create({
-					title: "Variant Added",
-					text: `${variant.item_name} added to cart`,
-					icon: "check",
-					iconClasses: "text-green-600",
-				})
+				showSuccess(`${variant.item_name} added to cart`)
 			}
 		} else if (option.type === "uom") {
 			const itemDetails = await cartStore.getItemDetailsResource.submit({
@@ -1674,22 +1587,12 @@ async function handleOptionSelected(option) {
 				cartStore.addItem(itemToAdd, cartStore.pendingItemQty)
 				uiStore.showItemSelectionDialog = false
 				cartStore.clearPendingItem()
-				toast.create({
-					title: "Item Added",
-					text: `${itemToAdd.item_name} (${option.uom}) added to cart`,
-					icon: "check",
-					iconClasses: "text-green-600",
-				})
+				showSuccess(`${itemToAdd.item_name} (${option.uom}) added to cart`)
 			}
 		}
 	} catch (error) {
 		log.error("Error handling option selection:", error)
-		toast.create({
-			title: "Error",
-			text: "Failed to process selection. Please try again.",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to process selection. Please try again.")
 	}
 }
 
@@ -1703,12 +1606,7 @@ async function handlePrintInvoice() {
 		uiStore.showSuccessDialog = false
 	} catch (error) {
 		log.error("Error printing invoice:", error)
-		toast.create({
-			title: "Print Error",
-			text: "Failed to print invoice. Please try again.",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to print invoice. Please try again.")
 	}
 }
 
@@ -1783,12 +1681,7 @@ async function handleLoadDraft(draft) {
 }
 
 function handleReturnCreated(returnInvoice) {
-	toast.create({
-		title: "Return Created",
-		text: `Return invoice ${returnInvoice.name} created successfully`,
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	showSuccess(`Return invoice ${returnInvoice.name} created successfully`)
 }
 
 function handleDiscountApplied(discount) {
@@ -1825,23 +1718,13 @@ function handleBatchSerialSelected(batchSerial) {
 
 function handleCreateReturnFromHistory(invoice) {
 	uiStore.showReturnDialog = true
-	toast.create({
-		title: "Create Return",
-		text: `Creating return for invoice ${invoice.name}`,
-		icon: "alert-circle",
-		iconClasses: "text-orange-600",
-	})
+	showWarning(`Creating return for invoice ${invoice.name}`)
 }
 
 function handleCustomerCreated(newCustomer) {
 	cartStore.setCustomer(newCustomer)
 	uiStore.showCreateCustomerDialog = false
-	toast.create({
-		title: "Customer Created",
-		text: `${newCustomer.customer_name} created and selected`,
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	showSuccess(`${newCustomer.customer_name} created and selected`)
 }
 
 async function handleRefresh() {
@@ -1911,12 +1794,7 @@ async function confirmClearCache() {
 				clearCacheOverlayRef.value.reset()
 			}
 
-			toast.create({
-				title: "Cache Cleared",
-				text: "All cached data has been cleared successfully",
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
+			showSuccess("All cached data has been cleared successfully")
 		} else {
 			throw new Error('Failed to clear cache completely')
 		}
@@ -1929,12 +1807,7 @@ async function confirmClearCache() {
 			clearCacheOverlayRef.value.reset()
 		}
 
-		toast.create({
-			title: "Cache Clear Failed",
-			text: "Failed to clear cache. Please try again.",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to clear cache. Please try again.")
 	}
 }
 
@@ -1959,12 +1832,7 @@ async function handleEditOfflineInvoice(invoice) {
 
 		await offlineStore.deleteOfflineInvoice(invoice.id)
 
-		toast.create({
-			title: "Invoice Restored",
-			text: "Invoice loaded to cart for editing",
-			icon: "check",
-			iconClasses: "text-blue-600",
-		})
+		showSuccess("Invoice loaded to cart for editing")
 	} catch (error) {
 		log.error("Error editing offline invoice:", error)
 	}
@@ -1985,22 +1853,12 @@ async function handleSyncClick() {
 		return
 	}
 
-	toast.create({
-		title: "All Synced",
-		text: "No pending invoices to sync",
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	showSuccess("No pending invoices to sync")
 }
 
 async function handleSyncAll() {
 	if (offlineStore.isOffline) {
-		toast.create({
-			title: "Offline Mode",
-			text: "Cannot sync while offline",
-			icon: "alert-circle",
-			iconClasses: "text-orange-600",
-		})
+		showWarning("Cannot sync while offline")
 		return
 	}
 
@@ -2024,12 +1882,7 @@ async function handleSyncAll() {
 				{ failedInvoiceId: firstError.invoiceId },
 			)
 		} else if (result.failed > 0) {
-			toast.create({
-				title: "Partial Sync",
-				text: `${result.failed} invoice(s) failed to sync`,
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning(`${result.failed} invoice(s) failed to sync`)
 		}
 	} catch (error) {
 		log.error("Sync error:", error)
@@ -2225,30 +2078,15 @@ async function handleWarehouseChanged(newWarehouse) {
 			await itemsSelectorRef.value.loadItems()
 		}
 
-		toast.create({
-			title: "Warehouse Updated",
-			text: `Switched to ${newWarehouse}. Stock quantities refreshed.`,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess(`Switched to ${newWarehouse}. Stock quantities refreshed.`)
 	} catch (error) {
 		log.error("Error handling warehouse change:", error)
-		toast.create({
-			title: "Warning",
-			text: `Warehouse updated but failed to reload stock. Please refresh manually.`,
-			icon: "alert-circle",
-			iconClasses: "text-orange-600",
-		})
+		showWarning(`Warehouse updated but failed to reload stock. Please refresh manually.`)
 	}
 }
 
 function handlePromotionSaved(data) {
-	toast.create({
-		title: "Success",
-		text: data.message || "Promotion saved successfully",
-		icon: "check",
-		iconClasses: "text-green-600",
-	})
+	showSuccess(data.message || "Promotion saved successfully")
 }
 
 // Optimized tab switching for mobile with RAF for smooth transitions
