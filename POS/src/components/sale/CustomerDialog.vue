@@ -176,6 +176,8 @@
 	<CreateCustomerDialog
 		v-model="showCreateDialog"
 		:pos-profile="posProfile"
+		:initial-phone="initialPhone"
+		:initial-name="initialName"
 		@customer-created="handleCustomerCreated"
 	/>
 </template>
@@ -184,7 +186,7 @@
 import { useCustomerSearchStore } from "@/stores/customerSearch"
 import { Button, Dialog } from "frappe-ui"
 import { storeToRefs } from "pinia"
-import { computed, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import CreateCustomerDialog from "./CreateCustomerDialog.vue"
 
 const props = defineProps({
@@ -207,10 +209,86 @@ const {
 
 // Local state
 const showCreateDialog = ref(false)
+const initialPhone = ref(null)
+const initialName = ref(null)
 
 const show = computed({
 	get: () => props.modelValue,
 	set: (val) => emit("update:modelValue", val),
+})
+
+// Helper function to check if search term looks like a phone number
+function isPhoneNumber(term) {
+	if (!term || typeof term !== 'string') {
+		console.log("🔍 isPhoneNumber: invalid input", term, typeof term)
+		return false
+	}
+	
+	const cleanTerm = term.trim().replace(/\s+/g, "")
+	if (cleanTerm.length === 0) {
+		console.log("🔍 isPhoneNumber: empty after trim")
+		return false
+	}
+	
+	// Check if it's all digits (at least 5 digits) or starts with +
+	// This includes numbers starting with 0 (like 01002406975, 056565666)
+	// Pattern: optional +, followed by 5+ digits
+	const phonePattern = /^\+?\d{5,}$/
+	const testResult = phonePattern.test(cleanTerm)
+	
+	console.log("🔍 isPhoneNumber check:", { 
+		original: term, 
+		cleanTerm, 
+		length: cleanTerm.length,
+		pattern: phonePattern.toString(),
+		testResult: testResult,
+		match: cleanTerm.match(phonePattern),
+		regexMatch: /^\+?\d{5,}$/.test(cleanTerm)
+	})
+	
+	return testResult
+}
+
+// Get initial phone value - computed property that is reactive to searchTerm AND showCreateDialog
+// Include showCreateDialog as dependency to force re-evaluation when dialog opens
+const getInitialPhoneValue = computed(() => {
+	// Access showCreateDialog to make it a dependency
+	const dialogOpen = showCreateDialog.value
+	
+	const term = searchTerm.value?.trim()
+	if (!term) {
+		return undefined
+	}
+	
+	console.log("📱 getInitialPhoneValue: evaluating for term:", term, "dialogOpen:", dialogOpen)
+	const isPhone = isPhoneNumber(term)
+	if (isPhone) {
+		console.log("📱 getInitialPhoneValue: ✅ RETURNING PHONE:", term)
+		return term
+	}
+	console.log("📱 getInitialPhoneValue: ❌ not a phone, returning undefined")
+	return undefined
+})
+
+// Get initial name value - computed property that is reactive to searchTerm AND showCreateDialog
+// Include showCreateDialog as dependency to force re-evaluation when dialog opens
+const getInitialNameValue = computed(() => {
+	// Access showCreateDialog to make it a dependency
+	const dialogOpen = showCreateDialog.value
+	
+	const term = searchTerm.value?.trim()
+	if (!term) {
+		return undefined
+	}
+	
+	console.log("📝 getInitialNameValue: evaluating for term:", term, "dialogOpen:", dialogOpen)
+	const isPhone = isPhoneNumber(term)
+	if (!isPhone) {
+		console.log("📝 getInitialNameValue: ✅ RETURNING NAME:", term)
+		return term
+	}
+	console.log("📝 getInitialNameValue: ❌ is a phone, returning undefined")
+	return undefined
 })
 
 // Alias for template compatibility
@@ -281,13 +359,125 @@ function selectCustomer(customer) {
 }
 
 function createNewCustomer() {
+	console.log("🚀 createNewCustomer() CALLED")
+	console.log("   searchTerm.value:", searchTerm.value)
+	
+	// Get search term FIRST
+	const term = searchTerm.value?.trim()
+	console.log("   term after trim:", term)
+	
+	// CRITICAL: Reset refs first to ensure clean state
+	initialPhone.value = null
+	initialName.value = null
+	console.log("   Refs reset to null")
+	
+	if (!term) {
+		// No search term - both are already null
+		console.log("➕ Creating customer: empty search term")
+		showCreateDialog.value = true
+		return
+	}
+	
+	// CRITICAL: Set refs BEFORE opening dialog
+	// Check if it's a phone number
+	console.log("🔍 Checking if phone number:", term, "type:", typeof term, "length:", term.length)
+	const isPhone = isPhoneNumber(term)
+	console.log("🔍 isPhoneNumber result:", isPhone)
+	
+	if (isPhone) {
+		// It's a phone number - set phone, clear name
+		initialPhone.value = term
+		initialName.value = null
+		console.log("✅✅✅ Setting as PHONE:", term)
+		console.log("   initialPhone.value =", initialPhone.value)
+		console.log("   initialName.value =", initialName.value)
+	} else {
+		// It's a name - set name, clear phone
+		initialPhone.value = null
+		initialName.value = term
+		console.log("✅✅✅ Setting as NAME:", term)
+		console.log("   initialPhone.value =", initialPhone.value)
+		console.log("   initialName.value =", initialName.value)
+	}
+	
+	console.log("➕ FINAL STATE BEFORE OPENING DIALOG:", { 
+		searchTerm: term, 
+		isPhoneNumber: isPhone,
+		initialPhone: initialPhone.value,
+		initialName: initialName.value
+	})
+	
+	// Open dialog AFTER refs are set
 	showCreateDialog.value = true
+	
+	console.log("➕ Dialog opened - refs should be set:", {
+		initialPhone: initialPhone.value,
+		initialName: initialName.value
+	})
 }
+
+// CRITICAL: Watch for dialog opening and set refs based on searchTerm
+// This is the PRIMARY mechanism - computed properties are just for reactive display
+watch(showCreateDialog, (newVal, oldVal) => {
+	console.log("🔔 showCreateDialog watcher:", { newVal, oldVal, searchTerm: searchTerm.value })
+	
+	if (newVal && !oldVal) {
+		// Dialog is opening - set refs based on current searchTerm
+		const term = searchTerm.value?.trim()
+		console.log("🔔 Dialog opening with searchTerm:", term)
+		
+		if (!term) {
+			// No search term - clear both
+			initialPhone.value = null
+			initialName.value = null
+			console.log("🔔 No search term - cleared refs")
+		} else {
+			// Check if it's a phone number
+			console.log("🔔 About to check if phone number:", term)
+			const isPhone = isPhoneNumber(term)
+			console.log("🔔 isPhoneNumber result:", isPhone, "for:", term)
+			
+			if (isPhone) {
+				// It's a phone number - set phone, clear name
+				initialPhone.value = term
+				initialName.value = null
+				console.log("✅✅✅ Watch: Setting as PHONE:", term)
+				console.log("   initialPhone.value =", initialPhone.value)
+				console.log("   initialName.value =", initialName.value)
+			} else {
+				// It's a name - set name, clear phone
+				initialPhone.value = null
+				initialName.value = term
+				console.log("✅✅✅ Watch: Setting as NAME:", term)
+				console.log("   initialPhone.value =", initialPhone.value)
+				console.log("   initialName.value =", initialName.value)
+			}
+		}
+	} else if (!newVal && oldVal) {
+		// Dialog closed - reset refs
+		initialPhone.value = null
+		initialName.value = null
+		console.log("🔔 Dialog closed - reset refs")
+	}
+}, { immediate: false })
 
 async function handleCustomerCreated(customer) {
 	if (props.posProfile) {
+		// Add customer to cache - this now pre-builds the search index immediately
+		// This ensures the customer appears in searches right away without page refresh
 		await customerStore.addCustomerToCache(customer)
+		
+		console.log("✅ Customer added to cache and search index:", {
+			name: customer.customer_name,
+			mobile: customer.mobile_no,
+			readyForSearch: true
+		})
 	}
+
+	// CRITICAL: Set search term to the customer name so it appears in search results
+	// This makes the newly created customer immediately visible in the search dropdown
+	customerStore.setSearchTerm(customer.customer_name)
+	console.log("🔍 Search term updated to show newly created customer:", customer.customer_name)
 
 	// Track new customer selection
 	customerStore.trackCustomerSelection(customer.name)

@@ -246,13 +246,23 @@
 <script setup>
 import { usePOSPermissions } from "@/composables/usePermissions"
 import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
-import { computed, onMounted, onUnmounted, ref, watch } from "vue"
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 
 const props = defineProps({
 	modelValue: Boolean,
 	posProfile: String,
 	initialName: String,
+	initialPhone: String,
 })
+
+// Debug: Log props when they change
+watch(
+	() => [props.modelValue, props.initialPhone, props.initialName],
+	([modelVal, phone, name]) => {
+		console.log("📋 CreateCustomerDialog props:", { modelVal, phone, name })
+	},
+	{ immediate: true }
+)
 
 const emit = defineEmits(["update:modelValue", "customer-created"])
 
@@ -563,12 +573,98 @@ watch(
 	}
 )
 
-// Watch for dialog open and populate initial name
+// Helper function to extract country code from phone number
+function extractCountryCodeFromPhone(phoneNumber) {
+	if (!phoneNumber) return { countryCode: "+966", phone: "" }
+	
+	let cleanPhone = phoneNumber.trim().replace(/[^\d+]/g, "")
+	
+	// If it starts with +, extract country code directly
+	if (cleanPhone.startsWith("+")) {
+		const match = cleanPhone.match(/^\+(\d{1,3})/)
+		if (match) {
+			const code = "+" + match[1]
+			const remainingPhone = cleanPhone.substring(code.length)
+			const phone = remainingPhone.startsWith("0") ? remainingPhone.substring(1) : remainingPhone
+			return { countryCode: code, phone }
+		}
+	}
+	
+	// Auto-detect from pattern (number-based detection)
+	const originalPhone = phoneNumber.trim()
+	let detectedCode = "+966" // Default
+	
+	// Egyptian pattern: 01 (11 digits total with leading 0)
+	if (originalPhone.match(/^0?1[0-2]\d{8}$/)) {
+		detectedCode = "+20" // Egypt
+	}
+	// Saudi Arabia pattern: 05 (9 digits total with leading 0)
+	else if (originalPhone.match(/^0?5[0-9]\d{7}$/) && !originalPhone.match(/^0?5[024568]\d{7}$/)) {
+		detectedCode = "+966" // Saudi Arabia
+	}
+	// UAE pattern: 050/052/054/055/056/058
+	else if (originalPhone.match(/^0?5[024568]\d{7}$/)) {
+		detectedCode = "+971" // UAE
+	}
+	// Kuwait pattern: starts with 5/6/9 (8 digits total)
+	else if (originalPhone.match(/^0?[569]\d{7}$/)) {
+		detectedCode = "+965" // Kuwait
+	}
+	
+	// Remove leading zero and any non-digit characters
+	const phone = cleanPhone.replace(/^0/, "").replace(/\D/g, "")
+	
+	return { countryCode: detectedCode, phone }
+}
+
+/**
+ * Set initial data from props when dialog opens
+ * Priority: Phone number > Customer name
+ * 
+ * Use cases covered:
+ * 1. Phone number search (e.g., "056565666") → Sets mobile number, clears customer name
+ * 2. Name search (e.g., "John Doe") → Sets customer name, clears mobile number
+ * 3. Empty search → Both fields remain empty
+ */
+function setInitialData() {
+	console.log("📋 setInitialData called with:", { 
+		initialPhone: props.initialPhone, 
+		initialName: props.initialName,
+		modelValue: props.modelValue 
+	})
+	
+	if (!props.modelValue) return
+	
+	// CRITICAL: If initialPhone exists, it takes priority (most common use case)
+	if (props.initialPhone) {
+		console.log("📱 Setting phone from initialPhone:", props.initialPhone)
+		const { countryCode, phone } = extractCountryCodeFromPhone(props.initialPhone)
+		// Set phone fields
+		customerData.value.country_code = countryCode
+		customerData.value.mobile_no = phone
+		// CRITICAL: Clear customer name - phone number should NEVER go in customer name
+		customerData.value.customer_name = ""
+		console.log("✅ Phone set:", { countryCode, phone, customerName: customerData.value.customer_name })
+	} else if (props.initialName) {
+		// Second most common use case: Name search → set customer name
+		console.log("📝 Setting name from initialName:", props.initialName)
+		customerData.value.customer_name = props.initialName
+		// Clear phone when name is provided
+		customerData.value.mobile_no = ""
+		customerData.value.country_code = "+966" // Reset to default
+	}
+	// If neither is provided, both fields remain empty (user starts fresh)
+}
+
+// Watch for dialog open and populate initial data
 watch(
 	() => props.modelValue,
 	(newVal) => {
-		if (newVal && props.initialName) {
-			customerData.value.customer_name = props.initialName
+		if (newVal) {
+			// Use nextTick to ensure props are fully set before setting initial data
+			nextTick(() => {
+				setInitialData()
+			})
 		} else if (!newVal) {
 			// Reset form when dialog closes
 			customerData.value = {
@@ -581,6 +677,37 @@ watch(
 			}
 			// Close dropdown when dialog closes
 			showCountryDropdown.value = false
+		}
+	},
+)
+
+// Watch initialPhone directly - this is CRITICAL for when dialog opens with phone
+watch(
+	() => props.initialPhone,
+	(initialPhone, oldPhone) => {
+		console.log("📱 initialPhone prop watcher triggered:", { 
+			newValue: initialPhone, 
+			oldValue: oldPhone,
+			modelValue: props.modelValue,
+			initialName: props.initialName
+		})
+		if (props.modelValue) {
+			setInitialData()
+		}
+	},
+	{ immediate: true }
+)
+
+// Watch initialName to ensure it doesn't override phone
+watch(
+	() => props.initialName,
+	(initialName) => {
+		// Only set name if dialog is open, no phone was provided, and name exists
+		if (props.modelValue && !props.initialPhone && initialName) {
+			console.log("📝 initialName prop changed (no phone):", initialName)
+			customerData.value.customer_name = initialName
+			// Clear phone when name is provided
+			customerData.value.mobile_no = ""
 		}
 	},
 )
@@ -748,6 +875,7 @@ watch(
 			customerGroupsResource.reload()
 			territoriesResource.reload()
 			checkPermissions()
+			// IMPORTANT: Do NOT reset form here - let the other watch handle initial data
 		} else {
 			resetForm()
 		}

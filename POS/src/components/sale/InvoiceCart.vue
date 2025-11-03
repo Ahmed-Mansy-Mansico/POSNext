@@ -547,6 +547,7 @@
 
 <script setup>
 import { usePOSCartStore } from "@/stores/posCart"
+import { useCustomerSearchStore } from "@/stores/customerSearch"
 import { usePOSOffersStore } from "@/stores/posOffers"
 import { usePOSSettingsStore } from "@/stores/posSettings"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
@@ -558,6 +559,7 @@ import EditItemDialog from "./EditItemDialog.vue"
 
 // Use Pinia store
 const cartStore = usePOSCartStore()
+const customerSearchStore = useCustomerSearchStore()
 const offersStore = usePOSOffersStore()
 const settingsStore = usePOSSettingsStore()
 
@@ -708,6 +710,27 @@ const customersResource = createResource({
 		customersResource.reload()
 	}
 })()
+
+// Watch for customer changes to load their gift cards
+watch(
+	() => props.customer,
+	(newCustomer) => {
+		if (newCustomer && props.posProfile && !isOffline()) {
+			giftCardsResource.reload()
+		} else {
+			availableGiftCards.value = []
+		}
+	},
+)
+
+// Sync allCustomers with the store's allCustomers
+watch(
+	() => customerSearchStore.allCustomers,
+	(newCustomers) => {
+		allCustomers.value = newCustomers
+	},
+	{ deep: true }
+)
 
 // Load offers resource and set them in store
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
