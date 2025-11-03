@@ -9,7 +9,9 @@ import {
 	createCSRFAwareRequest,
 	ensureCSRFToken,
 	getCSRFTokenFromCookie,
+	onCSRFTokenRefresh,
 } from "./utils/csrf"
+import { offlineWorker } from "./utils/offline/workerClient"
 
 import {
 	Alert,
@@ -72,11 +74,37 @@ const globalComponents = {
 	Badge,
 }
 
+// Helper to sync CSRF token to worker
+async function syncCSRFTokenToWorker() {
+	if (window.csrf_token && typeof window.csrf_token === 'string') {
+		try {
+			await offlineWorker.setCSRFToken(window.csrf_token)
+			if (import.meta.env.DEV) {
+				console.log("CSRF token synced to worker")
+			}
+		} catch (error) {
+			if (import.meta.env.DEV) {
+				console.warn("Failed to sync CSRF token to worker:", error)
+			}
+		}
+	}
+}
+
 // Initialize CSRF token and user session before mounting
 async function initializeApp() {
 	// Set up the app - CSRF token will be initialized after login
 	const app = createApp(App)
 	const pinia = createPinia()
+
+	// Register callback to sync CSRF token to worker whenever it's refreshed
+	// This handles both periodic refreshes and automatic retry refreshes
+	onCSRFTokenRefresh((newToken) => {
+		offlineWorker.setCSRFToken(newToken).catch((error) => {
+			if (import.meta.env.DEV) {
+				console.warn("Failed to sync refreshed CSRF token to worker:", error)
+			}
+		})
+	})
 
 	// Wrap frappeRequest with CSRF auto-refresh
 	const csrfAwareFrappeRequest = createCSRFAwareRequest(frappeRequest)
@@ -106,6 +134,7 @@ async function initializeApp() {
 		if (import.meta.env.DEV) {
 			console.log("CSRF token found in cookie, using it")
 		}
+		await syncCSRFTokenToWorker()
 	} else {
 		// No token in cookie, try to fetch one (this is a GET request, doesn't need CSRF)
 		if (import.meta.env.DEV) {
@@ -113,6 +142,7 @@ async function initializeApp() {
 		}
 		try {
 			await ensureCSRFToken({ silent: true })
+			await syncCSRFTokenToWorker()
 		} catch (error) {
 			if (import.meta.env.DEV) {
 				console.log("CSRF token fetch failed, will retry on first API call")
@@ -159,6 +189,7 @@ async function initializeApp() {
 				console.log("Performing scheduled CSRF token refresh...")
 			}
 			await ensureCSRFToken({ forceRefresh: true, silent: true })
+			await syncCSRFTokenToWorker()
 		},
 		30 * 60 * 1000,
 	) // 30 minutes

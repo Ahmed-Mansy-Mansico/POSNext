@@ -105,6 +105,7 @@ import ShiftOpeningDialog from "../components/ShiftOpeningDialog.vue"
 import { useShift } from "../composables/useShift"
 import { session } from "../data/session"
 import { ensureCSRFToken } from "../utils/csrf"
+import { offlineWorker } from "../utils/offline/workerClient"
 
 const router = useRouter()
 const { shiftState } = useShift()
@@ -166,6 +167,11 @@ watch(
 			try {
 				console.log("User logged in, initializing CSRF token...")
 				await ensureCSRFToken()
+
+				// Sync CSRF token to worker for background API calls
+				if (window.csrf_token) {
+					await offlineWorker.setCSRFToken(window.csrf_token)
+				}
 			} catch (error) {
 				console.error("Failed to initialize CSRF token after login:", error)
 			}

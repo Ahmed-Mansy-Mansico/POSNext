@@ -45,6 +45,7 @@ async function initDB() {
 // Server connectivity state
 let serverOnline = true
 let manualOffline = false
+let csrfToken = null // CSRF token passed from main thread
 
 // Periodic stock sync state
 let stockSyncInterval = null
@@ -499,12 +500,19 @@ async function fetchStockFromServer() {
 
 		const itemCodes = Array.from(trackedItemCodes)
 
+		const headers = {
+			'Content-Type': 'application/json',
+			'Accept': 'application/json'
+		}
+
+		// Add CSRF token if available
+		if (csrfToken) {
+			headers['X-Frappe-CSRF-Token'] = csrfToken
+		}
+
 		const response = await fetch('/api/method/pos_next.api.items.get_stock_quantities', {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Accept': 'application/json'
-			},
+			headers,
 			body: JSON.stringify({
 				item_codes: JSON.stringify(itemCodes),
 				warehouse: currentWarehouse
@@ -688,6 +696,11 @@ self.onmessage = async (event) => {
 		let result
 
 		switch (type) {
+			case "SET_CSRF_TOKEN":
+				csrfToken = payload.token
+				result = { success: true }
+				break
+
 			case "PING_SERVER":
 				result = await pingServer()
 				break

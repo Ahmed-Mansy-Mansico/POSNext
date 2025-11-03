@@ -4,6 +4,7 @@ const CSRF_TOKEN_ENDPOINT = "/api/method/pos_next.api.utilities.get_csrf_token"
 
 let refreshPromise = null
 let lastKnownToken = null
+let tokenRefreshCallbacks = [] // Callbacks to notify when token is refreshed
 
 function readCookie(name) {
 	const value = `; ${document.cookie}`
@@ -35,9 +36,24 @@ function setGlobalToken(token, source) {
 			console.log(`CSRF token ${context}: ${prefix}...`)
 		}
 		lastKnownToken = token
+
+		// Notify all registered callbacks about the token refresh
+		tokenRefreshCallbacks.forEach(callback => {
+			try {
+				callback(token)
+			} catch (error) {
+				console.error("Error in CSRF token refresh callback:", error)
+			}
+		})
 	}
 
 	return token
+}
+
+export function onCSRFTokenRefresh(callback) {
+	if (typeof callback === 'function') {
+		tokenRefreshCallbacks.push(callback)
+	}
 }
 
 export function getCSRFTokenFromCookie() {

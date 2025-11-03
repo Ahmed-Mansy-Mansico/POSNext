@@ -424,6 +424,10 @@ class OfflineWorkerClient {
 		return this.sendMessage("SET_MANUAL_OFFLINE", { value })
 	}
 
+	async setCSRFToken(token) {
+		return this.sendMessage("SET_CSRF_TOKEN", { token })
+	}
+
 	async updateStockQuantities(stockUpdates) {
 		return this.sendMessage("UPDATE_STOCK_QUANTITIES", { stockUpdates })
 	}
