@@ -96,7 +96,8 @@ fixtures = [
 				[
 					"Sales Invoice-posa_pos_opening_shift",
 					"Sales Invoice-posa_is_printed",
-					"Item-custom_company"
+					"Item-custom_company",
+					"POS Profile-create_pos_invoice_instead_of_sales_invoice"
 				]
 			]
 		]
@@ -186,6 +187,8 @@ doc_events = {
 		"validate": "pos_next.validations.validate_item"
 	},
 	"Sales Invoice": {
+		"validate": "pos_next.api.sales_invoice_hooks.validate",
+		"before_cancel": "pos_next.api.sales_invoice_hooks.before_cancel",
 		"on_submit": "pos_next.realtime_events.emit_stock_update_event",
 		"on_cancel": "pos_next.realtime_events.emit_stock_update_event",
 		"after_insert": "pos_next.realtime_events.emit_invoice_created_event"

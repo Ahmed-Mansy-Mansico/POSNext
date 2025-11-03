@@ -154,8 +154,13 @@
 
 <script setup>
 import { printInvoiceByName } from "@/utils/printInvoice"
-import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
+import { useFormatters } from "@/composables/useFormatters"
+import { Button, Dialog, Input, createResource } from "frappe-ui"
 import { computed, ref, watch } from "vue"
+
+const { showError } = useToast()
+const { formatCurrency } = useFormatters()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -211,12 +216,7 @@ const invoicesResource = createResource({
 	},
 	onError(error) {
 		console.error("Error loading invoices:", error)
-		toast.create({
-			title: "Error",
-			text: "Failed to load invoices",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to load invoices")
 	},
 })
 
@@ -296,9 +296,5 @@ function formatDateTime(date, time) {
 		return `${dateStr} ${time}`
 	}
 	return dateStr
-}
-
-function formatCurrency(amount) {
-	return Number.parseFloat(amount || 0).toFixed(2)
 }
 </script>

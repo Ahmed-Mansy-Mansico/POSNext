@@ -257,6 +257,11 @@
 											<h4 class="text-sm font-semibold text-gray-900">Pricing & Discounts</h4>
 										</div>
 										<div class="space-y-3">
+											<CheckboxField
+												v-model="settings.tax_inclusive"
+												label="Tax Inclusive"
+												description="When enabled, displayed prices include tax. When disabled, tax is calculated separately. Changes apply immediately to your cart when you save."
+											/>
 											<NumberField
 												v-model="settings.max_discount_allowed"
 												label="Max Discount (%)"
@@ -348,7 +353,8 @@
 import CheckboxField from "@/components/settings/CheckboxField.vue"
 import NumberField from "@/components/settings/NumberField.vue"
 import SelectField from "@/components/settings/SelectField.vue"
-import { Button, call, createResource, toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
+import { Button, call, createResource } from "frappe-ui"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import {
 	getSectionHeaderClasses,
@@ -361,6 +367,7 @@ import { usePOSEvents } from "@/composables/usePOSEvents"
 
 const log = logger.create('POSSettings')
 const { detectSettingsChanges, updateSettingsSnapshot, emitStockSyncConfigured } = usePOSEvents()
+const { showSuccess, showError } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -392,6 +399,7 @@ const settings = ref({
 	allow_partial_payment: 0,
 	silent_print: 0,
 	allow_negative_stock: 0,
+	tax_inclusive: 0,
 })
 
 // Stock Sync Settings (localStorage persisted)
@@ -467,12 +475,7 @@ const settingsResource = createResource({
 	},
 	onError(error) {
 		loading.value = false
-		toast.create({
-			title: "Error",
-			text: "Failed to load settings",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to load settings")
 	},
 })
 
@@ -500,6 +503,24 @@ watch(
 		}
 	},
 	{ immediate: true },
+)
+
+// Watch for tax_inclusive changes to provide immediate feedback
+const originalTaxInclusive = ref(null)
+watch(
+	() => settings.value.tax_inclusive,
+	(newValue, oldValue) => {
+		// Store original value on first load
+		if (originalTaxInclusive.value === null && oldValue !== undefined) {
+			originalTaxInclusive.value = oldValue
+		}
+
+		// Only show feedback if value actually changed from original
+		if (originalTaxInclusive.value !== null && newValue !== originalTaxInclusive.value) {
+			const mode = newValue ? 'inclusive' : 'exclusive'
+			log.info(`Tax mode toggled to: ${mode}`)
+		}
+	}
 )
 
 // Methods
@@ -539,12 +560,7 @@ async function loadSettings() {
 
 async function saveSettings() {
 	if (!props.posProfile) {
-		toast.create({
-			title: "Error",
-			text: "POS Profile not found",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("POS Profile not found")
 		return
 	}
 
@@ -552,6 +568,7 @@ async function saveSettings() {
 	const oldWarehouse = props.currentWarehouse
 	const warehouseChanged = selectedWarehouse.value !== oldWarehouse
 	const negativeStockChanged = originalAllowNegativeStock.value !== settings.value.allow_negative_stock
+	const taxInclusiveChanged = originalTaxInclusive.value !== null && originalTaxInclusive.value !== settings.value.tax_inclusive
 
 	// Capture old settings for change detection
 	const oldSettings = {
@@ -572,8 +589,9 @@ async function saveSettings() {
 		if (result) {
 			Object.assign(settings.value, result)
 			settings.value.pos_profile = props.posProfile
-			// Update original value after successful save
+			// Update original values after successful save
 			originalAllowNegativeStock.value = result.allow_negative_stock
+			originalTaxInclusive.value = result.tax_inclusive
 		}
 
 		// Update warehouse in POS Profile if changed
@@ -615,24 +633,20 @@ async function saveSettings() {
 		}
 
 		// Show success toast for other changes
-		const successMessage = warehouseChanged
-			? "Settings saved and warehouse updated. Reloading stock..."
-			: "Settings saved successfully"
+		let successMessage = "Settings saved successfully"
+		if (warehouseChanged && taxInclusiveChanged) {
+			successMessage = "Settings saved, warehouse updated, and tax mode changed. Cart will be recalculated."
+		} else if (warehouseChanged) {
+			successMessage = "Settings saved and warehouse updated. Reloading stock..."
+		} else if (taxInclusiveChanged) {
+			const mode = settings.value.tax_inclusive ? 'inclusive' : 'exclusive'
+			successMessage = `Settings saved. Tax mode is now ${mode}. Cart will be recalculated.`
+		}
 
-		toast.create({
-			title: "Success",
-			text: successMessage,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess(successMessage)
 	} catch (error) {
 		log.error("Error saving settings:", error)
-		toast.create({
-			title: "Error",
-			text: error.message || "Failed to save settings",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError(error.message || "Failed to save settings")
 	} finally {
 		saving.value = false
 	}

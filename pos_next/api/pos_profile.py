@@ -44,15 +44,70 @@ def get_pos_profile_data(pos_profile):
 	profile_doc = frappe.get_doc("POS Profile", pos_profile)
 	company_doc = frappe.get_doc("Company", profile_doc.company)
 
+	# Get POS Settings for this profile
+	pos_settings = get_pos_settings(pos_profile)
+
 	return {
 		"pos_profile": profile_doc,
 		"company": company_doc,
+		"pos_settings": pos_settings,
 		"print_settings": {
 			"auto_print": profile_doc.get("print_receipt_on_order_complete", 0),
 			"print_format": profile_doc.get("print_format"),
 			"letter_head": profile_doc.get("letter_head"),
 		}
 	}
+
+
+@frappe.whitelist()
+def get_pos_settings(pos_profile):
+	"""Get POS Settings for a given POS Profile"""
+	if not pos_profile:
+		return {}
+
+	try:
+		# Get POS Settings linked to this POS Profile
+		pos_settings = frappe.db.get_value(
+			"POS Settings",
+			{"pos_profile": pos_profile, "enabled": 1},
+			[
+				"tax_inclusive",
+				"allow_user_to_edit_additional_discount",
+				"allow_user_to_edit_item_discount",
+				"use_percentage_discount",
+				"max_discount_allowed",
+				"disable_rounded_total",
+				"allow_credit_sale",
+				"allow_return",
+				"allow_write_off_change",
+				"allow_partial_payment",
+				"decimal_precision",
+				"allow_negative_stock"
+			],
+			as_dict=True
+		)
+
+		# Return settings or defaults if not found
+		if not pos_settings:
+			return {
+				"tax_inclusive": 0,
+				"allow_user_to_edit_additional_discount": 0,
+				"allow_user_to_edit_item_discount": 1,
+				"use_percentage_discount": 0,
+				"max_discount_allowed": 0,
+				"disable_rounded_total": 1,
+				"allow_credit_sale": 0,
+				"allow_return": 0,
+				"allow_write_off_change": 0,
+				"allow_partial_payment": 0,
+				"decimal_precision": "2",
+				"allow_negative_stock": 0
+			}
+
+		return pos_settings
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get POS Settings Error")
+		return {}
 
 
 @frappe.whitelist()

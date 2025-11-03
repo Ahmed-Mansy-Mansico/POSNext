@@ -149,8 +149,11 @@
 <script setup>
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { clearAllDrafts, deleteDraft, getAllDrafts } from "@/utils/draftManager"
-import { Button, Dialog, toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
+import { Button, Dialog } from "frappe-ui"
 import { onMounted, ref, watch } from "vue"
+
+const { showSuccess, showError } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -191,12 +194,7 @@ async function loadDrafts() {
 		drafts.value = await getAllDrafts()
 	} catch (error) {
 		console.error("Error loading drafts:", error)
-		toast.create({
-			title: "Error",
-			text: "Failed to load draft invoices",
-			icon: "x",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to load draft invoices")
 	}
 }
 
@@ -215,20 +213,10 @@ async function confirmDeleteDraft() {
 		// Notify parent to update count
 		emit("drafts-updated")
 
-		toast.create({
-			title: "Deleted",
-			text: "Draft invoice deleted",
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess("Draft invoice deleted")
 	} catch (error) {
 		console.error("Error deleting draft:", error)
-		toast.create({
-			title: "Error",
-			text: "Failed to delete draft",
-			icon: "x",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to delete draft")
 	}
 }
 
@@ -241,20 +229,10 @@ async function confirmClearAll() {
 		// Notify parent to update count
 		emit("drafts-updated")
 
-		toast.create({
-			title: "Cleared",
-			text: "All draft invoices deleted",
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess("All draft invoices deleted")
 	} catch (error) {
 		console.error("Error clearing drafts:", error)
-		toast.create({
-			title: "Error",
-			text: "Failed to clear drafts",
-			icon: "x",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to clear drafts")
 	}
 }
 

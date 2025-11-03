@@ -300,8 +300,11 @@
 </template>
 
 <script setup>
-import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
+import { useToast } from "@/composables/useToast"
+import { Button, Dialog, Input, createResource } from "frappe-ui"
 import { computed, onMounted, reactive, ref, watch } from "vue"
+
+const { showSuccess, showError, showWarning } = useToast()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -342,12 +345,7 @@ const loadInvoicesResource = createResource({
 	},
 	onError(error) {
 		console.error("Error loading invoices:", error)
-		toast.create({
-			title: "Error",
-			text: "Failed to load recent invoices",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to load recent invoices")
 	},
 })
 
@@ -384,21 +382,11 @@ const fetchInvoiceResource = createResource({
 		if (data) {
 			// Validate that invoice can be returned
 			if (data.docstatus !== 1) {
-				toast.create({
-					title: "Invalid Invoice",
-					text: "Invoice must be submitted to create a return",
-					icon: "alert-circle",
-					iconClasses: "text-amber-600",
-				})
+				showWarning("Invoice must be submitted to create a return")
 				return
 			}
 			if (data.is_return === 1) {
-				toast.create({
-					title: "Invalid Invoice",
-					text: "Cannot create return against a return invoice",
-					icon: "alert-circle",
-					iconClasses: "text-amber-600",
-				})
+				showWarning("Cannot create return against a return invoice")
 				return
 			}
 
@@ -406,12 +394,7 @@ const fetchInvoiceResource = createResource({
 			const availableItems = data.items.filter((item) => item.qty > 0)
 
 			if (availableItems.length === 0) {
-				toast.create({
-					title: "Fully Returned",
-					text: "All items from this invoice have already been returned",
-					icon: "alert-circle",
-					iconClasses: "text-amber-600",
-				})
+				showWarning("All items from this invoice have already been returned")
 				originalInvoice.value = null
 				returnItems.value = []
 				return
@@ -434,12 +417,7 @@ const fetchInvoiceResource = createResource({
 	},
 	onError(error) {
 		console.error("Error fetching invoice:", error)
-		toast.create({
-			title: "Error",
-			text: "Failed to load invoice details",
-			icon: "alert-circle",
-			iconClasses: "text-red-600",
-		})
+		showError("Failed to load invoice details")
 	},
 })
 
@@ -509,12 +487,7 @@ const createReturnResource = createResource({
 
 		resetForm()
 		show.value = false
-		toast.create({
-			title: "Success",
-			text: `Return invoice ${data.name} created successfully`,
-			icon: "check",
-			iconClasses: "text-green-600",
-		})
+		showSuccess(`Return invoice ${data.name} created successfully`)
 	},
 	onError(error) {
 		isSubmitting.value = false
@@ -708,12 +681,7 @@ async function handleCreateReturn() {
 
 	// Validate payment method
 	if (!refundPaymentMethod.value) {
-		toast.create({
-			title: "Validation Error",
-			text: "Please select a payment method for the refund",
-			icon: "alert-circle",
-			iconClasses: "text-amber-600",
-		})
+		showWarning("Please select a payment method for the refund")
 		return
 	}
 

@@ -187,6 +187,7 @@ import { Button, Dialog, Input } from "frappe-ui"
 import { createResource } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 import { useShift } from "../composables/useShift"
+import { useFormatters } from "../composables/useFormatters"
 import ShiftClosingDialog from "./ShiftClosingDialog.vue"
 
 const props = defineProps({
@@ -202,6 +203,7 @@ const open = computed({
 
 const { createOpeningShift, getOpeningDialogData, checkOpeningShift } =
 	useShift()
+const { formatDateTime } = useFormatters()
 
 const step = ref(1)
 const selectedProfile = ref(null)
@@ -342,11 +344,6 @@ function closeAndOpenNew() {
 
 function closeDialog() {
 	open.value = false
-}
-
-function formatDateTime(datetime) {
-	if (!datetime) return ""
-	return new Date(datetime).toLocaleString()
 }
 
 async function handleExistingShiftClosed() {

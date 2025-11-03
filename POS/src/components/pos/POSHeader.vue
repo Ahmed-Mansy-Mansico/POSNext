@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="bg-white shadow-sm sticky top-0 z-[200]"
+		class="bg-white shadow-sm sticky top-0 z-[200] overflow-x-hidden"
 	>
 		<div class="flex py-2 sm:py-3">
 			<!-- POS Icon - Aligned with Management Sidebar (64px) -->
@@ -19,11 +19,11 @@
 			<!-- Main Header Content -->
 			<div class="flex-1 flex justify-between items-center gap-1 sm:gap-2 px-2 sm:px-4 md:px-6">
 				<!-- Left Side: Brand Info -->
-				<div class="flex items-center space-x-1 sm:space-x-4 min-w-0 flex-1">
-					<div class="min-w-0">
-						<div class="flex items-center gap-2">
-							<h1 class="text-xs sm:text-base font-bold text-gray-900 truncate">POS Next</h1>
-							<span class="relative inline-flex items-center px-2 py-0.5 text-[9px] sm:text-[10px] font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-md shadow-sm hover:shadow-md transition-shadow">
+				<div class="flex items-center space-x-1 sm:space-x-4 min-w-0 flex-1 overflow-hidden">
+					<div class="min-w-0 flex-shrink overflow-hidden">
+						<div class="flex items-center gap-1 sm:gap-2">
+							<h1 class="text-xs sm:text-base font-bold text-gray-900 truncate flex-shrink">POS Next</h1>
+							<span class="hidden sm:inline-flex relative items-center px-1 sm:px-2 py-0.5 text-[8px] sm:text-[10px] font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-md shadow-sm hover:shadow-md transition-shadow flex-shrink-0">
 								<span class="absolute inset-0 bg-white/20 rounded-md animate-pulse"></span>
 								<span class="relative">v{{ appVersion }}</span>
 							</span>
@@ -32,7 +32,7 @@
 					</div>
 
 					<!-- Time and Shift Duration - Compact on mobile -->
-					<div class="hidden lg:flex items-center space-x-4 ml-6">
+					<div class="hidden lg:flex items-center space-x-4 ml-6 flex-shrink-0">
 						<!-- Current Time -->
 						<StatusBadge
 							variant="blue"
@@ -53,11 +53,8 @@
 					</div>
 
 					<!-- Mobile Time Display - Very compact -->
-					<div class="flex lg:hidden items-center text-[10px] text-gray-600 font-medium">
-						<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-						</svg>
-						<span class="hidden xs:inline">{{ currentTime }}</span>
+					<div class="flex lg:hidden items-center text-[10px] text-gray-600 font-medium flex-shrink-0 ml-1">
+						<span class="hidden xs:inline whitespace-nowrap">{{ currentTime }}</span>
 					</div>
 				</div>
 

@@ -1,11 +1,11 @@
 import { useOffline } from "@/composables/useOffline"
+import { useToast } from "@/composables/useToast"
 import { parseError } from "@/utils/errorHandler"
 import {
 	cacheCustomersFromServer,
 	cachePaymentMethodsFromServer,
 } from "@/utils/offline"
 import { offlineWorker } from "@/utils/offline/workerClient"
-import { toast } from "frappe-ui"
 import { defineStore } from "pinia"
 import { computed, ref } from "vue"
 
@@ -23,6 +23,9 @@ export const usePOSSyncStore = defineStore("posSync", () => {
 		checkCacheReady,
 		getCacheStats,
 	} = useOffline()
+
+	// Use custom toast
+	const { showSuccess, showError, showWarning } = useToast()
 
 	// Additional offline state
 	const pendingInvoicesList = ref([])
@@ -44,32 +47,17 @@ export const usePOSSyncStore = defineStore("posSync", () => {
 		try {
 			await deletePending(invoiceId)
 			await loadPendingInvoices()
-			toast.create({
-				title: "Invoice Deleted",
-				text: "Offline invoice deleted successfully",
-				icon: "check",
-				iconClasses: "text-green-600",
-			})
+			showSuccess("Offline invoice deleted successfully")
 		} catch (error) {
 			console.error("Error deleting offline invoice:", error)
-			toast.create({
-				title: "Delete Failed",
-				text: error.message || "Failed to delete offline invoice",
-				icon: "alert-circle",
-				iconClasses: "text-red-600",
-			})
+			showError(error.message || "Failed to delete offline invoice")
 			throw error
 		}
 	}
 
 	async function syncAllPending() {
 		if (isOffline.value) {
-			toast.create({
-				title: "Offline Mode",
-				text: "Cannot sync while offline",
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning("Cannot sync while offline")
 			return { success: 0, failed: 0, errors: [] }
 		}
 
@@ -77,12 +65,7 @@ export const usePOSSyncStore = defineStore("posSync", () => {
 			const result = await syncPending()
 
 			if (result.success > 0) {
-				toast.create({
-					title: "Sync Complete",
-					text: `${result.success} invoice(s) synced successfully`,
-					icon: "check",
-					iconClasses: "text-green-600",
-				})
+				showSuccess(`${result.success} invoice(s) synced successfully`)
 				await loadPendingInvoices()
 			}
 
@@ -110,12 +93,7 @@ export const usePOSSyncStore = defineStore("posSync", () => {
 				// to prevent duplicate fetches and improve performance.
 				// Only cache customers and payment methods here.
 
-				toast.create({
-					title: "Syncing Data",
-					text: "Loading customers and payment methods for offline use...",
-					icon: "download",
-					iconClasses: "text-blue-600",
-				})
+				showSuccess("Loading customers and payment methods for offline use...")
 
 				// Fetch customers and payment methods (items handled by itemStore)
 				const [customersData, paymentMethodsData] =
@@ -137,33 +115,18 @@ export const usePOSSyncStore = defineStore("posSync", () => {
 					await offlineWorker.cachePaymentMethods(methodsWithProfile)
 				}
 
-				toast.create({
-					title: "Sync Complete",
-					text: "Data is ready for offline use",
-					icon: "check",
-					iconClasses: "text-green-600",
-				})
+				showSuccess("Data is ready for offline use")
 			}
 		} catch (error) {
 			console.error("Error pre-loading data:", error)
-			toast.create({
-				title: "Sync Warning",
-				text: "Some data may not be available offline",
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning("Some data may not be available offline")
 		}
 	}
 
 	async function checkOfflineCacheAvailability() {
 		const cacheReady = await checkCacheReady()
 		if (!cacheReady && isOffline.value) {
-			toast.create({
-				title: "Limited Functionality",
-				text: "POS is offline without cached data. Please connect to sync.",
-				icon: "alert-circle",
-				iconClasses: "text-orange-600",
-			})
+			showWarning("POS is offline without cached data. Please connect to sync.")
 		}
 		return cacheReady
 	}

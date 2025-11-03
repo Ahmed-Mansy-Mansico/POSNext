@@ -249,10 +249,13 @@
 										<input
 											:value="item.quantity"
 											@input="updateQuantity(item, $event.target.value)"
+											@blur="handleQuantityBlur(item)"
+											@keydown.enter="$event.target.blur()"
 											type="number"
-											min="1"
-											step="1"
-											class="w-10 sm:w-11 text-center bg-white border-0 text-xs sm:text-sm font-bold text-gray-900 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+											min="0.0001"
+											step="any"
+											inputmode="decimal"
+											class="w-16 sm:w-20 text-center bg-white border-0 text-sm sm:text-base font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
 											:aria-label="'Quantity'"
 										/>
 										<button
@@ -434,7 +437,7 @@
 			<div v-if="items.length > 0" class="mb-2.5">
 				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
 					<span>Total Quantity</span>
-					<span class="font-medium text-gray-900">{{ totalQuantity }}</span>
+					<span class="font-medium text-gray-900">{{ formatQuantity(totalQuantity) }}</span>
 				</div>
 				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
 					<span>Subtotal</span>
@@ -526,6 +529,7 @@ import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSOffersStore } from "@/stores/posOffers"
 import { usePOSSettingsStore } from "@/stores/posSettings"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { useFormatters } from "@/composables/useFormatters"
 import { isOffline } from "@/utils/offline"
 import { offlineWorker } from "@/utils/offline/workerClient"
 import { createResource } from "frappe-ui"
@@ -536,6 +540,9 @@ import EditItemDialog from "./EditItemDialog.vue"
 const cartStore = usePOSCartStore()
 const offersStore = usePOSOffersStore()
 const settingsStore = usePOSSettingsStore()
+
+// Use formatters
+const { formatQuantity } = useFormatters()
 
 const props = defineProps({
 	items: {
@@ -803,23 +810,79 @@ function formatCurrency(amount) {
 	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
+/**
+ * Intelligently determine the step size based on current quantity
+ * - Whole numbers (1, 2, 3): step by 1
+ * - Multiples of 0.5 (1.5, 2.5): step by 0.5
+ * - Multiples of 0.25 (0.25, 0.75): step by 0.25
+ * - Multiples of 0.1 (0.1, 0.3): step by 0.1
+ * - Other decimals: step by 0.01
+ */
+function getSmartStep(quantity) {
+	// Check if it's a whole number
+	if (quantity === Math.floor(quantity)) {
+		return 1
+	}
+
+	// Round to 4 decimal places to avoid floating point errors
+	const rounded = Math.round(quantity * 10000) / 10000
+
+	// Check if it's a multiple of 0.5
+	if (Math.abs((rounded % 0.5)) < 0.0001) {
+		return 0.5
+	}
+
+	// Check if it's a multiple of 0.25
+	if (Math.abs((rounded % 0.25)) < 0.0001) {
+		return 0.25
+	}
+
+	// Check if it's a multiple of 0.1
+	if (Math.abs((rounded % 0.1)) < 0.0001) {
+		return 0.1
+	}
+
+	// For other decimals, use 0.01 for fine control
+	return 0.01
+}
+
 function incrementQuantity(item) {
-	emit("update-quantity", item.item_code, item.quantity + 1)
+	const step = getSmartStep(item.quantity)
+	const newQty = Math.round((item.quantity + step) * 10000) / 10000
+	emit("update-quantity", item.item_code, newQty)
 }
 
 function decrementQuantity(item) {
-	if (item.quantity > 1) {
-		emit("update-quantity", item.item_code, item.quantity - 1)
-	} else {
-		// If quantity is 1, remove the item
+	const step = getSmartStep(item.quantity)
+	const newQty = Math.round((item.quantity - step) * 10000) / 10000
+
+	if (newQty <= 0) {
+		// If quantity would be 0 or negative, remove the item
 		emit("remove-item", item.item_code)
+	} else {
+		emit("update-quantity", item.item_code, newQty)
 	}
 }
 
 function updateQuantity(item, value) {
-	const qty = Number.parseInt(value) || 1
-	if (qty > 0) {
+	const qty = Number.parseFloat(value)
+	// Allow any positive number during typing (don't round yet)
+	if (!isNaN(qty) && qty > 0) {
 		emit("update-quantity", item.item_code, qty)
+	}
+}
+
+function handleQuantityBlur(item) {
+	// When user leaves the input field, round and validate
+	if (!item.quantity || item.quantity <= 0) {
+		// If quantity is 0 or invalid, remove the item
+		emit("remove-item", item.item_code)
+	} else {
+		// Round to 4 decimal places for consistency
+		const roundedQty = Math.round(item.quantity * 10000) / 10000
+		if (roundedQty !== item.quantity) {
+			emit("update-quantity", item.item_code, roundedQty)
+		}
 	}
 }
 

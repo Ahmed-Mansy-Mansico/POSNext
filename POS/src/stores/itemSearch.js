@@ -20,6 +20,7 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 	const searchTerm = ref("")
 	const selectedItemGroup = ref(null)
 	const itemGroups = ref([])
+	const profileItemGroups = ref([]) // Item groups from POS Profile filter
 	const loading = ref(false)
 	const loadingMore = ref(false)
 	const searching = ref(false) // Separate loading state for search
@@ -167,9 +168,19 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 
 		if (!sourceItems?.length) return []
 
-		const list = selectedItemGroup.value
-			? sourceItems.filter(i => i.item_group === selectedItemGroup.value)
-			: sourceItems
+		let list
+		if (selectedItemGroup.value) {
+			// User selected a specific item group tab
+			list = sourceItems.filter(i => i.item_group === selectedItemGroup.value)
+		} else if (profileItemGroups.value && profileItemGroups.value.length > 0) {
+			// "All Items" tab with POS Profile item group filters
+			// Combine items from all selected groups in the profile
+			const allowedGroups = new Set(profileItemGroups.value.map(g => g.item_group))
+			list = sourceItems.filter(i => allowedGroups.has(i.item_group))
+		} else {
+			// "All Items" tab with no filters - show everything
+			list = sourceItems
+		}
 
 		// Inject live stock (Pinia auto-updates!)
 		// Each variant appears as a separate item
@@ -628,6 +639,19 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		selectedItemGroup.value = group
 		// Item group impacts filtering; drop filtered cache so UI reflects new subset
 		clearBaseCache()
+
+		// If there's an active search, re-run it with the new group context
+		// to ensure searchResults contains items from the correct group
+		if (searchTerm.value?.trim()) {
+			// Clear any pending debounce timer
+			if (searchDebounceTimer) {
+				clearTimeout(searchDebounceTimer)
+				searchDebounceTimer = null
+			}
+
+			// Immediately trigger a fresh search with the new group
+			searchItems(searchTerm.value)
+		}
 	}
 
 	/**
@@ -638,8 +662,30 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		stockStore.reserve(items) // Simple!
 	}
 
-	function setPosProfile(profile) {
+	async function setPosProfile(profile) {
 		posProfile.value = profile
+
+		// Fetch item groups from POS Profile
+		if (profile) {
+			try {
+				const data = await call("pos_next.api.pos_profile.get_pos_profile_data", {
+					pos_profile: profile
+				})
+
+				// Extract item_groups from the profile
+				if (data?.pos_profile?.item_groups) {
+					profileItemGroups.value = data.pos_profile.item_groups
+					log.info(`Loaded ${profileItemGroups.value.length} item group filters from POS Profile`)
+				} else {
+					profileItemGroups.value = []
+				}
+			} catch (error) {
+				log.error("Error fetching POS Profile item groups", error)
+				profileItemGroups.value = []
+			}
+		} else {
+			profileItemGroups.value = []
+		}
 	}
 
 	function invalidateCache() {
@@ -660,6 +706,7 @@ export const useItemSearchStore = defineStore("itemSearch", () => {
 		searchTerm,
 		selectedItemGroup,
 		itemGroups,
+		profileItemGroups,
 		loading,
 		loadingMore,
 		searching,

@@ -31,11 +31,34 @@ bench get-app https://github.com/BrainWise-DEV/pos_next.git --branch develop
 
 # Install on site
 bench --site [your-site-name] install-app pos_next
-
+bench --site [your-site-name] migrate
 # Build and restart
 bench build --app pos_next
 bench restart
 ```
+
+## 🔄 Updating Existing Installation
+
+If you already have POS Next installed and want to update to the latest version:
+
+```bash
+cd ~/frappe-bench
+
+# Pull latest changes
+cd apps/pos_next
+git pull origin develop
+cd ../..
+
+# Apply database migrations and rebuild
+bench --site [your-site-name] migrate
+bench build --app pos_next
+bench --site [your-site-name] clear-cache
+
+# Restart (production only, skip if using bench start)
+bench restart
+```
+
+**Note**: If running in development mode with `bench start`, simply restart the bench process instead of using `bench restart`.
 
 ### Step 2: Access POS
 
