@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tax Inclusive Setting**
+  - New "Tax Inclusive" toggle in POS Settings under Pricing & Discounts
+  - When enabled, displayed prices include tax (tax is part of the price)
+  - When disabled, tax is calculated separately and added to the price
+  - Changes apply immediately to cart when saved
+  - Backend API endpoints for tax-inclusive invoice creation
+  - Comprehensive tax calculation hooks in sales invoice processing
+- **Custom Toast Notification System**
+  - Implemented custom `useToast` composable for consistent notifications across the app
+  - Centralized toast notification management
+  - Cleaner code with standardized success/error/info message handling
+- **POS Profile Enhancement**
+  - New custom field to create POS Invoices instead of Sales Invoices for better performance
+  - Improved invoice creation workflow
+- **Centralized Formatting Utilities**
+  - Created `useFormatters` composable for consistent formatting across all components
+  - Includes formatters for currency, quantity, dates, times, and percentages
+  - Eliminates code duplication and ensures consistency
+- **Smart Quantity Controls**
+  - Intelligent step detection for quantity increment/decrement buttons
+  - Automatically adjusts step size based on current value (1 for integers, 0.5 for halves, 0.25 for quarters, etc.)
+  - Natural counting experience for both whole and fractional items
+
+### Changed
+- **Enhanced Quantity Precision**
+  - Quantity formatting now supports up to 4 decimal places (e.g., 0.25, 0.125, 0.3333)
+  - Smart rounding removes trailing zeros for cleaner display (2.0 → 2, 0.5 → 0.5)
+  - Precision increased from 2 to 4 decimal places across all quantity calculations
+- **Improved Cart Quantity Input**
+  - Input field width increased by 60% for better visibility (64px/80px on mobile/tablet)
+  - Font size increased for easier reading
+  - Now accepts any decimal value without interruption during typing
+  - Validation and rounding only occurs when input loses focus
+  - Added Enter key support to quickly confirm changes
+  - Minimum value set to 0.0001 for maximum flexibility
+- **Mobile Header Optimization**
+  - Version badge hidden on mobile devices to prevent overflow
+  - Clock icon removed from mobile time display for cleaner UI
+  - Improved responsive spacing and flex layout
+  - Added horizontal scroll prevention at multiple levels
+
+### Fixed
+- **Cart Quantity Display Issues**
+  - Fixed fractional quantities showing incorrect precision (0.2 instead of 0.25)
+  - Quantity input now properly displays and accepts multi-decimal values
+  - Items are automatically removed from cart when quantity reaches zero
+- **Mobile UI Issues**
+  - Fixed header overflow caused by version badge on small screens
+  - Prevented horizontal scrolling on mobile devices
+  - Fixed text truncation issues in header components
+- **Formatting Function Conflicts**
+  - Resolved duplicate function declaration errors in Vue components
+  - Changed formatters from named exports to composable-only exports to prevent conflicts
+- **Closing Shift Display**
+  - Fixed "Items Sold" showing excessive decimal places (6.600000000000 → 6.6)
+  - Applied proper formatting to all numeric fields in closing shift dialog
+  - Tax rates now display with proper precision
+
+### Improved
+- **Code Quality**
+  - Refactored toast notifications reducing code by 250+ lines across 10+ components
+  - Replaced direct toast calls with centralized composable pattern
+  - Refactored formatting functions from 10+ components into single reusable composable
+  - Removed duplicate code across ShiftClosingDialog, ShiftOpeningDialog, InvoiceHistoryDialog, etc.
+  - Better separation of concerns with dedicated formatting utilities
+  - Cleaner component code with standardized notification patterns
+- **User Experience**
+  - Larger, more accessible quantity input fields
+  - Clearer visual feedback during quantity editing
+  - More intuitive increment/decrement behavior
+  - Cleaner mobile interface with reduced visual clutter
+  - Consistent notification styling and behavior across the app
+- **Performance**
+  - Option to use POS Invoices instead of Sales Invoices for faster invoice creation
+  - Reduced component complexity through code refactoring
+
 ## [1.1.1] - 2025-10-29
 
 ### Added
