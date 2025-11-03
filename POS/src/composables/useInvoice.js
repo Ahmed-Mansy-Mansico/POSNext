@@ -12,6 +12,7 @@ export function useInvoice() {
 	const additionalDiscount = ref(0)
 	const couponCode = ref(null)
 	const taxRules = ref([]) // Tax rules from POS Profile
+	const taxInclusive = ref(false) // Tax inclusive setting from POS Settings
 
 	// Performance: Incrementally maintained aggregates (updated on add/remove/change)
 	// This avoids O(n) array reductions on every reactive change
@@ -94,23 +95,36 @@ export function useInvoice() {
 	// ========================================================================
 	// COMPUTED TOTALS - IMPORTANT: Subtotal uses price_list_rate (original price)
 	// ========================================================================
-	// Formula: Grand Total = Subtotal + Tax - Discount
-	// - Subtotal: Sum of (price_list_rate × quantity) for all items
-	// - Discount: Sum of discount_amounts + additional cart discount
-	// - Tax: Sum of tax amounts
-	// This ensures discounts are only applied once!
+	// Formula depends on tax_inclusive mode:
+	//
+	// TAX EXCLUSIVE (default):
+	// - Subtotal: Sum of (price_list_rate × quantity) = net amounts
+	// - Tax: Calculated and added on top
+	// - Grand Total = Subtotal - Discount + Tax
+	//
+	// TAX INCLUSIVE:
+	// - Subtotal: Sum of (price_list_rate × quantity) = gross amounts (includes tax)
+	// - Tax: Extracted from prices (for display only)
+	// - Grand Total = Subtotal - Discount (tax already included!)
+	//
+	// This ensures tax is not double-counted in inclusive mode!
 	// ========================================================================
 	const subtotal = computed(() => _cachedSubtotal.value)
 	const totalTax = computed(() => _cachedTotalTax.value)
 	const totalDiscount = computed(
 		() => _cachedTotalDiscount.value + (additionalDiscount.value || 0),
 	)
-	const grandTotal = computed(
-		() =>
-			_cachedSubtotal.value +
-			_cachedTotalTax.value -
-			(_cachedTotalDiscount.value + (additionalDiscount.value || 0)),
-	)
+	const grandTotal = computed(() => {
+		const discount = _cachedTotalDiscount.value + (additionalDiscount.value || 0)
+
+		if (taxInclusive.value) {
+			// Tax inclusive: Subtotal already includes tax, so don't add it again
+			return _cachedSubtotal.value - discount
+		} else {
+			// Tax exclusive: Add tax on top of subtotal
+			return _cachedSubtotal.value + _cachedTotalTax.value - discount
+		}
+	})
 	const totalPaid = computed(() => _cachedTotalPaid.value)
 
 	const remainingAmount = computed(() => {
@@ -425,12 +439,19 @@ export function useInvoice() {
 		// 1. Base Amount (price_list_rate × quantity)
 		// 2. Discount Amount
 		// 3. Final Rate (discounted price per unit)
-		// 4. Net Amount (after discount, before tax)
+		// 4. Net Amount (after discount, before/after tax depending on tax_inclusive)
 		// 5. Tax Amount
 		// 6. Total Amount (net + tax)
 		//
 		// IMPORTANT: Always use price_list_rate as the base for calculations
 		// to avoid double-discount bugs!
+		//
+		// TAX INCLUSIVE MODE:
+		// When tax_inclusive is true, the displayed price already includes tax.
+		// So we work backwards to extract the net amount and tax:
+		// - Gross = Base - Discount (this includes tax)
+		// - Net = Gross / (1 + tax_rate/100)
+		// - Tax = Gross - Net
 		// ========================================================================
 
 		// Step 1: Calculate base amount using price_list_rate (original price before discount)
@@ -451,17 +472,38 @@ export function useInvoice() {
 		}
 		item.discount_amount = discountAmount
 
-		// Step 3: Calculate final rate (price after discount per unit)
-		// This is the actual selling price per unit after applying the discount
-		item.rate = item.quantity > 0 ? (baseAmount - discountAmount) / item.quantity : priceListRate
-
-		// Step 4: Calculate net amount (after discount, before tax)
-		const netAmount = baseAmount - discountAmount
-
-		// Step 5: Calculate tax on net amount (optimized with cached tax rate)
+		// Get total tax rate
 		const totalTaxRate = calculateTotalTaxRate()
-		const taxAmount = (netAmount * totalTaxRate) / 100
+
+		// Step 3 & 4 & 5: Calculate based on tax inclusive mode
+		let netAmount = 0
+		let taxAmount = 0
+
+		if (taxInclusive.value && totalTaxRate > 0) {
+			// TAX INCLUSIVE MODE
+			// The price already includes tax, so extract the net amount
+			const grossAmount = baseAmount - discountAmount // This includes tax
+			netAmount = grossAmount / (1 + totalTaxRate / 100)
+			taxAmount = grossAmount - netAmount
+		} else {
+			// TAX EXCLUSIVE MODE (standard)
+			// Tax is added on top of the net amount
+			netAmount = baseAmount - discountAmount
+			taxAmount = (netAmount * totalTaxRate) / 100
+		}
+
 		item.tax_amount = taxAmount
+
+		// Step 3 (cont): Calculate final rate (price after discount per unit)
+		// This is the actual selling price per unit after applying the discount
+		// In tax inclusive mode, this is net + tax; in exclusive mode, this is just net
+		if (taxInclusive.value && totalTaxRate > 0) {
+			// Rate includes tax
+			item.rate = item.quantity > 0 ? (netAmount + taxAmount) / item.quantity : priceListRate
+		} else {
+			// Rate excludes tax
+			item.rate = item.quantity > 0 ? netAmount / item.quantity : priceListRate
+		}
 
 		// Step 6: Calculate final item amount (net amount without tax)
 		// Note: Tax is stored separately in item.tax_amount and added at invoice level
@@ -739,15 +781,20 @@ export function useInvoice() {
 		}
 	}
 
-	async function loadTaxRules(profileName) {
+	async function loadTaxRules(profileName, posSettings = null) {
 		/**
-		 * Load tax rules from POS Profile
+		 * Load tax rules from POS Profile and tax inclusive setting from POS Settings
 		 */
 		try {
 			const result = await getTaxesResource.submit({ pos_profile: profileName })
 			taxRules.value = result?.data || result || []
 
-			// Recalculate all items with new tax rules
+			// Load tax inclusive setting from POS Settings if provided
+			if (posSettings && posSettings.tax_inclusive !== undefined) {
+				taxInclusive.value = posSettings.tax_inclusive || false
+			}
+
+			// Recalculate all items with new tax rules and tax inclusive setting
 			invoiceItems.value.forEach((item) => recalculateItem(item))
 
 			// Rebuild cache after bulk operation
@@ -761,6 +808,19 @@ export function useInvoice() {
 		}
 	}
 
+	function setTaxInclusive(value) {
+		/**
+		 * Set tax inclusive mode and recalculate all items
+		 */
+		taxInclusive.value = value
+
+		// Recalculate all items with new tax inclusive setting
+		invoiceItems.value.forEach((item) => recalculateItem(item))
+
+		// Rebuild cache after bulk operation
+		rebuildIncrementalCache()
+	}
+
 	return {
 		// State
 		invoiceItems,
@@ -771,6 +831,7 @@ export function useInvoice() {
 		additionalDiscount,
 		couponCode,
 		taxRules,
+		taxInclusive,
 
 		// Computed
 		subtotal,
@@ -799,6 +860,7 @@ export function useInvoice() {
 		resetInvoice,
 		clearCart,
 		loadTaxRules,
+		setTaxInclusive,
 		recalculateItem,
 		rebuildIncrementalCache,
 

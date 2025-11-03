@@ -841,8 +841,30 @@ onMounted(async () => {
 	})
 
 	// Listen to pricing changes from settings
-	onPricingChanged(({ changes }) => {
+	onPricingChanged(async ({ changes }) => {
 		log.info('Event: Pricing settings changed', changes)
+
+		// Update tax_inclusive setting if it changed
+		if (changes.hasOwnProperty('tax_inclusive')) {
+			const newTaxInclusive = changes.tax_inclusive.new
+			log.info(`Updating tax_inclusive from ${changes.tax_inclusive.old} to ${newTaxInclusive}`)
+
+			// Update the cart store tax inclusive setting
+			cartStore.setTaxInclusive(newTaxInclusive)
+
+			// Reload tax rules to ensure they're applied with the new setting
+			// This is critical because tax_inclusive affects how taxes are calculated
+			try {
+				log.info('Reloading tax rules with new tax_inclusive setting...')
+				await cartStore.loadTaxRules(
+					shiftStore.currentShift?.pos_profile,
+					{ tax_inclusive: newTaxInclusive }
+				)
+				log.info('Tax rules reloaded successfully')
+			} catch (error) {
+				log.error('Failed to reload tax rules:', error)
+			}
+		}
 
 		// Recalculate cart items if there are any
 		if (cartStore.invoiceItems.length > 0) {
@@ -851,9 +873,22 @@ onMounted(async () => {
 			})
 			cartStore.rebuildIncrementalCache()
 
+			const message = changes.hasOwnProperty('tax_inclusive')
+				? 'Tax mode updated. Cart recalculated with new tax settings.'
+				: 'Discount settings changed. Cart recalculated.'
+
 			toast.create({
 				title: 'Pricing Updated',
-				text: 'Discount settings changed. Cart recalculated.',
+				text: message,
+				icon: 'check',
+				iconClasses: 'text-green-600'
+			})
+		} else if (changes.hasOwnProperty('tax_inclusive')) {
+			// Show feedback even if cart is empty
+			const mode = changes.tax_inclusive.new ? 'inclusive' : 'exclusive'
+			toast.create({
+				title: 'Tax Mode Updated',
+				text: `Prices are now ${mode} of tax. This will apply to new items added to cart.`,
 				icon: 'info',
 				iconClasses: 'text-blue-600'
 			})
@@ -944,7 +979,8 @@ onMounted(async () => {
 					settings: posSettingsStore.settings
 				})
 
-				await cartStore.loadTaxRules(shiftStore.profileName)
+				// Load tax rules with tax_inclusive setting from POS Settings
+				await cartStore.loadTaxRules(shiftStore.profileName, posSettingsStore.settings)
 
 				// Load POS Settings for the current profile
 				await settingsStore.loadSettings(shiftStore.profileName)
@@ -1256,7 +1292,10 @@ async function handleShiftOpened() {
 	if (shiftStore.currentProfile) {
 		cartStore.posProfile = shiftStore.profileName
 		cartStore.posOpeningShift = shiftStore.currentShift?.name
-		await cartStore.loadTaxRules(shiftStore.profileName)
+		// Load POS Settings first to get tax_inclusive setting
+		await posSettingsStore.loadSettings(shiftStore.profileName)
+		// Load tax rules with tax_inclusive setting
+		await cartStore.loadTaxRules(shiftStore.profileName, posSettingsStore.settings)
 	}
 	toast.create({
 		title: "Shift Opened",
