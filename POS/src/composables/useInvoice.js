@@ -1,5 +1,5 @@
 import { createResource } from "frappe-ui"
-import { computed, ref } from "vue"
+import { computed, ref, toRaw } from "vue"
 import { isOffline } from "@/utils/offline"
 
 export function useInvoice() {
@@ -549,7 +549,10 @@ export function useInvoice() {
 		 * Validate stock availability before submission
 		 * Returns array of errors if stock is insufficient
 		 */
-		const items = invoiceItems.value.map((item) => ({
+		// Use toRaw() to ensure we get current, non-reactive values (prevents stale cached quantities)
+		const rawItems = toRaw(invoiceItems.value)
+
+		const items = rawItems.map((item) => ({
 			item_code: item.item_code,
 			qty: item.quantity,
 			warehouse: item.warehouse,
@@ -575,12 +578,16 @@ export function useInvoice() {
 		 * Save invoice as draft (Step 1 - POSAwesome style)
 		 * This creates the invoice with docstatus=0
 		 */
+		// Use toRaw() to ensure we get current, non-reactive values (prevents stale cached quantities)
+		const rawItems = toRaw(invoiceItems.value)
+		const rawPayments = toRaw(payments.value)
+
 		const invoiceData = {
 			doctype: "Sales Invoice",
 			pos_profile: posProfile.value,
 			posa_pos_opening_shift: posOpeningShift.value,
 			customer: customer.value?.name || customer.value,
-			items: invoiceItems.value.map((item) => ({
+			items: rawItems.map((item) => ({
 				item_code: item.item_code,
 				item_name: item.item_name,
 				qty: item.quantity,
@@ -594,7 +601,7 @@ export function useInvoice() {
 				discount_percentage: item.discount_percentage || 0,
 				discount_amount: item.discount_amount || 0,
 			})),
-			payments: payments.value.map((p) => ({
+			payments: rawPayments.map((p) => ({
 				mode_of_payment: p.mode_of_payment,
 				amount: p.amount,
 				type: p.type,
@@ -617,12 +624,16 @@ export function useInvoice() {
 		 */
 		try {
 			// Step 1: Create invoice draft
+			// Use toRaw() to ensure we get current, non-reactive values (prevents stale cached quantities)
+			const rawItems = toRaw(invoiceItems.value)
+			const rawPayments = toRaw(payments.value)
+
 			const invoiceData = {
 				doctype: "Sales Invoice",
 				pos_profile: posProfile.value,
 				posa_pos_opening_shift: posOpeningShift.value,
 				customer: customer.value?.name || customer.value,
-				items: invoiceItems.value.map((item) => ({
+				items: rawItems.map((item) => ({
 					item_code: item.item_code,
 					item_name: item.item_name,
 					qty: item.quantity,
@@ -635,7 +646,7 @@ export function useInvoice() {
 					discount_percentage: item.discount_percentage || 0,
 					discount_amount: item.discount_amount || 0,
 				})),
-				payments: payments.value.map((p) => ({
+				payments: rawPayments.map((p) => ({
 					mode_of_payment: p.mode_of_payment,
 					amount: p.amount,
 					type: p.type,

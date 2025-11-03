@@ -8,7 +8,7 @@ import {
 } from "@/utils/stockValidator"
 import { useToast } from "@/composables/useToast"
 import { defineStore } from "pinia"
-import { computed, nextTick, ref, watch } from "vue"
+import { computed, nextTick, ref, toRaw, watch } from "vue"
 
 export const usePOSCartStore = defineStore("posCart", () => {
 	// Use the existing invoice composable for core functionality
@@ -131,6 +131,9 @@ export const usePOSCartStore = defineStore("posCart", () => {
 	}
 
 	function buildInvoiceDataForOffers(currentProfile) {
+		// Use toRaw() to ensure we get current, non-reactive values (prevents stale cached quantities)
+		const rawItems = toRaw(invoiceItems.value)
+
 		return {
 			doctype: "Sales Invoice",
 			pos_profile: posProfile.value,
@@ -141,7 +144,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			currency: currentProfile?.currency,
 			discount_amount: additionalDiscount.value || 0,
 			coupon_code: appliedCoupon.value?.name || "",
-			items: invoiceItems.value.map((item) => ({
+			items: rawItems.map((item) => ({
 				item_code: item.item_code,
 				item_name: item.item_name,
 				qty: item.quantity,
