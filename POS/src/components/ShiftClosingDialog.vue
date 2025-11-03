@@ -41,7 +41,7 @@
               <!-- Items Sold -->
               <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 md:p-4">
                 <div class="text-gray-600 text-xs uppercase font-medium mb-1">Items Sold</div>
-                <div class="text-lg md:text-2xl font-bold text-gray-900 mb-0.5 md:mb-1">{{ closingData.total_quantity || 0 }}</div>
+                <div class="text-lg md:text-2xl font-bold text-gray-900 mb-0.5 md:mb-1">{{ formatQuantity(closingData.total_quantity) }}</div>
                 <div class="text-gray-600 text-xs">Total items</div>
               </div>
 
@@ -328,7 +328,7 @@
                 <div v-for="(tax, idx) in closingData.taxes" :key="idx" class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div>
                     <p class="text-xs md:text-sm font-medium text-gray-900">{{ tax.account_head }}</p>
-                    <p class="text-xs text-gray-500">{{ tax.rate }}%</p>
+                    <p class="text-xs text-gray-500">{{ formatQuantity(tax.rate) }}%</p>
                   </div>
                   <div class="text-right">
                     <p class="text-sm md:text-base font-semibold text-gray-900">{{ formatCurrency(tax.amount) }}</p>
@@ -409,6 +409,7 @@
 import { Button, Dialog, Input } from "frappe-ui"
 import { computed, reactive, ref, watch } from "vue"
 import { useShift } from "../composables/useShift"
+import { useFormatters } from "../composables/useFormatters"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -423,6 +424,7 @@ const open = computed({
 })
 
 const { getClosingShiftData, submitClosingShift } = useShift()
+const { formatCurrency, formatQuantity, formatDateTime, formatTime } = useFormatters()
 
 const closingData = ref(null)
 const closingDataResource = getClosingShiftData
@@ -519,25 +521,6 @@ function closeDialog() {
 	open.value = false
 	closingData.value = null
 	showInvoiceDetails.value = false
-}
-
-// Formatting Functions
-function formatCurrency(amount) {
-	if (amount === null || amount === undefined) return "0.00"
-	return Number.parseFloat(amount).toFixed(2)
-}
-
-function formatDateTime(datetime) {
-	if (!datetime) return ""
-	return new Date(datetime).toLocaleString()
-}
-
-function formatTime(datetime) {
-	if (!datetime) return ""
-	return new Date(datetime).toLocaleTimeString([], {
-		hour: "2-digit",
-		minute: "2-digit",
-	})
 }
 
 // Calculation Functions

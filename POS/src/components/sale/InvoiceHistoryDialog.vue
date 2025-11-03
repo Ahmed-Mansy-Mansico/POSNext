@@ -155,10 +155,12 @@
 <script setup>
 import { printInvoiceByName } from "@/utils/printInvoice"
 import { useToast } from "@/composables/useToast"
+import { useFormatters } from "@/composables/useFormatters"
 import { Button, Dialog, Input, createResource } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
 const { showError } = useToast()
+const { formatCurrency } = useFormatters()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -294,9 +296,5 @@ function formatDateTime(date, time) {
 		return `${dateStr} ${time}`
 	}
 	return dateStr
-}
-
-function formatCurrency(amount) {
-	return Number.parseFloat(amount || 0).toFixed(2)
 }
 </script>

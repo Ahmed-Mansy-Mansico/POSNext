@@ -518,11 +518,13 @@ import PaymentDialog from "@/components/sale/PaymentDialog.vue"
 import { useInvoiceFilters } from "@/composables/useInvoiceFilters"
 import { useInvoiceFiltersStore } from "@/stores/invoiceFilters"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
+import { useFormatters } from "@/composables/useFormatters"
 import { useToast } from "@/composables/useToast"
 import { Button, call } from "frappe-ui"
 import { computed, onMounted, ref, watch } from "vue"
 
 const { showSuccess, showError } = useToast()
+const { formatDate, formatDateTime } = useFormatters()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -824,18 +826,6 @@ async function handlePaymentCompleted(paymentData) {
 
 function formatCurrency(amount) {
 	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
-}
-
-function formatDate(date) {
-	if (!date) return ""
-	const d = new Date(date)
-	return d.toLocaleDateString()
-}
-
-function formatDateTime(datetime) {
-	if (!datetime) return ""
-	const d = new Date(datetime)
-	return d.toLocaleString()
 }
 
 function calculateDraftTotal(items) {
