@@ -399,6 +399,7 @@
 			v-model="uiStore.showCreateCustomerDialog"
 			:pos-profile="shiftStore.profileName"
 			:initial-name="uiStore.initialCustomerName"
+			:initial-phone="uiStore.initialCustomerPhone"
 			@customer-created="handleCustomerCreated"
 		/>
 
@@ -678,6 +679,7 @@ import { useToast } from "@/composables/useToast"
 
 import { useItemSearchStore } from "@/stores/itemSearch"
 import { useStockStore } from "@/stores/stock"
+import { useCustomerSearchStore } from "@/stores/customerSearch"
 // Pinia Stores
 import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSDraftsStore } from "@/stores/posDrafts"
@@ -691,6 +693,7 @@ import { logger } from "@/utils/logger"
 const cartStore = usePOSCartStore()
 const shiftStore = usePOSShiftStore()
 const uiStore = usePOSUIStore()
+const customerSearchStore = useCustomerSearchStore()
 const offlineStore = usePOSSyncStore()
 const draftsStore = usePOSDraftsStore()
 const posSettingsStore = usePOSSettingsStore()
@@ -1410,8 +1413,40 @@ function handleCustomerSelected(selectedCustomer) {
 }
 
 function handleCreateCustomer(searchValue) {
-	uiStore.setInitialCustomerName(searchValue || "")
+	const value = (searchValue || "").trim()
+	
+	// Check if it's a phone number
+	const isPhone = isPhoneNumberValue(value)
+	
+	if (isPhone) {
+		// It's a phone number - set initialPhone, not initialName
+		uiStore.setInitialCustomerPhone(value)
+		uiStore.setInitialCustomerName("")
+		console.log("✅ handleCreateCustomer: Setting as PHONE:", value)
+	} else {
+		// It's a name - set initialName, not initialPhone
+		uiStore.setInitialCustomerName(value)
+		uiStore.setInitialCustomerPhone("")
+		console.log("✅ handleCreateCustomer: Setting as NAME:", value)
+	}
+	
 	uiStore.showCreateCustomerDialog = true
+}
+
+// Helper function to check if value is a phone number
+function isPhoneNumberValue(term) {
+	if (!term || typeof term !== 'string') {
+		return false
+	}
+	
+	const cleanTerm = term.trim().replace(/\s+/g, "")
+	if (cleanTerm.length === 0) {
+		return false
+	}
+	
+	// Pattern: optional +, followed by 5+ digits
+	const phonePattern = /^\+?\d{5,}$/
+	return phonePattern.test(cleanTerm)
 }
 
 function handleProceedToPayment() {
@@ -1824,7 +1859,18 @@ function handleCreateReturnFromHistory(invoice) {
 	})
 }
 
-function handleCustomerCreated(newCustomer) {
+async function handleCustomerCreated(newCustomer) {
+	// Add the newly created customer to the search cache
+	// so it appears in search results immediately without refresh
+	if (newCustomer && newCustomer.customer_name) {
+		await customerSearchStore.addCustomerToCache(newCustomer)
+		
+		console.log("✅ POSSale handleCustomerCreated: Customer added to search cache:", {
+			name: newCustomer.customer_name,
+			mobile: newCustomer.mobile_no,
+		})
+	}
+	
 	cartStore.setCustomer(newCustomer)
 	uiStore.showCreateCustomerDialog = false
 	toast.create({
