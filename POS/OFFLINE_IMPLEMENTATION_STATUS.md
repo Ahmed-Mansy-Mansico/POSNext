@@ -11,11 +11,11 @@ The POS application currently **does not work when the backend is offline** beca
 
 ---
 
-## Comparison with POSawesome
+## Offline Implementation Comparison
 
-### ✅ POSawesome - Fully Offline Capable
+### ✅ Full Offline Capability Reference
 
-**How POSawesome Works:**
+**How Offline POS Systems Work:**
 1. **Pre-Loading Phase (While Online):**
    - Loads ALL items into IndexedDB
    - Loads ALL customers into IndexedDB

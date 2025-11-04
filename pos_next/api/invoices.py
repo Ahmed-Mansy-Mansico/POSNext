@@ -89,7 +89,7 @@ def get_payment_account(mode_of_payment, company):
 
 
 # ==========================================
-# Stock Validation Functions (from POSAwesome)
+# Stock Validation Functions
 # ==========================================
 
 
@@ -160,7 +160,7 @@ def _should_block(pos_profile):
         if pos_settings_allow_negative:
             return False
 
-        # Try to get custom field from POSAwesome (may not exist in vanilla ERPNext)
+        # Try to get custom field (may not exist in vanilla ERPNext)
         block_sale = cint(
             frappe.db.get_value(
                 "POS Profile", pos_profile, "posa_block_sale_beyond_available_qty"

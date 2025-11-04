@@ -575,7 +575,7 @@ export function useInvoice() {
 
 	async function saveDraft() {
 		/**
-		 * Save invoice as draft (Step 1 - POSAwesome style)
+		 * Save invoice as draft (Step 1)
 		 * This creates the invoice with docstatus=0
 		 */
 		// Use toRaw() to ensure we get current, non-reactive values (prevents stale cached quantities)
@@ -618,7 +618,7 @@ export function useInvoice() {
 
 	async function submitInvoice() {
 		/**
-		 * Two-step submission process (POSAwesome style):
+		 * Two-step submission process:
 		 * 1. Create/update draft invoice
 		 * 2. Validate stock and submit
 		 */

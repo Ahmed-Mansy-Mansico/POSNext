@@ -1,6 +1,6 @@
 # POS Next - Version Control System
 
-This document explains the version control mechanism implemented in POS Next, similar to POSAwesome.
+This document explains the version control mechanism implemented in POS Next.
 
 ## Overview
 
@@ -233,16 +233,13 @@ console.log(__BUILD_VERSION__)  // "1730043123456"
 4. **Document changes**: Update CHANGELOG.md with each release
 5. **Test locally**: Verify version changes before pushing
 
-## Comparison with POSAwesome
+## Key Features
 
-### Similarities
 - Uses timestamp-based build versions
 - Vite plugin generates version.json
 - Backend utility functions for version retrieval
 - Cache busting through query parameters
-
-### Differences
-- **Location**: POS Next uses `public/pos/` while POSAwesome uses `public/dist/js/`
+- **Location**: POS Next uses `public/pos/` for build assets
 - **Fallback**: POS Next checks manifest.webmanifest mtime as additional fallback
 - **Script**: POS Next includes automated version bump script
 - **Documentation**: POS Next has comprehensive version management guide

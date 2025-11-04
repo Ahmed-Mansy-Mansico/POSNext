@@ -145,7 +145,7 @@ def get_closing_shift_data(opening_shift):
 		opening_shift_dict = opening_shift_doc.as_dict()
 		opening_shift_json = json.dumps(opening_shift_dict, default=str)
 
-		# Call POSawesome function
+		# Create closing shift from opening shift
 		closing_data = make_closing_shift_from_opening(opening_shift_json)
 
 		# Convert the result to a serializable dict using frappe's as_dict which handles datetime

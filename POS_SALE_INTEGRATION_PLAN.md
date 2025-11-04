@@ -1,11 +1,11 @@
 # POS Sale Integration Plan - POS Next
 
 ## Overview
-This document outlines the strategy for integrating the POS sale functionality from POSawesome into POS Next, following Frappe UI design patterns and maintaining consistency with the existing login/shift management implementation.
+This document outlines the strategy for integrating the POS sale functionality into POS Next, following Frappe UI design patterns and maintaining consistency with the existing login/shift management implementation.
 
 ## Current State Analysis
 
-### POSawesome Architecture
+### Reference POS Architecture
 **Components Structure:**
 - `Pos.vue` - Main POS container with dialogs
 - `ItemsSelector.vue` - Item selection grid/list (175KB - complex)
@@ -65,7 +65,7 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 @frappe.whitelist()
 def get_item_details(item_code, pos_profile, customer=None, qty=1):
     """Get detailed item info including price, tax, stock"""
-    # Reuse POSawesome logic from posawesome.api.posapp
+    # Implement item details logic
     pass
 
 @frappe.whitelist()
@@ -77,7 +77,7 @@ def create_draft_invoice(invoice_data):
 @frappe.whitelist()
 def submit_invoice(invoice_data):
     """Create and submit POS Invoice or Sales Invoice"""
-    # Leverage posawesome.posawesome.doctype.pos_invoice.pos_invoice
+    # Implement invoice submission logic
     pass
 
 @frappe.whitelist()
@@ -93,7 +93,7 @@ def get_payment_methods(pos_profile):
 @frappe.whitelist()
 def apply_offers(invoice_data):
     """Calculate and apply promotional offers"""
-    # Use POSawesome offer engine
+    # Implement promotional offer logic
     pass
 ```
 
@@ -801,9 +801,9 @@ export default router
 - Consistent with Login and Shift dialogs
 - No custom Vuetify components
 
-### 2. **Leverage POSawesome Backend**
-- Reuse POSawesome's `posawesome.api.posapp` methods
-- Don't reinvent the wheel for item/price logic
+### 2. **Build on Existing Backend**
+- Implement robust API methods for POS operations
+- Create efficient item/price logic
 - Wrapper API in `pos_next` for clean separation
 
 ### 3. **Simple First, Enhance Later**
@@ -814,7 +814,7 @@ export default router
 
 ### 4. **Offline Support (Future)**
 - Phase 2 enhancement
-- Use IndexedDB like POSawesome
+- Use IndexedDB for offline storage
 - Sync queue for offline invoices
 
 ### 5. **Responsive Design**
