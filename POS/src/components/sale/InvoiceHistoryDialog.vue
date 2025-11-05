@@ -96,7 +96,7 @@
 										</svg>
 									</button>
 									<button
-										@click="printInvoice(invoice)"
+										@click="printInvoiceFromPrintview(invoice)"
 										class="p-1.5 hover:bg-green-50 rounded transition-colors"
 										title="Print"
 									>
@@ -153,7 +153,7 @@
 </template>
 
 <script setup>
-import { printInvoiceByName } from "@/utils/printInvoice"
+import { printInvoiceByName, printInvoiceFromPrintView } from "@/utils/printInvoice"
 import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
@@ -271,6 +271,18 @@ function viewInvoice(invoice) {
 async function printInvoice(invoice) {
 	try {
 		await printInvoiceByName(invoice.name)
+	} catch (error) {
+		console.error("Error printing invoice:", error)
+		window.frappe.msgprint({
+			title: "Error",
+			message: "Failed to print invoice",
+			indicator: "red",
+		})
+	}
+}
+async function printInvoiceFromPrintview(invoice) {
+	try {
+		await printInvoiceFromPrintView(invoice,'POS Sales Invoice Print')
 	} catch (error) {
 		console.error("Error printing invoice:", error)
 		window.frappe.msgprint({
