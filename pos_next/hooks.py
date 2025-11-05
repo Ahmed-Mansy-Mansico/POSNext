@@ -98,7 +98,9 @@ fixtures = [
 					"Sales Invoice-posa_is_printed",
 					"Item-custom_company",
 					"POS Profile-create_pos_invoice_instead_of_sales_invoice",
-					"POS Profile-posa_cash_mode_of_payment"
+					"POS Profile-posa_cash_mode_of_payment",
+					"POS Profile-posa_allow_delete",
+					"POS Profile-posa_block_sale_beyond_available_qty"
 				]
 			]
 		]
