@@ -2,9 +2,14 @@
 @import "frappe-ui/src/style.css";
 @import "@abdulrysr/saudi-riyal-new-symbol-font/style.css";
 
-/* Apply Saudi Riyal symbol font to currency-displaying elements */
+/* Apply Saudi Riyal symbol font to body for currency support */
 body {
-	font-family: "saudi-riyal-symbol", "Inter", sans-serif;
+	font-family: "SaudiRiyalSymbol", "Inter", sans-serif;
+}
+
+/* Ensure all text elements inherit the font stack with Saudi Riyal support */
+* {
+	font-family: inherit;
 }
 
 /* Ensure frappe-ui dialogs render above sticky mobile navigation */
