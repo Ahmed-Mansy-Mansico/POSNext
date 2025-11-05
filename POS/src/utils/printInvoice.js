@@ -366,7 +366,7 @@ function printInvoiceCustom(invoiceData) {
 				<!-- Footer -->
 				<div class="footer">
 					<div style="margin-bottom: 5px;">Thank you for your business!</div>
-					<div style="font-size: 10px;">Powered by POS Next</div>
+					<div style="font-size: 10px;">Powered by <a href="https://nexus.brainwise.me" target="_blank" style="color: #3b82f6; text-decoration: none; font-weight: 600;">BrainWise</a></div>
 				</div>
 			</div>
 

@@ -638,6 +638,9 @@
 			@cancel="showClearCacheDialog = false"
 			@confirm="confirmClearCache"
 		/>
+
+		<!-- Footer -->
+		<POSFooter />
 		</template>
 	</div>
 </template>
@@ -647,6 +650,7 @@ import ShiftClosingDialog from "@/components/ShiftClosingDialog.vue"
 import ShiftOpeningDialog from "@/components/ShiftOpeningDialog.vue"
 import ClearCacheOverlay from "@/components/common/ClearCacheOverlay.vue"
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue"
+import POSFooter from "@/components/common/POSFooter.vue"
 import ManagementSlider from "@/components/pos/ManagementSlider.vue"
 import POSHeader from "@/components/pos/POSHeader.vue"
 import BatchSerialDialog from "@/components/sale/BatchSerialDialog.vue"
