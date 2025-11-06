@@ -40,7 +40,10 @@ const footerStyle = computed(() => ({
 	WebkitUserSelect: 'none',
 	MozUserSelect: 'none',
 	msUserSelect: 'none',
-	position: 'relative',
+	position: 'fixed',
+	bottom: '0',
+	left: '0',
+	right: '0',
 	width: '100%'
 }))
 
@@ -170,6 +173,10 @@ const ensureStylePresence = () => {
 			.pos-footer-component {
 				pointer-events: auto !important;
 				min-height: 45px;
+				position: fixed !important;
+				bottom: 0 !important;
+				left: 0 !important;
+				right: 0 !important;
 			}
 			.pos-footer-component .footer-content {
 				display: flex;
@@ -247,6 +254,13 @@ const checkIntegrity = () => {
 				el.style.display = 'flex'
 				el.style.visibility = 'visible'
 				el.style.opacity = '1'
+			}
+			// Ensure position stays fixed
+			if (style.position !== 'fixed') {
+				el.style.position = 'fixed'
+				el.style.bottom = '0'
+				el.style.left = '0'
+				el.style.right = '0'
 			}
 		})
 	}

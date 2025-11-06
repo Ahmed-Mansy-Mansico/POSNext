@@ -182,10 +182,11 @@
 		</div>
 
 		<!-- Grid View -->
-		<div v-if="viewMode === 'grid'" key="grid" class="flex-1 flex flex-col overflow-hidden">
+		<div v-if="viewMode === 'grid'" key="grid" class="flex-1 flex flex-col overflow-hidden min-h-0">
 			<div
 				ref="gridScrollContainer"
 				class="flex-1 overflow-y-auto p-1.5 sm:p-3"
+				style="min-height: 0;"
 			>
 				<div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 sm:gap-2.5">
 					<div
@@ -344,20 +345,21 @@
 		</div>
 
 		<!-- Table View -->
-		<div v-if="viewMode === 'list'" key="list" class="flex-1 flex flex-col overflow-hidden">
+		<div v-if="viewMode === 'list'" key="list" class="flex-1 flex flex-col overflow-hidden min-h-0">
 			<div
 				ref="listScrollContainer"
 				class="flex-1 overflow-x-auto overflow-y-auto"
+				style="min-height: 0;"
 			>
 				<table v-if="paginatedItems.length > 0" class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50 sticky top-0 z-10">
 						<tr>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Image</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
-							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Code</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Rate</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Qty</th>
-							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">UOM</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10 w-[50px] sm:w-[60px]">Image</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10 max-w-[120px] sm:max-w-[180px] md:max-w-[200px]">Name</th>
+							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10 sm:max-w-[150px]">Code</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10 w-[70px] sm:w-[100px]">Rate</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10 w-[70px] sm:w-[100px]">Qty</th>
+							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10 md:w-[80px]">UOM</th>
 						</tr>
 					</thead>
 					<tbody class="bg-white divide-y divide-gray-200">
@@ -370,7 +372,7 @@
 							@click="getOptimizedClickHandler(item).click"
 							class="cursor-pointer hover:bg-blue-50 hover:shadow-md transition-[background-color,box-shadow] duration-100 touch-manipulation active:bg-blue-100"
 						>
-							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
+							<td class="px-2 sm:px-3 py-2 whitespace-nowrap w-[50px] sm:w-[60px]">
 								<div class="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
 									<LazyImage
 										v-if="item.image"
@@ -391,14 +393,22 @@
 									</svg>
 								</div>
 							</td>
-							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{{ item.item_name }}</div></td>
-							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.item_code }}</div></td>
-							<td class="px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</div></td>
-							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
+							<td class="px-2 sm:px-3 py-2 max-w-[120px] sm:max-w-[180px] md:max-w-[200px]">
+								<div class="text-xs sm:text-sm font-medium text-gray-900 truncate" :title="item.item_name">
+									{{ item.item_name }}
+								</div>
+							</td>
+							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap sm:max-w-[150px]">
+								<div class="text-xs sm:text-sm text-gray-500 truncate" :title="item.item_code">{{ item.item_code }}</div>
+							</td>
+							<td class="px-2 sm:px-3 py-2 whitespace-nowrap w-[70px] sm:w-[100px]">
+								<div class="text-xs sm:text-sm font-semibold text-blue-600">{{ formatCurrency(item.rate || item.price_list_rate || 0) }}</div>
+							</td>
+							<td class="px-2 sm:px-3 py-2 whitespace-nowrap w-[70px] sm:w-[100px]">
 								<span
 									:class="[
-										'inline-block px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md shadow-sm',
-										'text-xs sm:text-sm font-bold',
+										'inline-block px-1.5 sm:px-3 py-0.5 sm:py-1.5 rounded-md shadow-sm',
+										'text-[10px] sm:text-sm font-bold',
 										getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).color,
 										getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).textColor
 									]"
@@ -407,26 +417,35 @@
 									{{ Math.floor(item.actual_qty ?? item.stock_qty ?? 0) }}
 								</span>
 							</td>
-                                                        <td class="hidden md:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.uom || item.stock_uom || 'Nos' }}</div></td>
+							<td class="hidden md:table-cell px-2 sm:px-3 py-2 whitespace-nowrap md:w-[80px]">
+								<div class="text-xs sm:text-sm text-gray-500">{{ item.uom || item.stock_uom || 'Nos' }}</div>
+							</td>
+						</tr>
+						<!-- Loading More Indicator Row -->
+						<tr v-if="loadingMore">
+							<td colspan="6" class="px-2 sm:px-3 py-4 text-center bg-white">
+								<div class="flex justify-center items-center">
+									<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+									<p class="ml-2 text-xs text-gray-500">Loading more items...</p>
+								</div>
+							</td>
+						</tr>
+
+						<!-- End of Results Indicator Row - Only show when browsing (not searching) -->
+						<tr v-else-if="!hasMore && filteredItems.length > 0 && !searchTerm">
+							<td colspan="6" class="px-2 sm:px-3 py-3 text-center bg-white">
+								<p class="text-xs text-gray-400">All items loaded</p>
+							</td>
+						</tr>
+
+						<!-- Search Results Count Row -->
+						<tr v-else-if="searchTerm && filteredItems.length > 0">
+							<td colspan="6" class="px-2 sm:px-3 py-3 text-center bg-white">
+								<p class="text-xs text-gray-500">{{ filteredItems.length }} items found</p>
+							</td>
 						</tr>
 					</tbody>
 				</table>
-
-				<!-- Loading More Indicator for Table View -->
-				<div v-if="loadingMore" class="flex justify-center items-center py-4 bg-white">
-					<div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-					<p class="ml-2 text-xs text-gray-500">Loading more items...</p>
-				</div>
-
-				<!-- End of Results Indicator - Only show when browsing (not searching) -->
-				<div v-else-if="!hasMore && filteredItems.length > 0 && !searchTerm" class="flex justify-center items-center py-3 bg-white">
-					<p class="text-xs text-gray-400">All items loaded</p>
-				</div>
-
-				<!-- Search Results Count -->
-				<div v-else-if="searchTerm && filteredItems.length > 0" class="flex justify-center items-center py-3 bg-white">
-					<p class="text-xs text-gray-500">{{ filteredItems.length }} items found</p>
-				</div>
 			</div>
 
 			<!-- Pagination Controls for List View -->

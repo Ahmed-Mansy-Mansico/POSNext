@@ -1,5 +1,5 @@
 <template>
-	<div class="h-screen flex flex-col bg-gray-50 overflow-x-hidden">
+	<div class="flex flex-col bg-gray-50 overflow-x-hidden" style="height: 100vh; max-height: 100vh;">
 		<!-- Loading State -->
 		<LoadingSpinner v-if="uiStore.isLoading" />
 
@@ -98,6 +98,7 @@
 	<div
 		v-if="shiftStore.hasOpenShift"
 		class="flex-1 flex overflow-hidden relative"
+		style="max-height: calc(100vh - 60px - var(--header-height, 60px));"
 	>
 		<!-- Icon-Only Management Slider - Always Visible -->
 		<ManagementSlider @menu-clicked="handleManagementMenuClick" />
@@ -235,7 +236,7 @@
 			<button
 				v-if="!uiStore.isDesktop && uiStore.mobileActiveTab === 'items' && cartStore.itemCount > 0"
 				@click="uiStore.setMobileTab('cart')"
-				class="lg:hidden fixed bottom-6 right-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full p-4 shadow-2xl hover:shadow-3xl hover:from-blue-700 hover:to-blue-800 active:from-blue-800 active:to-blue-900 transition-[background,box-shadow,transform] duration-200 z-50 touch-manipulation active:scale-95 ring-4 ring-blue-100"
+				class="lg:hidden fixed bottom-20 right-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full p-4 shadow-2xl hover:shadow-3xl hover:from-blue-700 hover:to-blue-800 active:from-blue-800 active:to-blue-900 transition-[background,box-shadow,transform] duration-200 z-50 touch-manipulation active:scale-95 ring-4 ring-blue-100"
 				:aria-label="'View cart with ' + cartStore.itemCount + ' items'"
 			>
 				<div class="relative">
@@ -254,7 +255,7 @@
 		</div>
 
 		<!-- No Shift Placeholder -->
-		<div v-else class="flex-1 flex items-center justify-center bg-gray-50">
+		<div v-else class="flex-1 flex items-center justify-center bg-gray-50" style="max-height: calc(100vh - 60px - var(--header-height, 60px));">
 			<div class="text-center">
 				<div class="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-blue-100">
 					<svg class="h-12 w-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
