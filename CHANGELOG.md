@@ -23,17 +23,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Discount percentages now display with 2 decimal precision (was showing many decimal places)
   - Added comprehensive JSDoc documentation for pricing and discount calculation logic
 
-## [1.4.0] - 2025-01-06
+## [1.4.0] - 2025-11-06
 
 ### Fixed
 - **Item Query Function Whitelisting**
-  - Fixed item search by whitelisting `item_query` function for API access
+  - Fixed "Function not whitelisted" error when adding Tax Rules
+  - Added `@frappe.whitelist()` decorator to `item_query` function
+  - Parse JSON filters parameter when called from frontend
+  - Remove mandatory company validation to allow global items
+  - Set `custom_company` to empty string for new items without company
+  - Fix demo data setup which creates items without company
   - Enabled global item selection across POS profiles
 - **Mobile UI Layout**
-  - Improved footer positioning for better mobile experience
-  - Enhanced list view layout on mobile devices
+  - Make footer fixed at bottom to prevent scrolling issues on mobile
+  - Add responsive column widths to list view for better mobile experience
+  - Fix vertical scrolling in ItemsSelector with proper min-height constraints
+  - Move status messages inside table rows to span full width
+  - Adjust floating cart button position to sit above fixed footer
+  - Optimize column sizing: mobile (120px name, 70px rate/qty), tablet (180px), desktop (200px)
 
-## [1.3.0] - 2025-01-05
+## [1.3.0] - 2025-11-05
 
 ### Added
 - **BrainWise Branding API**
@@ -47,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated CSS to properly render Saudi Riyal currency symbol (ر.س)
   - Improved font rendering for Arabic text
 
-## [1.2.0] - 2025-01-04
+## [1.2.0] - 2025-11-04
 
 ### Added
 - **CSRF Token Synchronization**
