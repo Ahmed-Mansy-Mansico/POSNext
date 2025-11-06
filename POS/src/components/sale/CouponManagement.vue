@@ -400,7 +400,7 @@
 									<p class="text-sm text-gray-700">
 										<strong>Current Discount:</strong>
 										<span v-if="couponDetails.discount_type === 'Percentage'">
-											{{ couponDetails.discount_percentage }}% off {{ couponDetails.apply_on }}
+											{{ Number(couponDetails.discount_percentage).toFixed(2) }}% off {{ couponDetails.apply_on }}
 										</span>
 										<span v-else>
 											{{ formatCurrency(couponDetails.discount_amount) }} off {{ couponDetails.apply_on }}

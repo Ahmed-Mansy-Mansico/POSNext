@@ -52,11 +52,30 @@ export async function printInvoice(
 }
 
 /**
- * Custom print format as fallback
- * @param {Object} invoiceData - The invoice document data
+ * Generates and prints a custom POS receipt using a thermal printer layout.
+ *
+ * This fallback printer is used when Frappe's standard print format is unavailable.
+ * The receipt is optimized for 80mm thermal printers with clean, readable formatting.
+ *
+ * Receipt Structure:
+ * - Header: Company name and invoice type
+ * - Info: Invoice number, date, customer, payment status
+ * - Items: Each item shows quantity × original price = subtotal
+ * - Discounts: Displayed as separate line items with negative amounts
+ * - Totals: Subtotal, tax, and grand total
+ * - Payments: Payment methods and amounts, change, outstanding balance
+ * - Footer: Thank you message and branding
+ *
+ * @param {Object} invoiceData - The invoice document data from ERPNext
+ * @param {string} invoiceData.name - Invoice number
+ * @param {string} invoiceData.company - Company name
+ * @param {Array} invoiceData.items - Invoice line items
+ * @param {Array} invoiceData.payments - Payment records
+ * @param {number} invoiceData.grand_total - Invoice total amount
  */
 function printInvoiceCustom(invoiceData) {
-	const printWindow = window.open("", "_blank", "width=800,height=600")
+	// Open print window with receipt size dimensions (80mm ≈ 302px at 96 DPI)
+	const printWindow = window.open("", "_blank", "width=350,height=600")
 
 	const printContent = `
 		<!DOCTYPE html>
@@ -73,9 +92,10 @@ function printInvoiceCustom(invoiceData) {
 
 				body {
 					font-family: 'Courier New', monospace;
-					padding: 20px;
+					padding: 10px;
 					width: 80mm;
-					margin: 0 auto;
+					margin: 0;
+					max-width: 80mm;
 				}
 
 				.receipt {
@@ -207,8 +227,15 @@ function printInvoiceCustom(invoiceData) {
 				}
 
 				@media print {
+					@page {
+						size: 80mm auto;
+						margin: 0;
+					}
+
 					body {
-						padding: 0;
+						width: 80mm;
+						padding: 5mm;
+						margin: 0;
 					}
 
 					.no-print {
@@ -261,6 +288,7 @@ function printInvoiceCustom(invoiceData) {
 				<div class="items-table">
 					${invoiceData.items
 						.map((item) => {
+							// Determine if item has promotional pricing
 							const hasItemDiscount =
 								(item.discount_percentage &&
 									Number.parseFloat(item.discount_percentage) > 0) ||
@@ -268,7 +296,11 @@ function printInvoiceCustom(invoiceData) {
 									Number.parseFloat(item.discount_amount) > 0)
 							const isFree = item.is_free_item
 							const qty = item.qty || item.quantity
-							const amount = item.amount || item.rate * qty
+
+							// Display original list price for transparency
+							const displayRate = item.price_list_rate || item.rate
+							// Calculate subtotal before any price reductions
+							const subtotal = qty * displayRate
 
 							return `
 						<div class="item-row">
@@ -276,14 +308,14 @@ function printInvoiceCustom(invoiceData) {
 								${item.item_name || item.item_code}${isFree ? " (FREE)" : ""}
 							</div>
 							<div class="item-details">
-								<span>${qty} × ${formatCurrency(item.rate)}</span>
-								<span><strong>${formatCurrency(amount)}</strong></span>
+								<span>${qty} × ${formatCurrency(displayRate)}</span>
+								<span><strong>${formatCurrency(subtotal)}</strong></span>
 							</div>
 							${
 								hasItemDiscount
 									? `
 							<div class="item-discount">
-								<span>Discount ${item.discount_percentage ? `(${item.discount_percentage}%)` : ""}</span>
+								<span>Discount ${item.discount_percentage ? `(${Number(item.discount_percentage).toFixed(2)}%)` : ""}</span>
 								<span>-${formatCurrency(item.discount_amount || 0)}</span>
 							</div>
 							`

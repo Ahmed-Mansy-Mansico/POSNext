@@ -431,85 +431,68 @@ export function useInvoice() {
 		}
 	}
 
+	/**
+	 * Recalculates all pricing fields for an invoice item.
+	 *
+	 * This function is the single source of truth for item-level calculations,
+	 * ensuring consistency between UI display and backend invoice data.
+	 *
+	 * Calculation Flow:
+	 * 1. Base Amount    = price_list_rate × quantity
+	 * 2. Discount       = Applied based on percentage or fixed amount
+	 * 3. Net Amount     = Base Amount - Discount (may include/exclude tax)
+	 * 4. Tax Amount     = Calculated based on tax_inclusive mode
+	 * 5. Final Amount   = Stored in item.amount for backend processing
+	 *
+	 * Important Design Decisions:
+	 * - item.rate always reflects the original list price (price_list_rate)
+	 * - Discounts are stored separately (discount_amount, discount_percentage)
+	 * - This allows UI to display original prices with clear discount visibility
+	 * - Backend receives calculated net rate (amount/quantity) for accurate totals
+	 *
+	 * Tax Modes:
+	 * - Tax Inclusive: Price includes tax. Extract net = gross / (1 + tax_rate)
+	 * - Tax Exclusive: Tax added on top. Tax = net × tax_rate
+	 *
+	 * @param {Object} item - Invoice item object with quantity, rates, and discount fields
+	 */
 	function recalculateItem(item) {
-		// ========================================================================
-		// ITEM CALCULATION - SINGLE SOURCE OF TRUTH
-		// ========================================================================
-		// This function calculates all item pricing in the correct order:
-		// 1. Base Amount (price_list_rate × quantity)
-		// 2. Discount Amount
-		// 3. Final Rate (discounted price per unit)
-		// 4. Net Amount (after discount, before/after tax depending on tax_inclusive)
-		// 5. Tax Amount
-		// 6. Total Amount (net + tax)
-		//
-		// IMPORTANT: Always use price_list_rate as the base for calculations
-		// to avoid double-discount bugs!
-		//
-		// TAX INCLUSIVE MODE:
-		// When tax_inclusive is true, the displayed price already includes tax.
-		// So we work backwards to extract the net amount and tax:
-		// - Gross = Base - Discount (this includes tax)
-		// - Net = Gross / (1 + tax_rate/100)
-		// - Tax = Gross - Net
-		// ========================================================================
-
-		// Step 1: Calculate base amount using price_list_rate (original price before discount)
-		// Use price_list_rate if available, otherwise fall back to rate
+		// Determine the base unit price (original list price)
 		const priceListRate = item.price_list_rate || item.rate
 		const baseAmount = item.quantity * priceListRate
 
-		// Step 2: Calculate discount amount
+		// Calculate discount from either percentage or fixed amount
 		let discountAmount = 0
 		if (item.discount_percentage > 0) {
-			// Calculate from percentage
 			discountAmount = (baseAmount * item.discount_percentage) / 100
 		} else if (item.discount_amount > 0) {
-			// If discount_amount is set directly, use it and calculate percentage
 			discountAmount = item.discount_amount
+			// Sync percentage when amount is provided directly
 			item.discount_percentage =
 				baseAmount > 0 ? (discountAmount / baseAmount) * 100 : 0
 		}
 		item.discount_amount = discountAmount
 
-		// Get total tax rate
+		// Calculate tax based on inclusive/exclusive mode
 		const totalTaxRate = calculateTotalTaxRate()
-
-		// Step 3 & 4 & 5: Calculate based on tax inclusive mode
 		let netAmount = 0
 		let taxAmount = 0
 
 		if (taxInclusive.value && totalTaxRate > 0) {
-			// TAX INCLUSIVE MODE
-			// The price already includes tax, so extract the net amount
-			const grossAmount = baseAmount - discountAmount // This includes tax
+			// Tax-inclusive: Work backwards from gross to extract net and tax
+			const grossAmount = baseAmount - discountAmount
 			netAmount = grossAmount / (1 + totalTaxRate / 100)
 			taxAmount = grossAmount - netAmount
 		} else {
-			// TAX EXCLUSIVE MODE (standard)
-			// Tax is added on top of the net amount
+			// Tax-exclusive: Calculate tax on top of net amount
 			netAmount = baseAmount - discountAmount
 			taxAmount = (netAmount * totalTaxRate) / 100
 		}
 
+		// Update item fields
 		item.tax_amount = taxAmount
-
-		// Step 3 (cont): Calculate final rate (price after discount per unit)
-		// This is the actual selling price per unit after applying the discount
-		// In tax inclusive mode, this is net + tax; in exclusive mode, this is just net
-		if (taxInclusive.value && totalTaxRate > 0) {
-			// Rate includes tax
-			item.rate = item.quantity > 0 ? (netAmount + taxAmount) / item.quantity : priceListRate
-		} else {
-			// Rate excludes tax
-			item.rate = item.quantity > 0 ? netAmount / item.quantity : priceListRate
-		}
-
-		// Step 6: Calculate final item amount (net amount without tax)
-		// Note: Tax is stored separately in item.tax_amount and added at invoice level
-		item.amount = netAmount
-
-		// Vue 3 reactivity tracks mutations automatically - no need to replace array
+		item.rate = priceListRate  // Preserve original price for display
+		item.amount = netAmount    // Net amount for backend calculations
 	}
 
 	function addPayment(payment) {
@@ -591,7 +574,9 @@ export function useInvoice() {
 				item_code: item.item_code,
 				item_name: item.item_name,
 				qty: item.quantity,
-				rate: item.rate,
+				// Convert net amount to effective rate for backend (amount ÷ quantity)
+				// ERPNext expects rate field to contain the final selling price per unit
+				rate: item.quantity > 0 ? item.amount / item.quantity : item.rate,
 				price_list_rate: item.price_list_rate || item.rate,
 				uom: item.uom,
 				warehouse: item.warehouse,
@@ -637,7 +622,10 @@ export function useInvoice() {
 					item_code: item.item_code,
 					item_name: item.item_name,
 					qty: item.quantity,
-					rate: item.rate,
+					// Convert net amount to effective rate for backend (amount ÷ quantity)
+					// ERPNext expects rate field to contain the final selling price per unit
+					rate: item.quantity > 0 ? item.amount / item.quantity : item.rate,
+					price_list_rate: item.price_list_rate || item.rate,
 					uom: item.uom,
 					warehouse: item.warehouse,
 					batch_no: item.batch_no,

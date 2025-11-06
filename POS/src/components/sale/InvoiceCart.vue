@@ -226,7 +226,7 @@
 									<svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
 										<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
 									</svg>
-									{{ item.discount_percentage }}% OFF
+									{{ Number(item.discount_percentage).toFixed(2) }}% OFF
 								</div>
 							</div>
 

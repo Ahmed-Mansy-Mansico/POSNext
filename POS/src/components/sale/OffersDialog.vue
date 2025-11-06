@@ -92,7 +92,7 @@
 								]"
 							>
 								<div class="text-lg font-bold">
-									<span v-if="offer.discount_percentage">{{ offer.discount_percentage }}% OFF</span>
+									<span v-if="offer.discount_percentage">{{ Number(offer.discount_percentage).toFixed(2) }}% OFF</span>
 									<span v-else-if="offer.discount_amount">{{ formatCurrency(offer.discount_amount) }} OFF</span>
 									<span v-else>Special Offer</span>
 								</div>
