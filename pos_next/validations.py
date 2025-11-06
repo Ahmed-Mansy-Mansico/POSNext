@@ -10,23 +10,31 @@ from frappe import _
 def validate_item(doc, method):
 	"""
 	Validate Item doctype
-	- Make company field mandatory for new items only
-	- Allow existing items with empty company (global items)
+	- Allow items with or without company
+	- Items without company are treated as global items (available to all companies)
+	- Explicitly set custom_company to empty string for new global items
 	"""
-	# Only enforce company for new items
+	# Only set custom_company for new items, don't modify existing items
 	if doc.is_new():
 		if not doc.get("custom_company"):
-			frappe.throw(_("Company is mandatory for new items. Leave empty only for global items that were created before this validation."))
+			doc.custom_company = ""
 
 
+@frappe.whitelist()
 def item_query(doctype, txt, searchfield, start, page_len, filters):
 	"""
 	Custom query to filter items by company
 	- If company is specified in filters, show:
 	  1. Items belonging to that company
-	  2. Global items (where posa_company is empty)
+	  2. Global items (where custom_company is empty)
 	- If no company specified, show all items
 	"""
+	import json
+
+	# Parse filters if it's a string (when called from frontend)
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+
 	conditions = ["disabled = 0"]
 	values = []
 
