@@ -8,81 +8,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Tax Inclusive Setting**
-  - New "Tax Inclusive" toggle in POS Settings under Pricing & Discounts
-  - When enabled, displayed prices include tax (tax is part of the price)
-  - When disabled, tax is calculated separately and added to the price
-  - Changes apply immediately to cart when saved
-  - Backend API endpoints for tax-inclusive invoice creation
-  - Comprehensive tax calculation hooks in sales invoice processing
-- **Custom Toast Notification System**
-  - Implemented custom `useToast` composable for consistent notifications across the app
-  - Centralized toast notification management
-  - Cleaner code with standardized success/error/info message handling
-- **POS Profile Enhancement**
-  - New custom field to create POS Invoices instead of Sales Invoices for better performance
-  - Improved invoice creation workflow
-- **Centralized Formatting Utilities**
-  - Created `useFormatters` composable for consistent formatting across all components
-  - Includes formatters for currency, quantity, dates, times, and percentages
-  - Eliminates code duplication and ensures consistency
-- **Smart Quantity Controls**
-  - Intelligent step detection for quantity increment/decrement buttons
-  - Automatically adjusts step size based on current value (1 for integers, 0.5 for halves, 0.25 for quarters, etc.)
-  - Natural counting experience for both whole and fractional items
-
-### Changed
-- **Enhanced Quantity Precision**
-  - Quantity formatting now supports up to 4 decimal places (e.g., 0.25, 0.125, 0.3333)
-  - Smart rounding removes trailing zeros for cleaner display (2.0 → 2, 0.5 → 0.5)
-  - Precision increased from 2 to 4 decimal places across all quantity calculations
-- **Improved Cart Quantity Input**
-  - Input field width increased by 60% for better visibility (64px/80px on mobile/tablet)
-  - Font size increased for easier reading
-  - Now accepts any decimal value without interruption during typing
-  - Validation and rounding only occurs when input loses focus
-  - Added Enter key support to quickly confirm changes
-  - Minimum value set to 0.0001 for maximum flexibility
-- **Mobile Header Optimization**
-  - Version badge hidden on mobile devices to prevent overflow
-  - Clock icon removed from mobile time display for cleaner UI
-  - Improved responsive spacing and flex layout
-  - Added horizontal scroll prevention at multiple levels
+- **Default Customer Auto-Loading**
+  - New `get_default_customer` API endpoint in POS Profile
+  - Automatically loads default customer when POS opens if configured in POS Profile
+  - Customer appears in cart immediately without manual selection
+  - Maintains proper customer object structure matching manual selection
 
 ### Fixed
-- **Cart Quantity Display Issues**
-  - Fixed fractional quantities showing incorrect precision (0.2 instead of 0.25)
-  - Quantity input now properly displays and accepts multi-decimal values
-  - Items are automatically removed from cart when quantity reaches zero
-- **Mobile UI Issues**
-  - Fixed header overflow caused by version badge on small screens
-  - Prevented horizontal scrolling on mobile devices
-  - Fixed text truncation issues in header components
-- **Formatting Function Conflicts**
-  - Resolved duplicate function declaration errors in Vue components
-  - Changed formatters from named exports to composable-only exports to prevent conflicts
-- **Closing Shift Display**
-  - Fixed "Items Sold" showing excessive decimal places (6.600000000000 → 6.6)
-  - Applied proper formatting to all numeric fields in closing shift dialog
-  - Tax rates now display with proper precision
+- **Original Price Display in Receipts and UI**
+  - Fixed discount handling to preserve original `price_list_rate` in both UI and created invoices
+  - Receipts now clearly show: quantity × original price = subtotal, then discount line, then final total
+  - Backend receives correct net rate for accurate invoice totals
+  - Print format updated to 80mm thermal receipt size instead of A4
+  - Discount percentages now display with 2 decimal precision (was showing many decimal places)
+  - Added comprehensive JSDoc documentation for pricing and discount calculation logic
 
-### Improved
-- **Code Quality**
-  - Refactored toast notifications reducing code by 250+ lines across 10+ components
-  - Replaced direct toast calls with centralized composable pattern
-  - Refactored formatting functions from 10+ components into single reusable composable
-  - Removed duplicate code across ShiftClosingDialog, ShiftOpeningDialog, InvoiceHistoryDialog, etc.
-  - Better separation of concerns with dedicated formatting utilities
-  - Cleaner component code with standardized notification patterns
-- **User Experience**
-  - Larger, more accessible quantity input fields
-  - Clearer visual feedback during quantity editing
-  - More intuitive increment/decrement behavior
-  - Cleaner mobile interface with reduced visual clutter
-  - Consistent notification styling and behavior across the app
-- **Performance**
-  - Option to use POS Invoices instead of Sales Invoices for faster invoice creation
-  - Reduced component complexity through code refactoring
+## [1.4.0] - 2025-01-06
+
+### Fixed
+- **Item Query Function Whitelisting**
+  - Fixed item search by whitelisting `item_query` function for API access
+  - Enabled global item selection across POS profiles
+- **Mobile UI Layout**
+  - Improved footer positioning for better mobile experience
+  - Enhanced list view layout on mobile devices
+
+## [1.3.0] - 2025-01-05
+
+### Added
+- **BrainWise Branding API**
+  - Implemented secure branding configuration API with validation
+  - Centralized branding management system
+- **POS Profile Custom Fields**
+  - Added "Cash Mode of Payment" field to specify default cash payment method
+  - Added "Block Sale Beyond Available Qty" field for stock control
+  - Added "Allow Delete Draft Invoices" field for draft management permissions
+- **Saudi Riyal Font Support**
+  - Updated CSS to properly render Saudi Riyal currency symbol (ر.س)
+  - Improved font rendering for Arabic text
+
+## [1.2.0] - 2025-01-04
+
+### Added
+- **CSRF Token Synchronization**
+  - Implemented CSRF token sync with offline worker for enhanced security
+  - Ensures secure API calls from background workers
+- **POSNext Workspace Configuration**
+  - Added workspace links for enhanced navigation
+  - Improved accessibility to POS features
+
+### Changed
+- **Project Documentation**
+  - Updated project references for clarity and consistency
+  - Improved inline documentation across codebase
+
+### Fixed
+- **Cart Data Processing**
+  - Use `toRaw()` to prevent stale cached quantities in invoice data
+  - Ensures fresh data is always used in calculations
+- **Header Layout**
+  - Removed `overflow-x-hidden` class from POSHeader for improved responsiveness
 
 ## [1.1.1] - 2025-10-29
 
@@ -206,7 +191,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shift management
 - Stock tracking
 
-[Unreleased]: https://github.com/yourusername/pos_next/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/yourusername/pos_next/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/yourusername/pos_next/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/yourusername/pos_next/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/yourusername/pos_next/compare/v1.1.1...v1.2.0
+[1.1.1]: https://github.com/yourusername/pos_next/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/yourusername/pos_next/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/yourusername/pos_next/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/yourusername/pos_next/compare/v1.0.0...v1.0.1
