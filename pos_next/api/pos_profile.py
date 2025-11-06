@@ -211,6 +211,31 @@ def get_warehouses(pos_profile):
 
 
 @frappe.whitelist()
+def get_default_customer(pos_profile):
+	"""Get the default customer configured in POS Profile"""
+	try:
+		if not pos_profile:
+			return {"customer": None}
+
+		# Get the default customer from POS Profile
+		default_customer = frappe.db.get_value("POS Profile", pos_profile, "customer")
+
+		if default_customer:
+			# Get customer details
+			customer_doc = frappe.get_doc("Customer", default_customer)
+			return {
+				"customer": default_customer,
+				"customer_name": customer_doc.customer_name,
+				"customer_group": customer_doc.customer_group,
+			}
+
+		return {"customer": None}
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Default Customer Error")
+		return {"customer": None}
+
+
+@frappe.whitelist()
 def update_warehouse(pos_profile, warehouse):
 	"""Update warehouse in POS Profile"""
 	try:

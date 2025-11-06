@@ -87,6 +87,14 @@ export function useInvoice() {
 		auto: false,
 	})
 
+	const getDefaultCustomerResource = createResource({
+		url: "pos_next.api.pos_profile.get_default_customer",
+		makeParams({ pos_profile }) {
+			return { pos_profile }
+		},
+		auto: false,
+	})
+
 	const cleanupDraftsResource = createResource({
 		url: "pos_next.api.invoices.cleanup_old_drafts",
 		auto: false,
@@ -738,23 +746,46 @@ export function useInvoice() {
 		}
 	}
 
-	function resetInvoice() {
-		invoiceItems.value = []
+	/**
+	 * Sets the default customer from POS Profile if available.
+	 * This is called when resetting/clearing the cart to auto-select
+	 * the default customer configured in the POS Profile.
+	 */
+	async function setDefaultCustomer() {
+		// Reset to null first
 		customer.value = null
-		payments.value = []
-		additionalDiscount.value = 0
-		couponCode.value = null
 
-		// Reset incremental cache
-		_cachedSubtotal.value = 0
-		_cachedTotalTax.value = 0
-		_cachedTotalDiscount.value = 0
-		_cachedTotalPaid.value = 0
+		// Only fetch default customer if we have a POS Profile
+		if (!posProfile.value) {
+			return
+		}
+
+		try {
+			const result = await getDefaultCustomerResource.submit({
+				pos_profile: posProfile.value,
+			})
+
+			// Set the default customer if one is configured
+			if (result && result.customer) {
+				// Create customer object matching the structure from customer selection
+				customer.value = {
+					name: result.customer,
+					customer_name: result.customer_name || result.customer,
+					customer_group: result.customer_group,
+				}
+			}
+		} catch (error) {
+			// Silently fail - default customer is optional
+			console.log("No default customer set in POS Profile")
+		}
 	}
 
-	async function clearCart() {
+	/**
+	 * Resets the invoice to a clean state.
+	 * If a POS Profile is active and has a default customer, it will be pre-selected.
+	 */
+	function resetInvoice() {
 		invoiceItems.value = []
-		customer.value = null
 		payments.value = []
 		additionalDiscount.value = 0
 		couponCode.value = null
@@ -764,6 +795,29 @@ export function useInvoice() {
 		_cachedTotalTax.value = 0
 		_cachedTotalDiscount.value = 0
 		_cachedTotalPaid.value = 0
+
+		// Set default customer from POS Profile if available
+		setDefaultCustomer()
+	}
+
+	/**
+	 * Clears the cart and resets to default state.
+	 * If a POS Profile is active and has a default customer, it will be pre-selected.
+	 */
+	async function clearCart() {
+		invoiceItems.value = []
+		payments.value = []
+		additionalDiscount.value = 0
+		couponCode.value = null
+
+		// Reset incremental cache
+		_cachedSubtotal.value = 0
+		_cachedTotalTax.value = 0
+		_cachedTotalDiscount.value = 0
+		_cachedTotalPaid.value = 0
+
+		// Set default customer from POS Profile if available
+		setDefaultCustomer()
 
 		// Cleanup old draft invoices (older than 1 hour) in background
 		// Skip if offline to avoid network errors
@@ -858,6 +912,7 @@ export function useInvoice() {
 		submitInvoice,
 		resetInvoice,
 		clearCart,
+		setDefaultCustomer,
 		loadTaxRules,
 		setTaxInclusive,
 		recalculateItem,

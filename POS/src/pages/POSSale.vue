@@ -967,6 +967,9 @@ onMounted(async () => {
 				// Load tax rules with tax_inclusive setting from POS Settings
 				await cartStore.loadTaxRules(shiftStore.profileName, posSettingsStore.settings)
 
+				// Set default customer from POS Profile if configured
+				await cartStore.setDefaultCustomer()
+
 				// Load POS Settings for the current profile
 				await settingsStore.loadSettings(shiftStore.profileName)
 
