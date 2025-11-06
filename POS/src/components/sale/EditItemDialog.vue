@@ -36,7 +36,7 @@
 							{{ localItem.item_name }}
 						</h3>
 						<p class="text-sm text-gray-500 truncate">
-							{{ currency }} {{ formatNumber(localItem.price_list_rate || localItem.rate) }} / {{ localItem.stock_uom || 'Nos' }}
+							{{ formatCurrency(localItem.price_list_rate || localItem.rate) }} / {{ localItem.stock_uom || 'Nos' }}
 						</p>
 					</div>
 				</div>
@@ -61,10 +61,13 @@
 									<input
 										v-model.number="localQuantity"
 										type="number"
-										min="1"
-										step="1"
+										min="0.0001"
+										step="any"
+										inputmode="decimal"
 										class="w-full text-center border-0 text-sm font-semibold focus:outline-none focus:ring-0 bg-transparent"
-										@input="validateQuantity"
+										@input="handleQuantityInput"
+										@blur="handleQuantityBlur"
+										@keydown.enter="$event.target.blur()"
 									/>
 								</div>
 								<button
@@ -83,7 +86,7 @@
 							<label class="block text-sm font-medium text-gray-700 mb-2">Rate</label>
 							<div class="relative h-10">
 								<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm font-medium">
-									{{ currency }}
+									{{ currencySymbol }}
 								</span>
 								<input
 									v-model.number="localRate"
@@ -184,15 +187,15 @@
 				<div class="bg-gray-50 rounded-lg p-4 space-y-2">
 					<div class="flex items-center justify-between text-sm">
 						<span class="text-gray-600">Subtotal:</span>
-						<span class="font-semibold text-gray-900">{{ currency }} {{ formatNumber(calculatedSubtotal) }}</span>
+						<span class="font-semibold text-gray-900">{{ formatCurrency(calculatedSubtotal) }}</span>
 					</div>
 					<div v-if="calculatedDiscount > 0" class="flex items-center justify-between text-sm text-red-600">
 						<span>Discount:</span>
-						<span class="font-semibold">-{{ currency }} {{ formatNumber(calculatedDiscount) }}</span>
+						<span class="font-semibold">-{{ formatCurrency(calculatedDiscount) }}</span>
 					</div>
 					<div class="flex items-center justify-between pt-2 border-t border-gray-200">
 						<span class="text-base font-bold text-gray-900">Total:</span>
-						<span class="text-lg font-bold text-blue-600">{{ currency }} {{ formatNumber(calculatedTotal) }}</span>
+						<span class="text-lg font-bold text-blue-600">{{ formatCurrency(calculatedTotal) }}</span>
 					</div>
 				</div>
 			</div>
@@ -219,6 +222,7 @@
 import { useToast } from "@/composables/useToast"
 import { usePOSSettingsStore } from "@/stores/posSettings"
 import { getItemStock } from "@/utils/stockValidator"
+import { formatCurrency as formatCurrencyUtil, getCurrencySymbol } from "@/utils/currency"
 import { Button, Dialog } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
@@ -266,6 +270,8 @@ const availableUoms = computed(() => {
 	)
 })
 
+const currencySymbol = computed(() => getCurrencySymbol(props.currency))
+
 // Initialize local state when item changes
 watch(
 	() => props.item,
@@ -300,21 +306,74 @@ watch(
 	{ immediate: true },
 )
 
+/**
+ * Intelligently determine the step size based on current quantity
+ * - Whole numbers (1, 2, 3): step by 1
+ * - Multiples of 0.5 (1.5, 2.5): step by 0.5
+ * - Multiples of 0.25 (0.25, 0.75): step by 0.25
+ * - Multiples of 0.1 (0.1, 0.3): step by 0.1
+ * - Other decimals: step by 0.01
+ */
+function getSmartStep(quantity) {
+	// Check if it's a whole number
+	if (quantity === Math.floor(quantity)) {
+		return 1
+	}
+
+	// Round to 4 decimal places to avoid floating point errors
+	const rounded = Math.round(quantity * 10000) / 10000
+
+	// Check if it's a multiple of 0.5
+	if (Math.abs((rounded % 0.5)) < 0.0001) {
+		return 0.5
+	}
+
+	// Check if it's a multiple of 0.25
+	if (Math.abs((rounded % 0.25)) < 0.0001) {
+		return 0.25
+	}
+
+	// Check if it's a multiple of 0.1
+	if (Math.abs((rounded % 0.1)) < 0.0001) {
+		return 0.1
+	}
+
+	// For other decimals, use 0.01 for fine control
+	return 0.01
+}
+
 function incrementQuantity() {
-	localQuantity.value++
+	const step = getSmartStep(localQuantity.value)
+	localQuantity.value = Math.round((localQuantity.value + step) * 10000) / 10000
 	calculateTotals()
 }
 
 function decrementQuantity() {
-	if (localQuantity.value > 1) {
-		localQuantity.value--
+	const step = getSmartStep(localQuantity.value)
+	const newQty = Math.round((localQuantity.value - step) * 10000) / 10000
+
+	if (newQty > 0) {
+		localQuantity.value = newQty
 		calculateTotals()
 	}
 }
 
-function validateQuantity() {
-	if (localQuantity.value < 1) {
+function handleQuantityInput() {
+	// Allow any value during typing, just recalculate totals
+	// Don't validate or reset - let user type freely
+	if (localQuantity.value > 0 && !isNaN(localQuantity.value)) {
+		calculateTotals()
+	}
+}
+
+function handleQuantityBlur() {
+	// Validate and fix the quantity when user is done editing (leaves the field)
+	if (!localQuantity.value || localQuantity.value <= 0 || isNaN(localQuantity.value)) {
+		// If invalid, reset to 1
 		localQuantity.value = 1
+	} else {
+		// Round to 4 decimal places for consistency
+		localQuantity.value = Math.round(localQuantity.value * 10000) / 10000
 	}
 	calculateTotals()
 }
@@ -389,8 +448,8 @@ function calculateTotals() {
 	calculateDiscount()
 }
 
-function formatNumber(num) {
-	return Number.parseFloat(num || 0).toFixed(2)
+function formatCurrency(amount) {
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
 function updateItem() {

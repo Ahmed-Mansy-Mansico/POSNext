@@ -23,6 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Discount percentages now display with 2 decimal precision (was showing many decimal places)
   - Added comprehensive JSDoc documentation for pricing and discount calculation logic
 
+### Improved
+- **Edit Item Dialog Decimal Quantity Support**
+  - Quantity field now accepts decimal values (e.g., 0.5, 1.25, 2.75) matching cart behavior
+  - Added smart step increment/decrement based on current quantity value
+  - Improved input handling allowing free editing with validation only on blur
+  - Supports very small quantities down to 0.0001
+  - Added mobile-friendly decimal keyboard input mode
+- **Currency Formatting in Edit Item Dialog**
+  - Replaced raw currency codes (SAR, EGP, etc.) with proper currency symbols
+  - All amounts now use consistent formatCurrency utility across the dialog
+  - Rate field prefix displays currency symbol instead of code
+  - Subtotal, discount, and total now properly formatted with locale support
+
 ## [1.4.0] - 2025-11-06
 
 ### Fixed
