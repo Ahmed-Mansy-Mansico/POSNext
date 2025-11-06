@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Discount percentages now display with 2 decimal precision (was showing many decimal places)
   - Added comprehensive JSDoc documentation for pricing and discount calculation logic
 
+### Changed
+- **Dependency Version Pinning**
+  - Pinned Vue version to exact 3.5.13 (removed caret) for better stability and reproducible builds
+
 ### Improved
 - **Edit Item Dialog Decimal Quantity Support**
   - Quantity field now accepts decimal values (e.g., 0.5, 1.25, 2.75) matching cart behavior
