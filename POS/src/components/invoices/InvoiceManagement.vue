@@ -95,7 +95,7 @@
 							<!-- Unpaid Tab -->
 							<div v-if="activeTab === 'partial'" class="space-y-4">
 								<!-- Filter Buttons -->
-								<div class="flex items-center space-x-2 mb-4">
+								<div class="flex items-center space-x-2 mb-4 flex-wrap gap-2">
 									<button
 										@click="unpaidFilter = 'all'"
 										:class="[
@@ -127,7 +127,18 @@
 												: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
 										]"
 									>
-										Totally Unpaid ({{ unpaidInvoices.filter(inv => inv.status === 'Unpaid').length }})
+										Unpaid ({{ unpaidInvoices.filter(inv => inv.status === 'Unpaid').length }})
+									</button>
+									<button
+										@click="unpaidFilter = 'overdue'"
+										:class="[
+											'px-4 py-2 rounded-lg font-medium text-sm transition-all',
+											unpaidFilter === 'overdue'
+												? 'bg-red-500 text-white shadow-md'
+												: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+										]"
+									>
+										Overdue ({{ unpaidInvoices.filter(inv => inv.status === 'Overdue').length }})
 									</button>
 								</div>
 
@@ -170,12 +181,10 @@
 														<span
 															:class="[
 																'px-2 py-0.5 text-xs font-semibold rounded-full',
-																invoice.status === 'Partly Paid'
-																	? 'bg-orange-100 text-orange-700'
-																	: 'bg-red-100 text-red-700'
+																getStatusClass(invoice.status)
 															]"
 														>
-															{{ invoice.status === 'Partly Paid' ? 'Partially Paid' : 'Unpaid' }}
+															{{ getStatusLabel(invoice.status) }}
 														</span>
 													</div>
 													<div class="flex items-center space-x-4 mt-1 text-sm text-gray-600">
@@ -189,7 +198,7 @@
 															<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 																<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
 															</svg>
-															{{ formatDate(invoice.posting_date) }} {{ invoice.posting_time }}
+															{{ formatDate(invoice.posting_date) }} {{ formatTime(invoice.posting_time) }}
 														</div>
 													</div>
 												</div>
@@ -229,15 +238,38 @@
 
 											<!-- Payment Methods -->
 											<div v-if="invoice.payments && invoice.payments.length > 0" class="mt-3">
-												<div class="text-xs font-medium text-gray-600 mb-2">Previous Payments</div>
+												<div class="text-xs font-medium text-gray-600 mb-2">Payment History</div>
 												<div class="grid grid-cols-2 md:grid-cols-3 gap-2">
 													<div
 														v-for="(payment, idx) in invoice.payments"
 														:key="idx"
-														class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm"
+														:class="[
+															'flex flex-col p-2 rounded-lg border text-sm',
+															payment.source === 'Payment Entry'
+																? 'bg-blue-50 border-blue-200'
+																: 'bg-gray-50 border-gray-200'
+														]"
 													>
-														<span class="text-gray-700">{{ payment.mode_of_payment }}</span>
-														<span class="font-semibold text-gray-900">{{ formatCurrency(payment.amount) }}</span>
+														<div class="flex items-center justify-between mb-1">
+															<span class="text-gray-700 font-medium">{{ payment.mode_of_payment || 'N/A' }}</span>
+															<span class="font-semibold text-gray-900">{{ formatCurrency(payment.amount) }}</span>
+														</div>
+														<div class="flex items-center justify-between">
+															<span
+																v-if="payment.posting_date"
+																class="text-[9px] text-gray-500"
+															>
+																{{ formatDate(payment.posting_date) }}
+															</span>
+															<span
+																:class="[
+																	'text-[9px] font-semibold',
+																	payment.source === 'Payment Entry' ? 'text-blue-600' : 'text-gray-500'
+																]"
+															>
+																{{ getPaymentSourceLabel(payment.source) }}
+															</span>
+														</div>
 													</div>
 												</div>
 											</div>
@@ -281,16 +313,10 @@
 														<span
 															:class="[
 																'text-xs px-2.5 py-1 rounded-full font-semibold',
-																invoice.status === 'Paid'
-																	? 'bg-green-100 text-green-700 border border-green-200'
-																	: invoice.status === 'Partly Paid'
-																	? 'bg-orange-100 text-orange-700 border border-orange-200'
-																	: invoice.status === 'Unpaid'
-																	? 'bg-red-100 text-red-700 border border-red-200'
-																	: 'bg-gray-100 text-gray-700 border border-gray-200'
+																getStatusClass(invoice.status)
 															]"
 														>
-															{{ invoice.status }}
+															{{ getStatusLabel(invoice.status) }}
 														</span>
 													</div>
 												</div>
@@ -323,7 +349,7 @@
 												</svg>
 												<div class="flex-1">
 													<div class="text-xs text-gray-500">Date & Time</div>
-													<div class="text-sm font-medium text-gray-900">{{ formatDate(invoice.posting_date) }} {{ invoice.posting_time }}</div>
+													<div class="text-sm font-medium text-gray-900">{{ formatDate(invoice.posting_date) }} {{ formatTime(invoice.posting_time) }}</div>
 												</div>
 											</div>
 
@@ -524,7 +550,7 @@ import { Button, call } from "frappe-ui"
 import { computed, onMounted, ref, watch } from "vue"
 
 const { showSuccess, showError } = useToast()
-const { formatDate, formatDateTime } = useFormatters()
+const { formatDate, formatDateTime, formatTime } = useFormatters()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -575,13 +601,19 @@ const unpaidSummary = ref({
 const selectedInvoice = ref(null)
 const showPaymentDialog = ref(false)
 
-// Filtered unpaid invoices based on status filter
+// Filtered unpaid invoices based on payment amounts
 const filteredUnpaidInvoices = computed(() => {
 	if (unpaidFilter.value === "partial") {
-		return unpaidInvoices.value.filter((inv) => inv.status === "Partly Paid")
+		// Partially paid: status is 'Partly Paid' only
+		return unpaidInvoices.value.filter((inv) => inv.status === 'Partly Paid')
 	}
 	if (unpaidFilter.value === "unpaid") {
-		return unpaidInvoices.value.filter((inv) => inv.status === "Unpaid")
+		// Totally unpaid: status is 'Unpaid'
+		return unpaidInvoices.value.filter((inv) => inv.status === 'Unpaid')
+	}
+	if (unpaidFilter.value === "overdue") {
+		// Overdue: invoice status is Overdue
+		return unpaidInvoices.value.filter((inv) => inv.status === 'Overdue')
 	}
 	return unpaidInvoices.value // "all"
 })
@@ -732,12 +764,14 @@ watch(show, (val) => {
 
 // Watch for tab changes to emit refresh event for history/returns tabs
 watch(activeTab, (newTab) => {
-	// Emit refresh event when switching to history or returns tabs if data is empty
-	if (
-		(newTab === "history" || newTab === "returns") &&
-		props.historyInvoices.length === 0
-	) {
+	// Always emit refresh event when switching to history or returns tabs
+	// This ensures up-to-date outstanding amounts and invoice data
+	if (newTab === "history" || newTab === "returns") {
 		emit("refresh-history")
+	} else if (newTab === "partial") {
+		// Refresh unpaid invoices when switching to partial tab
+		loadUnpaidInvoices()
+		loadUnpaidSummary()
 	}
 })
 
@@ -749,8 +783,16 @@ function handleClose() {
 async function refreshCurrentTab() {
 	if (activeTab.value === "partial") {
 		await Promise.all([loadUnpaidInvoices(), loadUnpaidSummary()])
+	} else if (activeTab.value === "history") {
+		// Request parent to refresh history data
+		emit("refresh-history")
+	} else if (activeTab.value === "drafts") {
+		// Drafts are passed from parent, emit event if needed
+		emit("refresh-history")
+	} else if (activeTab.value === "returns") {
+		// Returns would also need a refresh
+		emit("refresh-history")
 	}
-	// Other tabs use data from parent, so emit refresh event if needed
 }
 
 async function loadUnpaidInvoices() {
@@ -813,9 +855,12 @@ async function handlePaymentCompleted(paymentData) {
 
 		showSuccess("Payment added successfully")
 
-		// Reload invoices and summary
+		// Reload invoices and summary for partial tab
 		await loadUnpaidInvoices()
 		await loadUnpaidSummary()
+
+		// Also refresh history data to show updated outstanding amounts
+		emit("refresh-history")
 
 		selectedInvoice.value = null
 	} catch (error) {
@@ -826,6 +871,64 @@ async function handlePaymentCompleted(paymentData) {
 
 function formatCurrency(amount) {
 	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
+}
+
+function getPaymentSourceLabel(source) {
+	// Convert source to user-friendly label
+	switch (source) {
+		case 'POS':
+			return 'POS'
+		case 'POS Payment Entry':
+			return 'POS'
+		case 'Payment Entry':
+			return 'Back Office'
+		default:
+			return source
+	}
+}
+
+function getStatusLabel(status) {
+	// Convert ERPNext status to user-friendly labels
+	switch (status) {
+		case 'Partly Paid':
+			return 'Partially Paid'
+		case 'Overdue':
+			return 'Overdue'
+		case 'Unpaid':
+			return 'Unpaid'
+		case 'Paid':
+			return 'Paid'
+		case 'Draft':
+			return 'Draft'
+		case 'Cancelled':
+			return 'Cancelled'
+		case 'Return':
+			return 'Return'
+		default:
+			return status
+	}
+}
+
+function getStatusClass(status) {
+	// Return appropriate CSS classes for each status
+	switch (status) {
+		case 'Partly Paid':
+			return 'bg-orange-100 text-orange-700 border border-orange-200'
+		case 'Overdue':
+			return 'bg-red-100 text-red-700 border border-red-200'
+		case 'Unpaid':
+			return 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+		case 'Paid':
+			return 'bg-green-100 text-green-700 border border-green-200'
+		case 'Draft':
+			return 'bg-gray-100 text-gray-700 border border-gray-200'
+		case 'Cancelled':
+			return 'bg-gray-100 text-gray-700 border border-gray-200'
+		case 'Return':
+			return 'bg-purple-100 text-purple-700 border border-purple-200'
+		default:
+			return 'bg-gray-100 text-gray-700 border border-gray-200'
+	}
 }
 
 function calculateDraftTotal(items) {

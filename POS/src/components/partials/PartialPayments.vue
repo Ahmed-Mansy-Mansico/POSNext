@@ -85,8 +85,13 @@
 										<div>
 											<div class="flex items-center space-x-2">
 												<h3 class="text-lg font-bold text-gray-900">{{ invoice.name }}</h3>
-												<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-700">
-													Partial
+												<span
+													:class="[
+														'px-2 py-0.5 text-xs font-semibold rounded-full',
+														getStatusClass(invoice.status)
+													]"
+												>
+													{{ getStatusLabel(invoice.status) }}
 												</span>
 											</div>
 											<div class="flex items-center space-x-4 mt-1 text-sm text-gray-600">
@@ -100,7 +105,7 @@
 													<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
 													</svg>
-													{{ formatDate(invoice.posting_date) }} {{ invoice.posting_time }}
+													{{ formatDate(invoice.posting_date) }} {{ formatTime(invoice.posting_time) }}
 												</div>
 											</div>
 										</div>
@@ -140,15 +145,41 @@
 
 									<!-- Payment Methods -->
 									<div v-if="invoice.payments && invoice.payments.length > 0" class="mt-3">
-										<div class="text-xs font-medium text-gray-600 mb-2">Previous Payments</div>
+										<div class="text-xs font-medium text-gray-600 mb-2">Payment History</div>
 										<div class="grid grid-cols-2 md:grid-cols-3 gap-2">
 											<div
 												v-for="(payment, idx) in invoice.payments"
 												:key="idx"
-												class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200 text-sm"
+												:class="[
+													'flex flex-col p-2 rounded-lg border text-sm',
+													payment.source === 'Payment Entry'
+														? 'bg-blue-50 border-blue-200'
+														: 'bg-gray-50 border-gray-200'
+												]"
 											>
-												<span class="text-gray-700">{{ payment.mode_of_payment }}</span>
-												<span class="font-semibold text-gray-900">{{ formatCurrency(payment.amount) }}</span>
+												<div class="flex items-center justify-between mb-1">
+													<span class="text-gray-700 font-medium">{{ payment.mode_of_payment }}</span>
+													<span class="font-semibold text-gray-900">{{ formatCurrency(payment.amount) }}</span>
+												</div>
+												<div class="flex items-center justify-between">
+													<span
+														v-if="payment.posting_date"
+														class="text-[9px] text-gray-500"
+													>
+														{{ formatDate(payment.posting_date) }}
+													</span>
+													<span
+														v-if="payment.source"
+														:class="[
+															'text-[9px] font-semibold',
+															payment.source === 'Payment Entry'
+																? 'text-blue-600'
+																: 'text-gray-500'
+														]"
+													>
+														{{ getPaymentSourceLabel(payment.source) }}
+													</span>
+												</div>
 											</div>
 										</div>
 									</div>
@@ -178,11 +209,13 @@ import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import PaymentDialog from "@/components/sale/PaymentDialog.vue"
 import { usePOSSettingsStore } from "@/stores/posSettings"
 import { useToast } from "@/composables/useToast"
+import { useFormatters } from "@/composables/useFormatters"
 import { Button, call } from "frappe-ui"
 import { onMounted, ref, watch } from "vue"
 
 const posSettingsStore = usePOSSettingsStore()
 const { showSuccess, showError } = useToast()
+const { formatDate, formatTime } = useFormatters()
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -309,10 +342,62 @@ function formatCurrency(amount) {
 	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
-function formatDate(date) {
-	if (!date) return ""
-	const d = new Date(date)
-	return d.toLocaleDateString()
+function getPaymentSourceLabel(source) {
+	// Convert source to user-friendly label
+	switch (source) {
+		case 'POS':
+			return 'POS'
+		case 'POS Payment Entry':
+			return 'POS'
+		case 'Payment Entry':
+			return 'Back Office'
+		default:
+			return source
+	}
+}
+
+function getStatusLabel(status) {
+	// Convert ERPNext status to user-friendly labels
+	switch (status) {
+		case 'Partly Paid':
+			return 'Partially Paid'
+		case 'Overdue':
+			return 'Overdue'
+		case 'Unpaid':
+			return 'Unpaid'
+		case 'Paid':
+			return 'Paid'
+		case 'Draft':
+			return 'Draft'
+		case 'Cancelled':
+			return 'Cancelled'
+		case 'Return':
+			return 'Return'
+		default:
+			return status
+	}
+}
+
+function getStatusClass(status) {
+	// Return appropriate CSS classes for each status
+	switch (status) {
+		case 'Partly Paid':
+			return 'bg-orange-100 text-orange-700 border border-orange-200'
+		case 'Overdue':
+			return 'bg-red-100 text-red-700 border border-red-200'
+		case 'Unpaid':
+			return 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+		case 'Paid':
+			return 'bg-green-100 text-green-700 border border-green-200'
+		case 'Draft':
+			return 'bg-gray-100 text-gray-700 border border-gray-200'
+		case 'Cancelled':
+			return 'bg-gray-100 text-gray-700 border border-gray-200'
+		case 'Return':
+			return 'bg-purple-100 text-purple-700 border border-purple-200'
+		default:
+			return 'bg-gray-100 text-gray-700 border border-gray-200'
+	}
 }
 
 // Lifecycle
