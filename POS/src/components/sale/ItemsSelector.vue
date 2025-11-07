@@ -155,6 +155,30 @@
 			</div>
 		</div>
 
+		<!-- Prompt to search when search bar is empty -->
+		<div
+			v-else-if="!hasSearchTerm"
+			class="flex-1 flex items-center justify-center p-3"
+		>
+			<div class="text-center py-8">
+				<svg
+					class="mx-auto h-12 w-12 text-gray-300"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+					/>
+				</svg>
+				<p class="mt-3 text-sm font-medium text-gray-600">Search for items</p>
+				<p class="mt-1 text-xs text-gray-500">Enter item name, code, or scan barcode to see results</p>
+			</div>
+		</div>
+
 		<!-- Empty State - Simple, no animation -->
 		<div
 			v-else-if="(!filteredItems || filteredItems.length === 0)"
@@ -182,7 +206,7 @@
 		</div>
 
 		<!-- Grid View -->
-		<div v-if="viewMode === 'grid'" key="grid" class="flex-1 flex flex-col overflow-hidden">
+		<div v-else-if="viewMode === 'grid' && hasSearchTerm" key="grid" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="gridScrollContainer"
 				class="flex-1 overflow-y-auto p-1.5 sm:p-3"
@@ -277,7 +301,7 @@
 								
 								<!-- Final Rate -->
 								<div class="flex items-center justify-between border-t border-gray-200 pt-0.5">
-									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Rate:</span>
+									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Price:</span>
 									<div class="text-right">
 										<div class="font-bold text-blue-600 text-[10px] sm:text-xs">
 											{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
@@ -364,18 +388,17 @@
 		</div>
 
 		<!-- Table View -->
-		<div v-if="viewMode === 'list'" key="list" class="flex-1 flex flex-col overflow-hidden">
+		<div v-else-if="viewMode === 'list' && hasSearchTerm" key="list" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="listScrollContainer"
-				class="flex-1 overflow-x-auto overflow-y-auto"
-			>
+				class="flex-1 overflow-x-auto overflow-y-auto">
 				<table v-if="paginatedItems.length > 0" class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50 sticky top-0 z-10">
 						<tr>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Image</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
 							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Code</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Rate</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Price</th>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Qty</th>
 							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">UOM</th>
 						</tr>
@@ -411,8 +434,19 @@
 									</svg>
 								</div>
 							</td>
-							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{{ item.item_name }}</div></td>
-							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.item_code }}</div></td>
+
+							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-black-500">{{ item.item_code }}</div></td>
+
+							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">
+								<!-- if item name length is greater than 40 then show the item to the index 0 to 40 characters -->
+								
+								<span v-if="item.item_name.length > 40">
+									{{ item.item_name.substring(0, 40) }}
+								</span>
+								<span v-else>
+									{{ item.item_name }}
+								</span>
+							</div></td>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
 								<div class="text-xs space-y-1">
 									<!-- List Price -->
@@ -427,7 +461,7 @@
 									
 								<!-- Final Rate added to it 15% tax calculated and added to it discount amount -->
 								<div class="font-bold text-red-600 text-sm">
-									Rate: {{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
+									Price: {{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
 								</div>
 									
 								</div>
@@ -532,6 +566,7 @@ import { usePOSSettingsStore } from "@/stores/posSettings"
 import { useStock } from "@/composables/useStock"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { useToast } from "@/composables/useToast"
+import { toast } from "frappe-ui"
 import { storeToRefs } from "pinia"
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import {
@@ -633,6 +668,11 @@ const searchMode = computed(() => {
 })
 
 const searchPlaceholder = computed(() => SEARCH_PLACEHOLDERS[searchMode.value])
+
+// Check if search term has a value
+const hasSearchTerm = computed(() => {
+	return searchTerm.value && typeof searchTerm.value === 'string' && searchTerm.value.trim().length > 0
+})
 
 // Watch for cart items and pos profile changes (optimized - uses length + hash instead of deep watch)
 // Tracks: length, item_code, quantity, and amount to detect all cart changes including array replacements

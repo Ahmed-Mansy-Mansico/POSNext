@@ -955,3 +955,74 @@ def get_stock_quantities(item_codes, warehouse):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get Stock Quantities Error")
 		frappe.throw(_("Error fetching stock quantities: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_item_stock_all_warehouses(item_code):
+	"""
+	Get stock quantity for an item across all warehouses.
+	
+	Args:
+		item_code: Item code to get stock for
+		
+	Returns:
+		List of dicts with warehouse, warehouse_name, and actual_qty
+	"""
+	try:
+		if not item_code:
+			return []
+		
+		# Get all warehouses (excluding group warehouses, only ship or branch warehouses)
+		warehouses = frappe.db.sql(
+			"""
+			SELECT name, warehouse_name
+			FROM `tabWarehouse`
+			WHERE is_group = 0
+			AND (is_ship_warehouse = 1 OR is_branch_warehouse = 1)
+			ORDER BY warehouse_name ASC, name ASC
+			""",
+			as_dict=1,
+		)
+		
+		if not warehouses:
+			return []
+		
+		warehouse_names = [w["name"] for w in warehouses]
+		
+		# Get stock for the item across all warehouses
+		stock_rows = frappe.db.sql(
+			"""
+			SELECT
+				warehouse,
+				COALESCE(SUM(actual_qty), 0) AS actual_qty
+			FROM `tabBin`
+			WHERE item_code = %(item_code)s
+			AND warehouse IN %(warehouses)s
+			GROUP BY warehouse
+			""",
+			{
+				"item_code": item_code,
+				"warehouses": tuple(warehouse_names),
+			},
+			as_dict=1,
+		)
+		
+		# Create a lookup for warehouses that have stock
+		stock_lookup = {row["warehouse"]: row["actual_qty"] for row in stock_rows}
+		
+		# Build result with all warehouses (0 if no stock)
+		result = []
+		for warehouse in warehouses:
+			actual_qty = flt(stock_lookup.get(warehouse["name"], 0))
+			result.append({
+				"warehouse": warehouse["name"],
+				"warehouse_name": warehouse["warehouse_name"] or warehouse["name"],
+				"actual_qty": actual_qty,
+				"stock_qty": actual_qty,  # Alias for frontend convenience
+			})
+		
+		return result
+		
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Item Stock All Warehouses Error")
+		frappe.throw(_("Error fetching stock across warehouses: {0}").format(str(e)))

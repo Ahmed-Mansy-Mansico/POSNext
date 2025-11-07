@@ -107,22 +107,75 @@
                                         </div>
                                 </div>
                         </div>
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between gap-1.5 sm:gap-2">
                                 <h2 class="text-xs sm:text-sm font-semibold text-gray-900">Item Cart</h2>
-                                <button
-                                        v-if="items.length > 0"
-                                        @click="$emit('clear-cart')"
-                                        class="inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-red-600 transition-colors hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200 touch-manipulation"
-                                        type="button"
-                                        title="Clear all items from the cart"
-                                        aria-label="Clear all items from the cart"
-                                >
-                                        <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v2M4 7h16"/>
-                                        </svg>
-                                        <span class="hidden sm:inline">Clear Cart</span>
-                                        <span class="sm:hidden">Clear</span>
-                                </button>
+                                <div class="flex items-center gap-1 sm:gap-1.5">
+                                        <!-- View All Offers Button -->
+                                        <button
+                                                v-if="items.length > 0"
+                                                type="button"
+                                                @click="$emit('show-offers')"
+                                                class="relative inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-white border-2 border-green-300 hover:border-green-500 active:border-green-600 hover:bg-green-50 active:bg-green-100 transition-all group min-w-0 touch-manipulation active:scale-95"
+                                                :aria-label="'View all available offers'"
+                                                title="View offers"
+                                        >
+                                                <div class="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors flex-shrink-0">
+                                                        <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                                        </svg>
+                                                </div>
+                                                <span class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate">Offers</span>
+                                                <div class="flex items-center space-x-1 flex-shrink-0">
+                                                        <span
+                                                                v-if="appliedOfferCount > 0"
+                                                                class="bg-green-700 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center"
+                                                        >
+                                                                {{ appliedOfferCount }}
+                                                        </span>
+                                                        <span
+                                                                v-if="offersStore.autoEligibleCount > 0 && appliedOfferCount === 0"
+                                                                class="bg-green-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center"
+                                                        >
+                                                                {{ offersStore.autoEligibleCount }}
+                                                        </span>
+                                                </div>
+                                        </button>
+
+                                        <!-- Enter Coupon Code Button -->
+                                        <button
+                                                v-if="items.length > 0"
+                                                type="button"
+                                                @click="$emit('apply-coupon')"
+                                                class="relative inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 active:border-purple-600 hover:bg-purple-50 active:bg-purple-100 transition-all group min-w-0 touch-manipulation active:scale-95"
+                                                :aria-label="'Apply coupon code'"
+                                                title="Apply coupon"
+                                        >
+                                                <div class="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors flex-shrink-0">
+                                                        <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                </div>
+                                                <span class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate">Coupon</span>
+                                                <span v-if="availableGiftCards.length > 0" class="bg-purple-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center flex-shrink-0">
+                                                        {{ availableGiftCards.length }}
+                                                </span>
+                                        </button>
+
+                                        <button
+                                                v-if="items.length > 0"
+                                                @click="$emit('clear-cart')"
+                                                class="inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-red-600 transition-colors hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200 touch-manipulation"
+                                                type="button"
+                                                title="Clear all items from the cart"
+                                                aria-label="Clear all items from the cart"
+                                        >
+                                                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v2M4 7h16"/>
+                                                </svg>
+                                                <span class="hidden sm:inline">Clear Cart</span>
+                                                <span class="sm:hidden">Clear</span>
+                                        </button>
+                                </div>
                         </div>
                 </div>
 
@@ -193,6 +246,7 @@
 								<h4 class="text-[11px] sm:text-xs font-bold text-gray-900 truncate leading-tight">
 									{{ item.item_name }}
 								</h4>
+								
 								<button
 									type="button"
 									@click.stop="$emit('remove-item', item.item_code)"
@@ -211,6 +265,11 @@
 								<!-- Pricing Details -->
 								<div class="text-[9px] sm:text-[10px] text-gray-500 space-y-0.5 mb-1">
 									<!-- List Price -->
+
+									<!-- show item code below item name in the cart -->
+									<h2 class="text-[9px] sm:text-[9px] text-gray-500 mb-1">{{ item.item_code }}</h2>
+								
+
 									<div v-if="item.price_list_rate" class="flex items-center justify-between">
 										<span class="text-gray-400">List:</span>
 										<span class="font-medium text-gray-600">{{ formatCurrency(item.price_list_rate + item.price_list_rate * 0.15)  }}</span>
@@ -396,62 +455,6 @@
 			</div>
 		</div>
 
-		<!-- Coupons, Offers & Discount Section -->
-		<div v-if="items.length > 0" class="px-1.5 sm:px-2.5 pt-1.5 sm:pt-2.5 pb-1 bg-gray-50 space-y-2">
-			<div class="flex gap-1.5 sm:gap-2">
-				<!-- View All Offers Button -->
-				<button
-					type="button"
-					@click="$emit('show-offers')"
-					class="relative flex-1 flex items-center justify-between px-2 sm:px-2.5 py-2 sm:py-2.5 rounded-lg bg-white border-2 border-green-300 hover:border-green-500 active:border-green-600 hover:bg-green-50 active:bg-green-100 transition-all group min-w-0 touch-manipulation active:scale-95"
-					:aria-label="'View all available offers'"
-				>
-					<div class="flex items-center space-x-1.5 min-w-0 flex-1">
-						<div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors flex-shrink-0">
-							<svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-							</svg>
-						</div>
-						<span class="text-xs font-semibold text-gray-900 truncate">Offers</span>
-					</div>
-					<div class="flex items-center space-x-1 flex-shrink-0 ml-1">
-						<span
-							v-if="appliedOfferCount > 0"
-							class="bg-green-700 text-white text-[9px] font-bold rounded-full px-2 py-0.5 flex items-center"
-						>
-							{{ appliedOfferCount }} Applied
-						</span>
-						<span
-							v-if="offersStore.autoEligibleCount > 0"
-							class="bg-green-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center"
-						>
-							{{ offersStore.autoEligibleCount }}
-						</span>
-					</div>
-				</button>
-
-				<!-- Enter Coupon Code Button -->
-				<button
-					type="button"
-					@click="$emit('apply-coupon')"
-					class="relative flex-1 flex items-center px-2 sm:px-2.5 py-2 sm:py-2.5 rounded-lg bg-white border-2 border-purple-300 hover:border-purple-500 active:border-purple-600 hover:bg-purple-50 active:bg-purple-100 transition-all group min-w-0 touch-manipulation active:scale-95"
-					:aria-label="'Apply coupon code'"
-				>
-					<div class="flex items-center space-x-1 min-w-0 flex-1">
-						<div class="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors flex-shrink-0">
-							<svg class="w-3.5 h-3.5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-								<path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/>
-							</svg>
-						</div>
-						<span class="text-xs font-semibold text-gray-900 truncate">Coupon</span>
-					</div>
-					<span v-if="availableGiftCards.length > 0" class="bg-purple-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center flex-shrink-0 ml-1">
-						{{ availableGiftCards.length }}
-					</span>
-				</button>
-			</div>
-		</div>
-
 		<!-- Totals Summary -->
 		<div class="p-2 sm:p-2.5 bg-white border-t border-gray-200">
 			<!-- Summary Details -->
@@ -501,13 +504,13 @@
 			</div>
 
 			<!-- Action Buttons -->
-			<div class="space-y-1.5 sm:space-y-2">
+			<div class="flex gap-1.5 sm:gap-2">
 				<button
 					type="button"
 					@click="$emit('proceed-to-payment')"
 					:disabled="items.length === 0"
 					:class="[
-						'w-full py-3 sm:py-3.5 px-4 rounded-xl font-bold text-sm sm:text-base text-white transition-all flex items-center justify-center touch-manipulation',
+						'flex-1 py-3 sm:py-3.5 px-4 rounded-xl font-bold text-sm sm:text-base text-white transition-all flex items-center justify-center touch-manipulation',
 						items.length === 0
 							? 'bg-gray-300 cursor-not-allowed'
 							: 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-lg hover:shadow-xl active:scale-95'
@@ -523,13 +526,13 @@
 					type="button"
 					v-if="items.length > 0"
 					@click="$emit('save-draft')"
-					class="w-full py-2 sm:py-2.5 px-3 rounded-lg font-semibold text-xs sm:text-sm text-orange-700 bg-orange-50 hover:bg-orange-100 active:bg-orange-200 transition-all touch-manipulation active:scale-95"
+					class="flex-1 py-3 sm:py-3.5 px-3 rounded-xl font-semibold text-xs sm:text-sm text-orange-700 bg-orange-50 hover:bg-orange-100 active:bg-orange-200 transition-all touch-manipulation active:scale-95 flex items-center justify-center"
 					:aria-label="'Hold order as draft'"
 				>
-					<svg class="w-4 h-4 inline mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<svg class="w-4 h-4 sm:w-5 sm:h-5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
 					</svg>
-					Hold Order
+					<span>Hold Order</span>
 				</button>
 			</div>
 		</div>

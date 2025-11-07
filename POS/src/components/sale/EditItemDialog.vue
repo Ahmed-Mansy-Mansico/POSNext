@@ -35,6 +35,10 @@
 						<h3 class="text-base font-semibold text-gray-900 truncate">
 							{{ localItem.item_name }}
 						</h3>
+						<!-- show item code under the item name -->
+						<p class="text-sm text-gray-500 truncate">
+							{{ localItem.item_code }}
+						</p>
 						<p class="text-sm text-gray-500 truncate">
 							{{ currency }} {{ formatNumber(localItem.price_list_rate || localItem.rate) }} / {{ localItem.stock_uom || 'Nos' }}
 						</p>
@@ -143,6 +147,38 @@
 					</div>
 				</div>
 
+				<!-- Stock Information Section -->
+				<div class="border-t border-gray-200 pt-4">
+					<label class="block text-sm font-medium text-gray-700 mb-3">Stock Information</label>
+					<div v-if="loadingStock" class="flex items-center justify-center py-4">
+						<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+						<span class="ml-2 text-sm text-gray-500">Loading stock information...</span>
+					</div>
+					<div v-else-if="stockInfo.length > 0" class="border border-gray-200 rounded-lg overflow-hidden">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Warehouse</th>
+									<th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Total</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200">
+								<tr v-for="stock in stockInfo" :key="stock.warehouse" class="hover:bg-gray-50">
+									<td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+										{{ stock.warehouse_name }}
+									</td>
+									<td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">
+										{{ formatNumber(stock.actual_qty) }}
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+					<div v-else class="text-center py-4 text-sm text-gray-500">
+						No stock information available
+					</div>
+				</div>
+
 				<!-- Item Discount Section (only if allowed by POS Profile) -->
 				<div v-if="settingsStore.allowItemDiscount" class="border-t border-gray-200 pt-4">
 					<label class="block text-sm font-medium text-gray-700 mb-3">Item Discount</label>
@@ -219,6 +255,7 @@
 import { useToast } from "@/composables/useToast"
 import { usePOSSettingsStore } from "@/stores/posSettings"
 import { getItemStock } from "@/utils/stockValidator"
+import { call } from "@/utils/apiWrapper"
 import { Button, Dialog } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
@@ -253,6 +290,8 @@ const calculatedDiscount = ref(0)
 const calculatedTotal = ref(0)
 const hasStock = ref(true)
 const isCheckingStock = ref(false)
+const stockInfo = ref([])
+const loadingStock = ref(false)
 
 const show = computed({
 	get: () => props.modelValue,
@@ -295,6 +334,9 @@ watch(
 			isCheckingStock.value = false
 
 			calculateTotals()
+			
+			// Load stock information for all warehouses
+			loadStockInfo()
 		}
 	},
 	{ immediate: true },
@@ -408,6 +450,26 @@ function updateItem() {
 
 	emit("update-item", updatedItem)
 	show.value = false
+}
+
+async function loadStockInfo() {
+	if (!localItem.value || !localItem.value.item_code) {
+		stockInfo.value = []
+		return
+	}
+	
+	loadingStock.value = true
+	try {
+		const result = await call("pos_next.api.items.get_item_stock_all_warehouses", {
+			item_code: localItem.value.item_code,
+		})
+		stockInfo.value = result?.message || result || []
+	} catch (error) {
+		console.error("Error loading stock information:", error)
+		stockInfo.value = []
+	} finally {
+		loadingStock.value = false
+	}
 }
 
 function cancel() {
