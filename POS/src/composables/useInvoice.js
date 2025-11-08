@@ -582,9 +582,15 @@ export function useInvoice() {
 				item_code: item.item_code,
 				item_name: item.item_name,
 				qty: item.quantity,
-				// Convert net amount to effective rate for backend (amount ÷ quantity)
-				// ERPNext expects rate field to contain the final selling price per unit
-				rate: item.quantity > 0 ? item.amount / item.quantity : item.rate,
+				// IMPORTANT: Rate calculation depends on tax mode and discounts
+				// Tax-inclusive mode: Send gross amount (price after discount, before tax extraction)
+				//   - With discount: price_list_rate - discount_amount
+				//   - Without discount: price_list_rate
+				//   ERPNext will extract net amount based on included_in_print_rate flag
+				// Tax-exclusive mode: Send net amount (after discount, before tax addition)
+				rate: taxInclusive.value
+					? ((item.price_list_rate || item.rate) - (item.discount_amount || 0) / (item.quantity || 1))
+					: (item.quantity > 0 ? item.amount / item.quantity : item.rate),
 				price_list_rate: item.price_list_rate || item.rate,
 				uom: item.uom,
 				warehouse: item.warehouse,
@@ -630,9 +636,15 @@ export function useInvoice() {
 					item_code: item.item_code,
 					item_name: item.item_name,
 					qty: item.quantity,
-					// Convert net amount to effective rate for backend (amount ÷ quantity)
-					// ERPNext expects rate field to contain the final selling price per unit
-					rate: item.quantity > 0 ? item.amount / item.quantity : item.rate,
+					// IMPORTANT: Rate calculation depends on tax mode and discounts
+					// Tax-inclusive mode: Send gross amount (price after discount, before tax extraction)
+					//   - With discount: price_list_rate - discount_amount
+					//   - Without discount: price_list_rate
+					//   ERPNext will extract net amount based on included_in_print_rate flag
+					// Tax-exclusive mode: Send net amount (after discount, before tax addition)
+					rate: taxInclusive.value
+						? ((item.price_list_rate || item.rate) - (item.discount_amount || 0) / (item.quantity || 1))
+						: (item.quantity > 0 ? item.amount / item.quantity : item.rate),
 					price_list_rate: item.price_list_rate || item.rate,
 					uom: item.uom,
 					warehouse: item.warehouse,
