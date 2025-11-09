@@ -163,6 +163,21 @@
 
                                         <button
                                                 v-if="items.length > 0"
+                                                @click="$emit('create-customer', '')"
+                                                class="inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-green-600 transition-colors hover:text-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-200 touch-manipulation"
+                                                type="button"
+                                                title="Create new customer"
+                                                aria-label="Create new customer"
+                                        >
+                                                <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                                </svg>
+                                                <span class="hidden sm:inline">Create Customer</span>
+                                                <span class="sm:hidden">Customer</span>
+                                        </button>
+                                        
+                                        <button
+                                                v-if="items.length > 0"
                                                 @click="$emit('clear-cart')"
                                                 class="inline-flex items-center gap-1 sm:gap-1.5 rounded-full px-2 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold text-red-600 transition-colors hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-200 touch-manipulation"
                                                 type="button"
@@ -203,94 +218,113 @@
 				</p>
 				
 				<!-- Menu Items as Icons -->
-				<div class="grid grid-cols-3 gap-2 sm:gap-3 max-w-xs mx-auto">
-					<!-- View Shift -->
-					<button
-						@click="$emit('view-shift')"
-						class="flex flex-col items-center justify-center p-2 sm:p-3 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
-						title="View Shift"
-					>
-						<div class="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center mb-1 group-hover:bg-blue-200 transition-colors">
-							<svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-							</svg>
-						</div>
-						<span class="text-[9px] sm:text-[10px] font-medium text-gray-700">View Shift</span>
-					</button>
+				<div class="max-w-md mx-auto">
+					<!-- First 6 buttons in 3x2 grid -->
+					<div class="grid grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
+						<!-- View Shift -->
+						<button
+							@click="$emit('view-shift')"
+							class="flex flex-col items-center justify-center p-4 sm:p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
+							title="View Shift"
+						>
+							<div class="w-12 h-12 sm:w-14 sm:h-14 bg-blue-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-blue-200 transition-colors">
+								<svg class="w-6 h-6 sm:w-7 sm:h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+								</svg>
+							</div>
+							<span class="text-xs sm:text-sm font-medium text-gray-700">View Shift</span>
+						</button>
 					
-					<!-- Draft Invoices -->
-					<button
-						@click="$emit('show-drafts')"
-						class="flex flex-col items-center justify-center p-2 sm:p-3 bg-white border-2 border-gray-200 rounded-lg hover:border-purple-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
-						title="Draft Invoices"
-					>
-						<div class="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-full flex items-center justify-center mb-1 group-hover:bg-purple-200 transition-colors">
-							<svg class="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-							</svg>
-						</div>
-						<span class="text-[9px] sm:text-[10px] font-medium text-gray-700">Draft Invoices</span>
-					</button>
+						<!-- Draft Invoices -->
+						<button
+							@click="$emit('show-drafts')"
+							class="flex flex-col items-center justify-center p-4 sm:p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
+							title="Draft Invoices"
+						>
+							<div class="w-12 h-12 sm:w-14 sm:h-14 bg-purple-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-purple-200 transition-colors">
+								<svg class="w-6 h-6 sm:w-7 sm:h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+								</svg>
+							</div>
+							<span class="text-xs sm:text-sm font-medium text-gray-700">Draft Invoices</span>
+						</button>
 					
-					<!-- Invoice History -->
-					<button
-						@click="$emit('show-history')"
-						class="flex flex-col items-center justify-center p-2 sm:p-3 bg-white border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
-						title="Invoice History"
-					>
-						<div class="w-8 h-8 sm:w-10 sm:h-10 bg-gray-100 rounded-full flex items-center justify-center mb-1 group-hover:bg-gray-200 transition-colors">
-							<svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-							</svg>
-						</div>
-						<span class="text-[9px] sm:text-[10px] font-medium text-gray-700">Invoice History</span>
-					</button>
+						<!-- Invoice History -->
+						<button
+							@click="$emit('show-history')"
+							class="flex flex-col items-center justify-center p-4 sm:p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-gray-400 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
+							title="Invoice History"
+						>
+							<div class="w-12 h-12 sm:w-14 sm:h-14 bg-gray-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-gray-200 transition-colors">
+								<svg class="w-6 h-6 sm:w-7 sm:h-7 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+								</svg>
+							</div>
+							<span class="text-xs sm:text-sm font-medium text-gray-700">Invoice History</span>
+						</button>
 					
-					<!-- Return Invoice -->
-					<button
-						@click="$emit('show-return')"
-						class="flex flex-col items-center justify-center p-2 sm:p-3 bg-white border-2 border-gray-200 rounded-lg hover:border-red-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
-						title="Return Invoice"
-					>
-						<div class="w-8 h-8 sm:w-10 sm:h-10 bg-red-100 rounded-full flex items-center justify-center mb-1 group-hover:bg-red-200 transition-colors">
-							<svg class="w-4 h-4 sm:w-5 sm:h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-							</svg>
-						</div>
-						<span class="text-[9px] sm:text-[10px] font-medium text-gray-700">Return Invoice</span>
-					</button>
+						<!-- Return Invoice -->
+						<button
+							@click="$emit('show-return')"
+							class="flex flex-col items-center justify-center p-4 sm:p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
+							title="Return Invoice"
+						>
+							<div class="w-12 h-12 sm:w-14 sm:h-14 bg-red-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-red-200 transition-colors">
+								<svg class="w-6 h-6 sm:w-7 sm:h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+								</svg>
+							</div>
+							<span class="text-xs sm:text-sm font-medium text-gray-700">Return Invoice</span>
+						</button>
 					
-					<!-- Close Shift -->
-					<button
-						@click="$emit('close-shift')"
-						class="flex flex-col items-center justify-center p-2 sm:p-3 bg-white border-2 border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
-						title="Close Shift"
-					>
-						<div class="w-8 h-8 sm:w-10 sm:h-10 bg-orange-100 rounded-full flex items-center justify-center mb-1 group-hover:bg-orange-200 transition-colors">
-							<svg class="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-							</svg>
-						</div>
-						<span class="text-[9px] sm:text-[10px] font-medium text-gray-700">Close Shift</span>
-					</button>
+						<!-- Close Shift -->
+						<button
+							@click="$emit('close-shift')"
+							class="flex flex-col items-center justify-center p-4 sm:p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-orange-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
+							title="Close Shift"
+						>
+							<div class="w-12 h-12 sm:w-14 sm:h-14 bg-orange-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-orange-200 transition-colors">
+								<svg class="w-6 h-6 sm:w-7 sm:h-7 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+								</svg>
+							</div>
+							<span class="text-xs sm:text-sm font-medium text-gray-700">Close Shift</span>
+						</button>
 					
-					<!-- Logout -->
-					<button
-						@click="$emit('logout')"
-						class="flex flex-col items-center justify-center p-2 sm:p-3 bg-white border-2 border-gray-200 rounded-lg hover:border-red-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
-						title="Logout"
-					>
-						<div class="w-8 h-8 sm:w-10 sm:h-10 bg-red-100 rounded-full flex items-center justify-center mb-1 group-hover:bg-red-200 transition-colors">
-							<svg class="w-4 h-4 sm:w-5 sm:h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-							</svg>
-						</div>
-						<span class="text-[9px] sm:text-[10px] font-medium text-red-600">Logout</span>
-					</button>
+						<!-- Create Customer -->
+						<button
+							@click="$emit('create-customer', '')"
+							class="flex flex-col items-center justify-center p-4 sm:p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
+							title="Create Customer"
+						>
+							<div class="w-12 h-12 sm:w-14 sm:h-14 bg-green-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-green-200 transition-colors">
+								<svg class="w-6 h-6 sm:w-7 sm:h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+								</svg>
+							</div>
+							<span class="text-xs sm:text-sm font-medium text-gray-700">Create Customer</span>
+						</button>
+					</div>
+					
+					<!-- Logout button centered in bottom row -->
+					<div class="flex justify-center">
+						<button
+							@click="$emit('logout')"
+							class="flex flex-col items-center justify-center p-4 sm:p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
+							title="Logout"
+						>
+							<div class="w-12 h-12 sm:w-14 sm:h-14 bg-red-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-red-200 transition-colors">
+								<svg class="w-6 h-6 sm:w-7 sm:h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+								</svg>
+							</div>
+							<span class="text-xs sm:text-sm font-medium text-red-600">Logout</span>
+						</button>
+					</div>
 				</div>
 			</div>
 
-			<div v-else class="space-y-1 sm:space-y-2">
+			<div v-else class="space-y-0.5 sm:space-y-1">
 				<div
 					v-for="(item, index) in items"
 					:key="index"
@@ -350,31 +384,31 @@
 							<!-- Price & UOM Row -->
 							<div class="mb-1.5">
 								<!-- Pricing Details -->
-								<div class="text-[9px] sm:text-[10px] text-gray-500 space-y-0.5 mb-1">
+								<div class="text-xs sm:text-sm text-gray-500 space-y-0.5 mb-1">
 									<!-- List Price -->
 
 									<!-- show item code below item name in the cart -->
-									<h2 class="text-[9px] sm:text-[9px] text-gray-500 mb-1">{{ item.item_code }}</h2>
+									<h2 class="text-[10px] sm:text-xs text-gray-500 mb-1">{{ item.item_code }}</h2>
 								
 
 									<div v-if="item.price_list_rate" class="flex items-center justify-between">
-										<span class="text-gray-400">List:</span>
-										<span class="font-medium text-gray-600">{{ formatCurrency(item.price_list_rate + item.price_list_rate * 0.15)  }}</span>
+										<span class="text-gray-400 text-xs sm:text-sm">List:</span>
+										<span class="font-medium text-gray-600 text-xs sm:text-sm">{{ formatCurrency(item.price_list_rate + item.price_list_rate * 0.15)  }}</span>
 									</div>
 									
 									<!-- Discount Amount - Check multiple possible fields -->
 									<div v-if="getDiscountAmount(item) > 0" class="flex items-center justify-between">
-										<span class="text-red-500">Discount:</span>
-										<span class="font-medium text-red-600">-{{ formatCurrency(getDiscountAmount(item) + getDiscountAmount(item) * 0.15) }}</span>
+										<span class="text-red-500 text-xs sm:text-sm">Discount:</span>
+										<span class="font-medium text-red-600 text-xs sm:text-sm">-{{ formatCurrency(getDiscountAmount(item) + getDiscountAmount(item) * 0.15) }}</span>
 									</div>
 								</div>
 
 								<!-- Final Rate & UOM -->
 								<div class="flex items-center gap-1 border-t border-gray-200 pt-1">
-									<span class="text-[11px] sm:text-xs font-bold text-blue-600">
+									<span class="text-sm sm:text-base font-bold text-blue-600">
 										{{ formatCurrency(item.rate + (item.rate * 0.15) ) }}
 									</span>
-									<span class="text-[10px] text-gray-500">/</span>
+									<span class="text-xs text-gray-500">/</span>
 									<span class="inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] sm:text-xs font-semibold">
 										{{ item.uom || item.stock_uom || 'Nos' }}
 									</span>
@@ -382,9 +416,9 @@
 									<!-- Discount Badge if any -->
 									<div
 										v-if="getDiscountAmount(item) > 0"
-										class="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-red-50 to-orange-50 text-red-700 rounded-full text-[8px] font-bold border border-red-200 ml-1"
+										class="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-red-50 to-orange-50 text-red-700 rounded-full text-[10px] sm:text-xs font-bold border border-red-200 ml-1"
 									>
-										<svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+										<svg class="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
 											<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
 										</svg>
 										<span v-if="item.discount_percentage && item.discount_percentage > 0">
@@ -530,8 +564,8 @@
 
 								<!-- Item Total Price -->
 								<div class="text-right">
-									<div class="text-[9px] text-gray-500 leading-none mb-0.5">Total</div>
-									<div class="text-xs sm:text-sm font-bold text-blue-600 leading-none">
+									<div class="text-[10px] sm:text-xs text-gray-500 leading-none mb-0.5">Total</div>
+									<div class="text-sm sm:text-base font-bold text-blue-600 leading-none">
 										{{ formatCurrency(item.amount + (item.amount * 0.15) || item.rate * item.quantity + (item.rate * item.quantity * 0.15) ) }}
 									</div>
 								</div>
@@ -740,12 +774,6 @@ const emit = defineEmits([
 	"update-uom",
 	"edit-item",
 	"refresh-pricing",
-	"view-shift",
-	"show-drafts",
-	"show-history",
-	"show-return",
-	"close-shift",
-	"logout",
 ])
 
 const customerSearch = ref("")
