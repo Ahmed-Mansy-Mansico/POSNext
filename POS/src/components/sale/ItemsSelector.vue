@@ -155,27 +155,73 @@
 			</div>
 		</div>
 
-		<!-- Prompt to search when search bar is empty -->
+		<!-- Employee Performance Display when search bar is empty -->
 		<div
 			v-else-if="!hasSearchTerm"
-			class="flex-1 flex items-center justify-center p-3"
+			class="flex-1 overflow-y-auto p-3 sm:p-4 bg-white"
 		>
-			<div class="text-center py-8">
-				<svg
-					class="mx-auto h-12 w-12 text-gray-300"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-					/>
-				</svg>
-				<p class="mt-3 text-sm font-medium text-gray-600">Search for items</p>
-				<p class="mt-1 text-xs text-gray-500">Enter item name, code, or scan barcode to see results</p>
+			<div v-if="performanceLoading" class="flex items-center justify-center py-8">
+				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+			</div>
+			<div v-else-if="performanceData" class="max-w-2xl mx-auto">
+				<!-- Employee Header -->
+				<div class="mb-4 sm:mb-6">
+					<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-2">Employee</p>
+					<div class="flex items-center space-x-3">
+						<div class="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+							<svg class="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+							</svg>
+						</div>
+						<h3 class="text-sm sm:text-base font-bold text-gray-900">{{ performanceData.employee_name }}</h3>
+					</div>
+				</div>
+
+				<!-- Hours at work Section -->
+				<div class="mb-4 sm:mb-6">
+					<h4 class="text-xs sm:text-sm font-bold text-gray-900 mb-3">Hours at work</h4>
+					<div class="grid grid-cols-4 gap-2 sm:gap-3">
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Today</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.today }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Yesterday</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.yesterday }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Week</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.week }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Month</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.month }}</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Sales Section -->
+				<div>
+					<h4 class="text-xs sm:text-sm font-bold text-gray-900 mb-3">Sales {{ performanceData.currency }}</h4>
+					<div class="grid grid-cols-4 gap-2 sm:gap-3">
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Today</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.today, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Yesterday</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.yesterday, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Week</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.week, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Month</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.month, performanceData.currency) }}</p>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -567,6 +613,7 @@ import { useStock } from "@/composables/useStock"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { useToast } from "@/composables/useToast"
 import { toast } from "frappe-ui"
+import { createResource } from "frappe-ui"
 import { storeToRefs } from "pinia"
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import {
@@ -672,6 +719,55 @@ const searchPlaceholder = computed(() => SEARCH_PLACEHOLDERS[searchMode.value])
 // Check if search term has a value
 const hasSearchTerm = computed(() => {
 	return searchTerm.value && typeof searchTerm.value === 'string' && searchTerm.value.trim().length > 0
+})
+
+// Performance data state
+const performanceData = ref(null)
+const performanceLoading = ref(false)
+
+// Format currency helper
+function formatCurrency(amount, currency) {
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), currency || props.currency)
+}
+
+// Load employee performance data
+const performanceResource = createResource({
+	url: "pos_next.api.invoices.get_employee_performance",
+	makeParams() {
+		return {
+			pos_profile: props.posProfile || null,
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		performanceData.value = data?.message || data || null
+		performanceLoading.value = false
+	},
+	onError(error) {
+		console.error("Error loading employee performance:", error)
+		performanceLoading.value = false
+		performanceData.value = null
+	},
+})
+
+// Load performance data when component is mounted or posProfile changes
+watch(
+	() => props.posProfile,
+	(newProfile) => {
+		if (newProfile && !hasSearchTerm.value) {
+			performanceLoading.value = true
+			performanceResource.reload()
+		}
+	},
+	{ immediate: true }
+)
+
+// Reload performance data when search term becomes empty
+watch(hasSearchTerm, (hasTerm) => {
+	if (!hasTerm && props.posProfile) {
+		performanceLoading.value = true
+		performanceResource.reload()
+	}
 })
 
 // Watch for cart items and pos profile changes (optimized - uses length + hash instead of deep watch)
@@ -1078,10 +1174,6 @@ function toggleAutoAdd() {
 			iconClasses: "text-gray-600",
 		})
 	}
-}
-
-function formatCurrency(amount) {
-	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
 // Expose methods for parent component
