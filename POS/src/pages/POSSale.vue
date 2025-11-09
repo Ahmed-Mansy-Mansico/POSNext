@@ -227,6 +227,12 @@
 						@remove-offer="offer => cartStore.removeOffer(offer, shiftStore.currentProfile, offersDialogRef.value)"
 						@update-uom="cartStore.changeItemUOM"
 						@edit-item="handleEditItem"
+						@view-shift="showInvoiceManagement = true"
+						@show-drafts="uiStore.showDraftDialog = true"
+						@show-history="uiStore.showHistoryDialog = true"
+						@show-return="uiStore.showReturnDialog = true"
+						@close-shift="uiStore.showCloseShiftDialog = true"
+						@logout="uiStore.showLogoutDialog = true"
 					/>
 				</div>
 			</keep-alive>
@@ -429,6 +435,7 @@
 			:draft-invoices="draftsStore.drafts"
 			@view-invoice="handleViewInvoice"
 			@print-invoice="handlePrintInvoiceFromManagement"
+			@print-invoice-from-print-view="handlePrintInvoiceFromPrintView"
 			@load-draft="handleLoadDraftFromManagement"
 			@delete-draft="handleDeleteDraft"
 			@refresh-history="loadInvoiceHistoryData"
@@ -583,7 +590,11 @@
 					<Button variant="subtle" @click="uiStore.showSuccessDialog = false">
 						Close
 					</Button>
-					<Button variant="solid" theme="blue" @click="handlePrintInvoice">
+					<!-- <Button variant="solid" theme="blue" @click="handlePrintInvoice">
+						Print Invoice
+					</Button> -->
+					<!-- replace with print invoice from print view -->
+					<Button variant="solid" theme="blue" @click="handlePrintInvoiceFromPrintView">
 						Print Invoice
 					</Button>
 				</div>
@@ -671,7 +682,7 @@ import { usePOSEvents } from "@/composables/usePOSEvents"
 import { session } from "@/data/session"
 import { parseError } from "@/utils/errorHandler"
 import { offlineWorker } from "@/utils/offline/workerClient"
-import { printInvoiceByName } from "@/utils/printInvoice"
+import { printInvoiceByName, printInvoiceFromPrintView } from "@/utils/printInvoice"
 import { Button, Dialog, createResource, toast } from "frappe-ui"
 import { call } from "@/utils/apiWrapper"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
@@ -2233,6 +2244,38 @@ function handleViewInvoice(invoice) {
 // Note: handlePrintInvoice already exists above, will reuse it for invoice param
 function handlePrintInvoiceFromManagement(invoice) {
 	printInvoiceByName(invoice.name, shiftStore.profileName)
+}
+
+async function handlePrintInvoiceFromPrintView(invoice) {
+	try {
+		// If invoice is provided (from event), use it; otherwise use last invoice from success dialog
+		const invoiceData = invoice.name|| (uiStore.lastInvoiceName ? { name: uiStore.lastInvoiceName, doctype: "Sales Invoice" } : null)
+		
+		if (!invoiceData) {
+			toast.create({
+				title: "Print Error",
+				text: "No invoice available to print",
+				icon: "alert-circle",
+				iconClasses: "text-red-600",
+			})
+			return
+		}
+
+		await printInvoiceFromPrintView(invoiceData,'POS Sales Invoice Print')
+		
+		// Close success dialog if it's open
+		if (uiStore.showSuccessDialog) {
+			uiStore.showSuccessDialog = false
+		}
+	} catch (error) {
+		log.error("Error printing invoice:", error)
+		toast.create({
+			title: "Print Error",
+			text: "Failed to print invoice. Please try again.",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
 }
 
 // Note: handleLoadDraft already exists above, will delegate to it

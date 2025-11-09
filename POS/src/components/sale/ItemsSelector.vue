@@ -155,6 +155,76 @@
 			</div>
 		</div>
 
+		<!-- Employee Performance Display when search bar is empty -->
+		<div
+			v-else-if="!hasSearchTerm"
+			class="flex-1 overflow-y-auto p-3 sm:p-4 bg-white"
+		>
+			<div v-if="performanceLoading" class="flex items-center justify-center py-8">
+				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+			</div>
+			<div v-else-if="performanceData" class="max-w-2xl mx-auto">
+				<!-- Employee Header -->
+				<div class="mb-4 sm:mb-6">
+					<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-2">Employee</p>
+					<div class="flex items-center space-x-3">
+						<div class="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+							<svg class="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+							</svg>
+						</div>
+						<h3 class="text-sm sm:text-base font-bold text-gray-900">{{ performanceData.employee_name }}</h3>
+					</div>
+				</div>
+
+				<!-- Hours at work Section -->
+				<div class="mb-4 sm:mb-6">
+					<h4 class="text-xs sm:text-sm font-bold text-gray-900 mb-3">Hours at work</h4>
+					<div class="grid grid-cols-4 gap-2 sm:gap-3">
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Today</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.today }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Yesterday</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.yesterday }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Week</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.week }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Month</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.month }}</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Sales Section -->
+				<div>
+					<h4 class="text-xs sm:text-sm font-bold text-gray-900 mb-3">Sales {{ performanceData.currency }}</h4>
+					<div class="grid grid-cols-4 gap-2 sm:gap-3">
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Today</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.today, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Yesterday</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.yesterday, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Week</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.week, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Month</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.month, performanceData.currency) }}</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
 		<!-- Empty State - Simple, no animation -->
 		<div
 			v-else-if="(!filteredItems || filteredItems.length === 0)"
@@ -182,7 +252,7 @@
 		</div>
 
 		<!-- Grid View -->
-		<div v-if="viewMode === 'grid'" key="grid" class="flex-1 flex flex-col overflow-hidden">
+		<div v-else-if="viewMode === 'grid' && hasSearchTerm" key="grid" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="gridScrollContainer"
 				class="flex-1 overflow-y-auto p-1.5 sm:p-3"
@@ -277,7 +347,7 @@
 								
 								<!-- Final Rate -->
 								<div class="flex items-center justify-between border-t border-gray-200 pt-0.5">
-									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Rate:</span>
+									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Price:</span>
 									<div class="text-right">
 										<div class="font-bold text-blue-600 text-[10px] sm:text-xs">
 											{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
@@ -364,18 +434,17 @@
 		</div>
 
 		<!-- Table View -->
-		<div v-if="viewMode === 'list'" key="list" class="flex-1 flex flex-col overflow-hidden">
+		<div v-else-if="viewMode === 'list' && hasSearchTerm" key="list" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="listScrollContainer"
-				class="flex-1 overflow-x-auto overflow-y-auto"
-			>
+				class="flex-1 overflow-x-auto overflow-y-auto">
 				<table v-if="paginatedItems.length > 0" class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50 sticky top-0 z-10">
 						<tr>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Image</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
 							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Code</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Rate</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Price</th>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Qty</th>
 							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">UOM</th>
 						</tr>
@@ -411,8 +480,19 @@
 									</svg>
 								</div>
 							</td>
-							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{{ item.item_name }}</div></td>
-							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.item_code }}</div></td>
+
+							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-black-500">{{ item.item_code }}</div></td>
+
+							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">
+								<!-- if item name length is greater than 40 then show the item to the index 0 to 40 characters -->
+								
+								<span v-if="item.item_name.length > 40">
+									{{ item.item_name.substring(0, 40) }}
+								</span>
+								<span v-else>
+									{{ item.item_name }}
+								</span>
+							</div></td>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
 								<div class="text-xs space-y-1">
 									<!-- List Price -->
@@ -427,7 +507,7 @@
 									
 								<!-- Final Rate added to it 15% tax calculated and added to it discount amount -->
 								<div class="font-bold text-red-600 text-sm">
-									Rate: {{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
+									Price: {{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
 								</div>
 									
 								</div>
@@ -532,6 +612,8 @@ import { usePOSSettingsStore } from "@/stores/posSettings"
 import { useStock } from "@/composables/useStock"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { useToast } from "@/composables/useToast"
+import { toast } from "frappe-ui"
+import { createResource } from "frappe-ui"
 import { storeToRefs } from "pinia"
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import {
@@ -633,6 +715,60 @@ const searchMode = computed(() => {
 })
 
 const searchPlaceholder = computed(() => SEARCH_PLACEHOLDERS[searchMode.value])
+
+// Check if search term has a value
+const hasSearchTerm = computed(() => {
+	return searchTerm.value && typeof searchTerm.value === 'string' && searchTerm.value.trim().length > 0
+})
+
+// Performance data state
+const performanceData = ref(null)
+const performanceLoading = ref(false)
+
+// Format currency helper
+function formatCurrency(amount, currency) {
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), currency || props.currency)
+}
+
+// Load employee performance data
+const performanceResource = createResource({
+	url: "pos_next.api.invoices.get_employee_performance",
+	makeParams() {
+		return {
+			pos_profile: props.posProfile || null,
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		performanceData.value = data?.message || data || null
+		performanceLoading.value = false
+	},
+	onError(error) {
+		console.error("Error loading employee performance:", error)
+		performanceLoading.value = false
+		performanceData.value = null
+	},
+})
+
+// Load performance data when component is mounted or posProfile changes
+watch(
+	() => props.posProfile,
+	(newProfile) => {
+		if (newProfile && !hasSearchTerm.value) {
+			performanceLoading.value = true
+			performanceResource.reload()
+		}
+	},
+	{ immediate: true }
+)
+
+// Reload performance data when search term becomes empty
+watch(hasSearchTerm, (hasTerm) => {
+	if (!hasTerm && props.posProfile) {
+		performanceLoading.value = true
+		performanceResource.reload()
+	}
+})
 
 // Watch for cart items and pos profile changes (optimized - uses length + hash instead of deep watch)
 // Tracks: length, item_code, quantity, and amount to detect all cart changes including array replacements
@@ -1038,10 +1174,6 @@ function toggleAutoAdd() {
 			iconClasses: "text-gray-600",
 		})
 	}
-}
-
-function formatCurrency(amount) {
-	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
 }
 
 // Expose methods for parent component

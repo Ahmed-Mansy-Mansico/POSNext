@@ -1483,3 +1483,158 @@ def apply_offers(invoice_data, selected_offers=None):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Apply Offers Error")
         frappe.throw(_("Error applying offers: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_employee_performance(pos_profile=None):
+	"""
+	Get employee performance data (hours at work and sales) for TODAY, YESTERDAY, WEEK, and MONTH.
+	
+	Args:
+		pos_profile: Optional POS Profile name to filter by
+	
+	Returns:
+		Dictionary with employee name, hours at work, and sales data for different periods
+	"""
+	from frappe.utils import nowdate, add_days, get_first_day, get_last_day, getdate, now
+	from datetime import datetime, timedelta
+	
+	try:
+		user = frappe.session.user
+		employee_name = frappe.db.get_value("User", user, "full_name") or user
+		
+		# Get today's date
+		today = getdate(nowdate())
+		yesterday = add_days(today, -1)
+		# Get week start (Monday of current week) - weekday() returns 0 for Monday, 6 for Sunday
+		week_start = add_days(today, -today.weekday())
+		# Get first day of month - get_first_day takes only one parameter (date)
+		month_start = get_first_day(today)
+		
+		# Debug logging
+		frappe.log_error(f"Getting performance for user: {user}, pos_profile: {pos_profile}, today: {today}, week_start: {week_start}, month_start: {month_start}", "Get Employee Performance Debug")
+		
+		# Build filters for POS Profile if provided
+		pos_profile_filter = ""
+		pos_profile_params = []
+		if pos_profile:
+			pos_profile_filter = "AND si.pos_profile = %s"
+			pos_profile_params = [pos_profile]
+		
+		# Get hours at work from POS Opening Shift
+		def get_hours_at_work(start_date, end_date):
+			"""Calculate total hours worked in a date range"""
+			try:
+				hours_query = """
+					SELECT 
+						SUM(TIMESTAMPDIFF(HOUR, pos.period_start_date, 
+							COALESCE(pos_closing.period_end_date, NOW()))) as total_hours,
+						SUM(TIMESTAMPDIFF(MINUTE, pos.period_start_date, 
+							COALESCE(pos_closing.period_end_date, NOW()))) % 60 as total_minutes
+					FROM `tabPOS Opening Shift` pos
+					LEFT JOIN `tabPOS Closing Shift` pos_closing ON pos_closing.pos_opening_shift = pos.name
+					WHERE pos.user = %s
+						AND pos.docstatus = 1
+						AND DATE(pos.period_start_date) >= %s
+						AND DATE(pos.period_start_date) <= %s
+				"""
+				
+				result = frappe.db.sql(
+					hours_query,
+					(user, start_date, end_date),
+					as_dict=True
+				)
+				
+				if result and result[0] and result[0].total_hours is not None:
+					hours = result[0].total_hours or 0
+					minutes = result[0].total_minutes or 0
+					return f"{hours}:{minutes:02d}"
+				return "0:00"
+			except Exception as hours_error:
+				frappe.log_error(f"Error in get_hours_at_work({start_date}, {end_date}): {str(hours_error)}", "Get Hours At Work Error")
+				return "0:00"
+		
+		# Get sales data
+		def get_sales(start_date, end_date):
+			"""Calculate total sales in a date range"""
+			try:
+				sales_query = f"""
+					SELECT 
+						COALESCE(SUM(si.grand_total), 0) as total_sales
+					FROM `tabSales Invoice` si
+					WHERE si.docstatus = 1
+						AND si.is_pos = 1
+						AND si.owner = %s
+						AND DATE(si.posting_date) >= %s
+						AND DATE(si.posting_date) <= %s
+						{pos_profile_filter}
+				"""
+				
+				params = [user, start_date, end_date] + pos_profile_params
+				result = frappe.db.sql(sales_query, params, as_dict=True)
+				
+				if result and result[0]:
+					return flt(result[0].total_sales, 2)
+				return 0.0
+			except Exception as sales_error:
+				frappe.log_error(f"Error in get_sales({start_date}, {end_date}): {str(sales_error)}", "Get Sales Error")
+				return 0.0
+		
+		# Calculate hours and sales for each period
+		hours_today = get_hours_at_work(today, today)
+		hours_yesterday = get_hours_at_work(yesterday, yesterday)
+		hours_week = get_hours_at_work(week_start, today)
+		hours_month = get_hours_at_work(month_start, today)
+		
+		sales_today = get_sales(today, today)
+		sales_yesterday = get_sales(yesterday, yesterday)
+		sales_week = get_sales(week_start, today)
+		sales_month = get_sales(month_start, today)
+		
+		# Get currency from POS Profile or default
+		currency = "USD"  # Default currency
+		if pos_profile:
+			try:
+				profile_currency = frappe.db.get_value("POS Profile", pos_profile, "currency")
+				if profile_currency:
+					currency = profile_currency
+			except Exception as currency_error:
+				frappe.log_error(f"Error getting currency from POS Profile {pos_profile}: {str(currency_error)}", "Get Employee Performance Currency Error")
+		
+		return {
+			"employee_name": employee_name,
+			"hours_at_work": {
+				"today": hours_today,
+				"yesterday": hours_yesterday,
+				"week": hours_week,
+				"month": hours_month,
+			},
+			"sales": {
+				"today": sales_today,
+				"yesterday": sales_yesterday,
+				"week": sales_week,
+				"month": sales_month,
+			},
+			"currency": currency,
+		}
+	except Exception as e:
+		error_message = f"Get Employee Performance Error: {str(e)}\nTraceback: {frappe.get_traceback()}"
+		frappe.log_error(error_message, "Get Employee Performance Error")
+		frappe.log_error(f"User: {frappe.session.user}, POS Profile: {pos_profile}", "Get Employee Performance Error Context")
+		# Return default values on error
+		return {
+			"employee_name": frappe.session.user,
+			"hours_at_work": {
+				"today": "0:00",
+				"yesterday": "0:00",
+				"week": "0:00",
+				"month": "0:00",
+			},
+			"sales": {
+				"today": 0.0,
+				"yesterday": 0.0,
+				"week": 0.0,
+				"month": 0.0,
+			},
+			"currency": "USD",
+		}
