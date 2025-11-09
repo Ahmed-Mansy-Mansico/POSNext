@@ -159,7 +159,7 @@
 							<thead class="bg-gray-50">
 								<tr>
 									<th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Warehouse</th>
-									<th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Total</th>
+									<th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Qty In Stock</th>
 								</tr>
 							</thead>
 							<tbody class="bg-white divide-y divide-gray-200">
