@@ -1,7 +1,7 @@
 <template>
 	<div class="flex flex-col h-full bg-gray-50">
 		<!-- Item Groups Filter Tabs -->
-		<div class="px-1.5 sm:px-3 pt-1.5 sm:pt-3 pb-1.5 sm:pb-2 bg-white border-b border-gray-200">
+		<!-- <div class="px-1.5 sm:px-3 pt-1.5 sm:pt-3 pb-1.5 sm:pb-2 bg-white border-b border-gray-200">
 			<div class="flex items-center space-x-1 sm:space-x-2 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory">
 				<button
 					@click="itemStore.setSelectedItemGroup(null)"
@@ -31,7 +31,7 @@
 					<span>{{ group.item_group }}</span>
 				</button>
 			</div>
-		</div>
+		</div> -->
 
 		<!-- Cache Sync Indicator -->
 		<div v-if="cacheSyncing" class="px-1.5 sm:px-3 py-1 bg-blue-50 border-b border-blue-200">
