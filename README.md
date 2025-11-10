@@ -1,135 +1,178 @@
 # POS Next
 
-A modern, high-performance Point of Sale system for ERPNext with offline capabilities, real-time updates, and intuitive UI.
+<div align="center">
 
-## ✨ Key Features
+![POS Next Banner](docs/screenshots/01-main-dashboard.png)
 
-- 🚀 **Fast & Modern** - Vue 3 with optimized performance
-- 🔄 **Offline Mode** - IndexedDB caching for uninterrupted sales
-- 🎁 **Coupons & Offers** - Full promotional schemes and gift cards
-- 💱 **Multi-Currency** - Proper symbols (E£, ر.س, د.إ, $, €, £)
-- 💾 **Draft Invoices** - Hold and resume transactions
-- 🔄 **Returns** - Easy return processing
-- 💰 **Shift Management** - Real-time shift tracking
-- 🔍 **Barcode Scanning** - Fast item lookup
-- 📱 **Responsive UI** - Clean, modern interface
+**A modern, lightning-fast Point of Sale system for ERPNext**
+
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
+[![Frappe Version](https://img.shields.io/badge/Frappe-v15+-orange.svg)](https://github.com/frappe/frappe)
+[![ERPNext Version](https://img.shields.io/badge/ERPNext-v15+-green.svg)](https://github.com/frappe/erpnext)
+
+[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Demo](#-demo) • [Documentation](#-documentation)
+
+</div>
+
+---
+
+## 🎯 Why POS Next?
+
+POS Next is a **complete rewrite** of the ERPNext POS system, built from the ground up with modern technologies to deliver:
+
+- ⚡ **Blazing Fast Performance** - Vue 3 + Vite for instant load times
+- 🔄 **True Offline Support** - Keep selling even when your internet drops
+- 💎 **Modern UI/UX** - Clean, intuitive interface your staff will love
+- 🎁 **Advanced Promotions** - Full-featured offers, coupons, and gift cards
+- 💰 **Smart Payments** - Multiple payment methods, partial payments, split bills
+- 📊 **Real-time Insights** - Live shift tracking and instant reports
+
+## 📸 See It In Action
+
+### Complete Sales Cycle
+
+![Sales Cycle Demo](docs/screenshots/sales-cycle.gif)
+
+### Key Features
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/02-cart-with-items.png" alt="Shopping Cart"/>
+      <p align="center"><b>Intuitive Shopping Cart</b><br/>Add items instantly with barcode scanning or search</p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/04-payment-dialog.png" alt="Payment Processing"/>
+      <p align="center"><b>Smart Payment Processing</b><br/>Multiple payment methods, quick amounts, partial payments</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/03-offers-dialog.png" alt="Promotional Offers"/>
+      <p align="center"><b>Promotional Schemes</b><br/>Buy X Get Y, discounts, bundle offers, and more</p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/06-settings.png" alt="Settings"/>
+      <p align="center"><b>Comprehensive Settings</b><br/>Flexible configuration for every business need</p>
+    </td>
+  </tr>
+</table>
+
+## ✨ Features
+
+### Core Functionality
+
+- 🚀 **Modern Tech Stack**
+  - Vue 3 with Composition API
+  - Vite for lightning-fast builds
+  - Tailwind CSS for beautiful UI
+  - TypeScript-ready architecture
+
+- 🔄 **Offline-First Architecture**
+  - IndexedDB for local data caching
+  - Background sync when online
+  - Web Workers for smooth performance
+  - Service Worker for true PWA support
+
+- 💰 **Advanced Payment Options**
+  - Multiple payment methods per transaction
+  - Partial payments with tracking
+  - Quick amount buttons for faster checkout
+  - Change calculation and write-off
+  - Credit sale support with approval
+
+- 🎁 **Promotional Engine**
+  - **Coupons**: Percentage, fixed amount, free items
+  - **Promotional Schemes**: Buy X Get Y, tiered discounts
+  - **Gift Cards**: Full gift card management
+  - Auto-apply eligible offers
+  - Stack multiple promotions
+
+- 💱 **Multi-Currency Support**
+  - Proper currency symbols (E£, ر.س, د.إ, $, €, £)
+  - Real-time exchange rates
+  - Currency-specific formatting
+
+- 💾 **Draft Invoices (Hold Orders)**
+  - Save incomplete transactions
+  - Resume from any device
+  - Automatic cleanup
+  - Badge count indicator
+
+- 🔄 **Returns Management**
+  - Quick return invoice processing
+  - Partial or full returns
+  - Auto-credit note generation
+  - Stock adjustment
+
+- 💼 **Shift Management**
+  - Open/close shift workflow
+  - Live shift timer in navbar
+  - Shift-wise sales reports
+  - Cash reconciliation
+
+- 🔍 **Smart Search**
+  - Real-time item search
+  - Barcode scanning support
+  - Item group filtering
+  - Keyboard shortcuts (F4, F8, F9)
+
+- 📱 **Responsive Design**
+  - Desktop optimized
+  - Tablet friendly
+  - Touch-screen ready
+  - Grid and list views
+
+### Technical Features
+
+- 🔥 **Performance Optimized**
+  - Virtual scrolling for large inventories
+  - Lazy loading components
+  - Debounced search
+  - Optimistic UI updates
+
+- 🔒 **Enterprise Ready**
+  - Role-based permissions
+  - Audit trail logging
+  - Multi-warehouse support
+  - Tax compliance ready
+
+- 🌐 **Internationalization**
+  - RTL support ready
+  - Multi-language capable
+  - Regional formats
 
 ## 📋 Prerequisites
 
-1. **Frappe Framework** (version 15+)
-2. **ERPNext** (version 15+)
+- **Frappe Framework** version 15 or higher
+- **ERPNext** version 15 or higher
+- Modern browser (Chrome, Firefox, Safari, Edge)
 
 ## 🚀 Installation
 
-### Step 1: Install POS Next
+### Fresh Installation
 
 ```bash
+# Navigate to your bench
 cd ~/frappe-bench
 
-# Get POS Next
+# Get the app from GitHub
 bench get-app https://github.com/BrainWise-DEV/pos_next.git --branch develop
 
-# Install on site
+# Install on your site
 bench --site [your-site-name] install-app pos_next
+
+# Run migrations
 bench --site [your-site-name] migrate
-# Build and restart
+
+# Build assets
 bench build --app pos_next
+
+# Restart (production only)
 bench restart
 ```
 
-## 🔄 Updating Existing Installation
-
-If you already have POS Next installed and want to update to the latest version:
-
-```bash
-cd ~/frappe-bench
-
-# Pull latest changes
-cd apps/pos_next
-git pull origin develop
-cd ../..
-
-# Apply database migrations and rebuild
-bench --site [your-site-name] migrate
-bench build --app pos_next
-bench --site [your-site-name] clear-cache
-
-# Restart (production only, skip if using bench start)
-bench restart
-```
-
-**Note**: If running in development mode with `bench start`, simply restart the bench process instead of using `bench restart`.
-
-### Step 2: Access POS
-
-Visit `https://<your-domain>/pos` (or `http://<server-ip>/pos`) replacing the host with your DNS/IP.
-
-### Step 3: Setup
-
-1. **Create POS Profile**: `Retail > POS Profile > New`
-   - Set Company, Warehouse, Price List, Currency, Payment Methods
-
-2. **(Optional) Create Offers**: `POS Next > POS Offer`
-
-3. **(Optional) Create Coupons**: `POS Next > POS Coupon`
-
-## 📖 Quick Start
-
-### Making a Sale
-
-1. **Search Items** - Press `F4` or use barcode scanner
-2. **Add to Cart** - Click items to add, adjust quantity
-3. **Select Customer** - Press `F8` (optional)
-4. **Apply Coupons/Offers** - Click purple/green buttons
-5. **Checkout** - Press `F9`, select payment method
-
-### Using Drafts (Hold Feature)
-
-- **Save**: Click "Hold" button (saves cart, clears screen)
-- **Load**: Menu (⋮) > "Draft Invoices" (auto-deletes on load)
-- **Delete**: Click trash icon or "Clear All"
-
-### Processing Returns
-
-1. Menu (⋮) > "Return Invoice"
-2. Search invoice, select items to return
-3. Process return (creates credit note)
-
-### Shift Management
-
-- **Open**: Required before sales
-- **During**: Live timer in navbar (green badge)
-- **Close**: Menu (⋮) > "Close Shift"
-
-## ⌨️ Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `F4` | Search items |
-| `F8` | Search customers |
-| `F9` | Checkout |
-| `Ctrl+S` | Save draft |
-| `Esc` | Close dialog |
-
-## 💱 Currency Support
-
-Displays proper symbols for: EGP (E£), SAR (ر.س), AED (د.إ), USD ($), EUR (€), GBP (£), and more.
-
-## 🔧 Troubleshooting
-
-### Items Not Loading
-- Verify items exist in selected warehouse
-- Check POS Profile warehouse setting
-- Ensure price list has item prices
-- Clear cache and reload
-
-### Close Shift Not Working
-**Solution**: Update to latest version (fixed).
-
-### Draft Badge Not Updating
-**Solution**: Update to latest version (auto-updates now).
-
-## 🛠️ Development
+### Development Setup
 
 ```bash
 # Get app in dev mode
@@ -140,14 +183,163 @@ bench get-app /path/to/pos_next
 cd apps/pos_next/POS
 npm install
 
-# Run dev server (hot reload)
+# Run dev server with hot reload
 npm run dev
 
-# In another terminal
+# In another terminal, start Frappe
 bench start
 ```
 
-### Build for Production
+## 🔄 Updating
+
+Already have POS Next? Update to the latest version:
+
+```bash
+cd ~/frappe-bench/apps/pos_next
+git pull origin develop
+cd ../..
+
+# Apply updates
+bench --site [your-site-name] migrate
+bench build --app pos_next
+bench --site [your-site-name] clear-cache
+
+# Restart (production only - skip if using bench start)
+bench restart
+```
+
+## 🎯 Quick Start
+
+### 1. Setup POS Profile
+
+Navigate to: **Retail > POS Profile > New**
+
+Configure:
+- Company and Warehouse
+- Price List and Currency
+- Payment Methods (Cash, Card, etc.)
+- Default Customer (Walk-In)
+
+### 2. Access POS
+
+Visit: `https://your-site.com/pos` or `http://localhost:8000/pos`
+
+### 3. Make Your First Sale
+
+1. **Search Items** - Press `F4` or scan barcode
+2. **Add to Cart** - Click items or use auto-add mode
+3. **Select Customer** - Press `F8` (optional)
+4. **Apply Offers** - Green button shows available offers
+5. **Checkout** - Press `F9`, select payment method
+6. **Print** - Receipt prints automatically
+
+### Optional: Create Promotional Offers
+
+**POS Offer**: `POS Next > POS Offer > New`
+**POS Coupon**: `POS Next > POS Coupon > New`
+
+## ⌨️ Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `F4` | Search items |
+| `F8` | Search customers |
+| `F9` | Proceed to checkout |
+| `Ctrl+S` | Save draft (hold order) |
+| `Esc` | Close dialog |
+
+## 🎨 Feature Highlights
+
+### Offline Mode
+
+Never lose a sale! POS Next works seamlessly even without internet:
+- All item data cached locally
+- Stock levels synced in background
+- Invoices saved and uploaded when online
+- Visual indicator shows connection status
+
+### Smart Offers Engine
+
+Maximize revenue with sophisticated promotions:
+- **Buy 2 Get 1 Free** - Product-based offers
+- **Spend $100, Get 10% Off** - Value-based discounts
+- **Seasonal Coupons** - Time-limited promotions
+- **Free Shipping** - Threshold-based benefits
+
+### Shift Management
+
+Complete shift lifecycle:
+- Open shift to start selling
+- Live timer shows shift duration
+- Close shift for reconciliation
+- Detailed shift reports with cash movements
+
+## 💱 Currency Support
+
+Display prices in proper local format:
+- **Egypt**: E£ (EGP)
+- **Saudi Arabia**: ر.س (SAR)
+- **UAE**: د.إ (AED)
+- **US**: $ (USD)
+- **Europe**: € (EUR)
+- **UK**: £ (GBP)
+- And many more...
+
+## 🔧 Configuration
+
+### Stock Settings
+
+- **Warehouse Selection**: Choose active warehouse
+- **Negative Stock**: Allow overselling
+- **Auto Sync**: Background stock updates
+- **Stock Policy**: Validation rules
+
+### Pricing & Discounts
+
+- **Tax Inclusive**: Prices include tax
+- **Max Discount**: Item-level limits
+- **Additional Discount**: Invoice-level
+- **Rounded Totals**: Exact or rounded
+
+### Sales Operations
+
+- **Credit Sales**: Allow payment terms
+- **Partial Payments**: Split over multiple methods
+- **Returns**: Enable return processing
+- **Write-off**: Small change amounts
+- **Silent Print**: Auto-print receipts
+
+## 🛠️ Troubleshooting
+
+### Items Not Loading
+
+**Check:**
+1. Items exist in selected warehouse
+2. Price list has item prices defined
+3. POS Profile warehouse setting
+4. Browser console for errors
+
+**Solution:** Clear cache and reload
+```bash
+bench --site [your-site-name] clear-cache
+```
+
+### Offline Mode Not Working
+
+**Check:**
+1. Service Worker registered
+2. IndexedDB enabled in browser
+3. Sufficient storage available
+
+**Solution:** Check browser console, ensure HTTPS (required for Service Workers)
+
+### Close Shift Not Working
+
+**Status:** Fixed in v1.6.0+
+
+**Solution:** Update to latest version
+
+## 🏗️ Build for Production
 
 ```bash
 cd apps/pos_next/POS
@@ -156,98 +348,151 @@ bench build --app pos_next
 bench restart
 ```
 
-## 🔌 API Examples
+## 🔌 API Reference
 
-### Get Offers
-```javascript
+### Get Available Offers
+
+```python
 frappe.call({
     method: 'pos_next.api.offers.get_offers',
-    args: { pos_profile: 'Main POS' }
+    args: {
+        pos_profile: 'Main POS',
+        customer: 'CUST-00001'
+    },
+    callback: (r) => console.log(r.message)
 })
 ```
 
 ### Validate Coupon
-```javascript
+
+```python
 frappe.call({
     method: 'pos_next.api.offers.validate_coupon',
     args: {
         coupon_code: 'SUMMER2024',
         customer: 'CUST-00001',
-        company: 'My Company'
-    }
+        company: 'My Company',
+        grand_total: 1000
+    },
+    callback: (r) => console.log(r.message)
 })
 ```
 
 ### Create Invoice
-```javascript
+
+```python
 frappe.call({
     method: 'pos_next.api.invoices.create_invoice',
     args: {
         invoice_data: {
             customer: 'CUST-00001',
-            items: [{ item_code: 'ITEM-001', qty: 2, rate: 100 }],
-            payments: [{ mode_of_payment: 'Cash', amount: 200 }]
+            items: [
+                { item_code: 'ITEM-001', qty: 2, rate: 100 }
+            ],
+            payments: [
+                { mode_of_payment: 'Cash', amount: 200 }
+            ]
         }
-    }
+    },
+    callback: (r) => console.log(r.message)
 })
 ```
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
-3. Install pre-commit: `cd apps/pos_next && pre-commit install`
-4. Make changes and commit
-5. Push and open Pull Request
+We welcome contributions! Here's how:
 
-**Code Style**: Uses ruff, eslint, prettier, pyupgrade (via pre-commit)
+1. **Fork** the repository
+2. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+3. **Install** pre-commit hooks: `cd apps/pos_next && pre-commit install`
+4. **Make** your changes
+5. **Test** thoroughly
+6. **Commit** with clear messages
+7. **Push** to your fork
+8. **Open** a Pull Request
 
-## 📞 Support
+### Code Quality
 
-- **Issues**: [GitHub Issues](https://github.com/BrainWise-DEV/pos_next/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/BrainWise-DEV/pos_next/discussions)
-- **Forum**: [Frappe Forum](https://discuss.frappe.io/)
+We use automated tools to maintain code quality:
+- **Python**: ruff, pyupgrade
+- **JavaScript**: eslint, prettier
+- **Git**: pre-commit hooks
+
+## 📞 Support & Community
+
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/BrainWise-DEV/pos_next/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/BrainWise-DEV/pos_next/discussions)
+- 📖 **Forum**: [Frappe Community](https://discuss.frappe.io/)
+- 📧 **Email**: support@brainwise.me
 
 ## 📄 License
 
-AGPL-3.0 - See [LICENSE](LICENSE) file
+AGPL-3.0 License - See [LICENSE](LICENSE) file for details
 
-## 🙏 Credits
+This means you can:
+- ✅ Use commercially
+- ✅ Modify
+- ✅ Distribute
+- ✅ Use privately
 
-- [Frappe Framework](https://frappeframework.com/) - Full-stack framework
-- [ERPNext](https://erpnext.com/) - Open source ERP
-- [Vue.js 3](https://vuejs.org/) - Frontend framework
-- [Tailwind CSS](https://tailwindcss.com/) - Styling
+You must:
+- 📋 Disclose source
+- 📋 Include license
+- 📋 State changes
+- 📋 Share alike
 
-## 📝 Recent Updates (v1.0.0)
+## 🙏 Credits & Technology
 
-### Features
-- Modern Vue 3 Composition API interface
-- Offline-first with IndexedDB
-- Real-time Socket.io updates
-- Multi-currency with proper symbols
-- Draft invoice management (Hold/Resume)
-- Comprehensive coupon/offer system
-- Return invoice processing
-- Live shift duration timer
+Built with amazing open-source technologies:
 
-### Bug Fixes
-- Fixed duplicate currency symbols (EGPEGP → EGP)
-- Fixed currency showing codes instead of symbols
-- Fixed draft duplication on reload (auto-delete)
-- Fixed Close Shift button not working
-- Fixed badge count not updating after clearing drafts
-- Fixed currency in Draft Invoices dialog
+- [Frappe Framework](https://frappeframework.com/) - Full-stack web framework
+- [ERPNext](https://erpnext.com/) - Open-source ERP
+- [Vue.js 3](https://vuejs.org/) - Progressive JavaScript framework
+- [Vite](https://vitejs.dev/) - Next-generation frontend tooling
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Heroicons](https://heroicons.com/) - Beautiful hand-crafted SVG icons
+
+## 📝 Changelog
+
+### v1.6.1 (Latest)
+- Enhanced partial payments with overdue status tracking
+- Major backend refactoring for better maintainability
+- Performance improvements
+
+### v1.6.0
+- ✨ Implemented free items support for promotional offers
+- 🐛 Fixed tax-inclusive calculation preventing tax being treated as discount
+- 🔧 Improved promotional scheme handling
+
+### v1.0.0
+- 🎉 Initial release
+- ✨ Modern Vue 3 interface
+- 🔄 Offline-first architecture
+- 💰 Multi-currency support
+- 🎁 Coupon and offer system
+- 💾 Draft invoice management
 
 ## 🎯 Roadmap
 
-- [ ] Table management for restaurants
-- [ ] Kitchen display system (KDS)
-- [ ] Advanced reporting
-- [ ] Mobile app
-- [ ] Loyalty points
-- [ ] PWA support
+Coming soon:
+
+- [ ] 🍽️ **Restaurant Mode** - Table management, kitchen display
+- [ ] 📱 **Mobile App** - Native iOS and Android apps
+- [ ] 📊 **Advanced Analytics** - Sales insights, trends, forecasting
+- [ ] 🎯 **Loyalty Program** - Points, rewards, membership tiers
+- [ ] 📦 **Quick Restock** - Low stock alerts, auto-ordering
+- [ ] 🖨️ **Receipt Customization** - Custom templates, branding
+- [ ] 🔗 **Integration Hub** - Payment gateways, accounting software
+- [ ] 👥 **Customer Display** - Facing display for customers
 
 ---
 
-Made with ❤️ by BrainWise team
+<div align="center">
+
+**Made with ❤️ by [BrainWise](https://nexus.brainwise.me)**
+
+⭐ Star us on GitHub — it motivates us a lot!
+
+[Report Bug](https://github.com/BrainWise-DEV/pos_next/issues) • [Request Feature](https://github.com/BrainWise-DEV/pos_next/issues) • [Documentation](https://github.com/BrainWise-DEV/pos_next/wiki)
+
+</div>

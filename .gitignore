@@ -60,4 +60,6 @@ dev-dist/
 # Vite
 .vite/
 *.png
+!docs/screenshots/*.png
+!docs/screenshots/*.gif
 .playwright-mcp/*
