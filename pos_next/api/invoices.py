@@ -1505,14 +1505,14 @@ def get_employee_performance(pos_profile=None):
 		
 		# Get today's date
 		today = getdate(nowdate())
+		print(today)
+		print(type(today))
 		yesterday = add_days(today, -1)
 		# Get week start (Monday of current week) - weekday() returns 0 for Monday, 6 for Sunday
 		week_start = add_days(today, -today.weekday())
 		# Get first day of month - get_first_day takes only one parameter (date)
 		month_start = get_first_day(today)
 		
-		# Debug logging
-		frappe.log_error(f"Getting performance for user: {user}, pos_profile: {pos_profile}, today: {today}, week_start: {week_start}, month_start: {month_start}", "Get Employee Performance Debug")
 		
 		# Build filters for POS Profile if provided
 		pos_profile_filter = ""
@@ -1523,61 +1523,137 @@ def get_employee_performance(pos_profile=None):
 		
 		# Get hours at work from POS Opening Shift
 		def get_hours_at_work(start_date, end_date):
-			"""Calculate total hours worked in a date range"""
+			"""Calculate total hours worked in a date range - Optimized query"""
 			try:
+				# Pre-calculate datetime boundaries to avoid repeated calculations in SQL
+				start_datetime = datetime.combine(start_date, datetime.min.time())
+				end_datetime = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
+				
+				# Optimized query: Uses indexes better, avoids DATE() on columns, simplifies logic
 				hours_query = """
 					SELECT 
-						SUM(TIMESTAMPDIFF(HOUR, pos.period_start_date, 
-							COALESCE(pos_closing.period_end_date, NOW()))) as total_hours,
-						SUM(TIMESTAMPDIFF(MINUTE, pos.period_start_date, 
-							COALESCE(pos_closing.period_end_date, NOW()))) % 60 as total_minutes
+						COALESCE(SUM(
+							TIMESTAMPDIFF(HOUR,
+								CASE 
+									WHEN pos.period_start_date < %s THEN %s
+									ELSE pos.period_start_date
+								END,
+								CASE 
+									WHEN pos_closing.period_end_date IS NULL THEN 
+										CASE WHEN NOW() < %s THEN NOW() ELSE %s END
+									WHEN pos_closing.period_end_date > %s THEN %s
+									ELSE pos_closing.period_end_date
+								END
+							)
+						), 0) as total_hours,
+						COALESCE(SUM(
+							TIMESTAMPDIFF(MINUTE,
+								CASE 
+									WHEN pos.period_start_date < %s THEN %s
+									ELSE pos.period_start_date
+								END,
+								CASE 
+									WHEN pos_closing.period_end_date IS NULL THEN 
+										CASE WHEN NOW() < %s THEN NOW() ELSE %s END
+									WHEN pos_closing.period_end_date > %s THEN %s
+									ELSE pos_closing.period_end_date
+								END
+							)
+						), 0) %% 60 as total_minutes
 					FROM `tabPOS Opening Shift` pos
-					LEFT JOIN `tabPOS Closing Shift` pos_closing ON pos_closing.pos_opening_shift = pos.name
+					LEFT JOIN `tabPOS Closing Shift` pos_closing 
+						ON pos_closing.pos_opening_shift = pos.name
 					WHERE pos.user = %s
 						AND pos.docstatus = 1
-						AND DATE(pos.period_start_date) >= %s
-						AND DATE(pos.period_start_date) <= %s
+						-- Optimized: Use direct datetime comparison instead of DATE() function
+						AND pos.period_start_date <= %s
+						AND (
+							pos_closing.period_end_date IS NULL 
+							OR pos_closing.period_end_date >= %s
+						)
 				"""
 				
 				result = frappe.db.sql(
 					hours_query,
-					(user, start_date, end_date),
+					(
+						# For HOUR calculation
+						start_datetime, start_datetime,  # period_start_date comparison
+						end_datetime, end_datetime,     # period_end_date comparison (NULL case)
+						end_datetime, end_datetime,     # period_end_date comparison (closed case)
+						# For MINUTE calculation
+						start_datetime, start_datetime,  # period_start_date comparison
+						end_datetime, end_datetime,     # period_end_date comparison (NULL case)
+						end_datetime, end_datetime,     # period_end_date comparison (closed case)
+						# WHERE clause
+						user,
+						end_datetime,                   # pos.period_start_date <= end_datetime
+						start_datetime                   # pos_closing.period_end_date >= start_datetime
+					),
 					as_dict=True
 				)
 				
-				if result and result[0] and result[0].total_hours is not None:
-					hours = result[0].total_hours or 0
-					minutes = result[0].total_minutes or 0
-					return f"{hours}:{minutes:02d}"
+				if result and len(result) > 0:
+					row = result[0]
+					total_hours = row.get('total_hours')
+					total_minutes = row.get('total_minutes')
+					
+					if total_hours is not None:
+						# Safely convert to int
+						hours = max(0, cint(total_hours))
+						minutes = max(0, min(59, cint(total_minutes)))
+						
+						return "{0} Hour : {1:02d} Minute".format(hours, minutes)
+				
 				return "0:00"
 			except Exception as hours_error:
-				frappe.log_error(f"Error in get_hours_at_work({start_date}, {end_date}): {str(hours_error)}", "Get Hours At Work Error")
+				error_msg = "Error in get_hours_at_work: start_date=" + str(start_date) + ", end_date=" + str(end_date) + ", error=" + str(hours_error)
+				frappe.log_error(error_msg, "Get Hours At Work Error")
 				return "0:00"
 		
 		# Get sales data
 		def get_sales(start_date, end_date):
-			"""Calculate total sales in a date range"""
+			"""Calculate total sales in a date range - filtered by shift opening date"""
 			try:
+				# Pre-calculate datetime boundaries
+				start_datetime = datetime.combine(start_date, datetime.min.time())
+				end_datetime = datetime.combine(end_date, datetime.min.time()) + timedelta(days=1)
+				
+				# Optimized query: Join with POS Opening Shift to filter by shift start date
 				sales_query = f"""
 					SELECT 
 						COALESCE(SUM(si.grand_total), 0) as total_sales
 					FROM `tabSales Invoice` si
+					INNER JOIN `tabPOS Opening Shift` pos
+						ON si.posa_pos_opening_shift = pos.name
+					LEFT JOIN `tabPOS Closing Shift` pos_closing
+						ON pos_closing.name = pos.pos_closing_shift
 					WHERE si.docstatus = 1
 						AND si.is_pos = 1
 						AND si.owner = %s
-						AND DATE(si.posting_date) >= %s
-						AND DATE(si.posting_date) <= %s
+						AND pos.user = %s
+						AND pos.docstatus = 1
+						-- Filter: sales must be after shift opened
+						AND si.posting_date >= pos.period_start_date
+						-- Filter: sales must be within the date range
+						AND si.posting_date >= %s
+						AND si.posting_date < %s
+						-- Filter: sales must be before shift closed (if closed) or until now
+						AND (
+							pos_closing.period_end_date IS NULL
+							OR si.posting_date <= pos_closing.period_end_date
+						)
 						{pos_profile_filter}
 				"""
 				
-				params = [user, start_date, end_date] + pos_profile_params
+				params = [user, user, start_datetime, end_datetime] + pos_profile_params
 				result = frappe.db.sql(sales_query, params, as_dict=True)
 				
 				if result and result[0]:
 					return flt(result[0].total_sales, 2)
 				return 0.0
 			except Exception as sales_error:
-				frappe.log_error(f"Error in get_sales({start_date}, {end_date}): {str(sales_error)}", "Get Sales Error")
+				error_msg = "Error in get_sales: start_date=" + str(start_date) + ", end_date=" + str(end_date) + ", error=" + str(sales_error)
+				frappe.log_error(error_msg, "Get Sales Error")
 				return 0.0
 		
 		# Calculate hours and sales for each period

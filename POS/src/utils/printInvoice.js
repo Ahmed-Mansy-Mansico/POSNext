@@ -26,14 +26,12 @@ export async function printInvoiceFromPrintView(
 			doctype: doctype,
 			name: invoiceData.name,
 			format: format,
-			no_letterhead: letterhead ? 0 : 1,
+			// no_letterhead: letterhead ? 0 : 1,
+			no_letterhead: letterhead ? 1 : 0,
 			_lang: "en",
 			trigger_print: 1,
+			letterhead: letterhead || "",
 		})
-
-		if (letterhead) {
-			params.append("letterhead", letterhead)
-		}
 
 		// Try HTML print view first (more reliable, doesn't require wkhtmltopdf)
 		const printUrl = `/printview?${params.toString()}`

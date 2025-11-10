@@ -307,7 +307,7 @@
 					</div>
 					
 					<!-- Logout button centered in bottom row -->
-					<div class="flex justify-center">
+					<!-- <div class="flex justify-center">
 						<button
 							@click="$emit('logout')"
 							class="flex flex-col items-center justify-center p-4 sm:p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-red-300 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
@@ -320,7 +320,7 @@
 							</div>
 							<span class="text-xs sm:text-sm font-medium text-red-600">Logout</span>
 						</button>
-					</div>
+					</div> -->
 				</div>
 			</div>
 
