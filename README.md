@@ -33,6 +33,14 @@ POS Next is a **complete rewrite** of the ERPNext POS system, built from the gro
 
 ![Sales Cycle Demo](docs/screenshots/sales-cycle.gif)
 
+## 📞 Support & Community
+
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/BrainWise-DEV/pos_next/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/BrainWise-DEV/pos_next/discussions)
+- 📖 **Forum**: [Frappe Community](https://discuss.frappe.io/)
+- 📱 **Telegram Group**: [Join our community](https://t.me/+J2WHnNKCn8ZhOWQ0) - Get help, share ideas, and connect with other users
+- 📧 **Email**: support@brainwise.me
+
 ### Key Features
 
 <table>
@@ -417,13 +425,6 @@ We use automated tools to maintain code quality:
 - **Python**: ruff, pyupgrade
 - **JavaScript**: eslint, prettier
 - **Git**: pre-commit hooks
-
-## 📞 Support & Community
-
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/BrainWise-DEV/pos_next/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/BrainWise-DEV/pos_next/discussions)
-- 📖 **Forum**: [Frappe Community](https://discuss.frappe.io/)
-- 📧 **Email**: support@brainwise.me
 
 ## 📄 License
 
