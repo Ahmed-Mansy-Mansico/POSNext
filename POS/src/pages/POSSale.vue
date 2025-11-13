@@ -12,6 +12,7 @@
 				:has-open-shift="shiftStore.hasOpenShift"
 				:profile-name="shiftStore.profileName"
 				:user-name="getCurrentUser()"
+				:user-image="getCurrentUserImage()"
 				:is-offline="offlineStore.isOffline"
 				:is-syncing="offlineStore.isSyncing"
 				:pending-invoices-count="offlineStore.pendingInvoicesCount"
@@ -1762,6 +1763,13 @@ function getCurrentUser() {
 		)
 	}
 	return "User"
+}
+
+function getCurrentUserImage() {
+        if (typeof window !== "undefined" && window.frappe?.session) {
+                return window.frappe.session.user_image || null
+        }
+        return null
 }
 
 function confirmLogout() {

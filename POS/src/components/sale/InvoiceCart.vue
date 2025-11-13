@@ -30,7 +30,7 @@
 						</svg>
 					</button>
 				</div>
-				<div v-else>
+								<div v-else class="relative">
 					<!-- Search Icon Prefix -->
 					<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
 						<svg v-if="customersLoaded" class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,11 +47,26 @@
 						@input="handleSearchInput"
 						type="text"
 						placeholder="Search customer by name or mobile"
-						class="w-full pl-8 sm:pl-10 text-[11px] sm:text-xs border border-gray-300 rounded-md px-2 sm:px-3 py-1.5 sm:py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+						class="w-full pl-8 sm:pl-10 pr-10 sm:pr-12 text-[11px] sm:text-xs border border-gray-300 rounded-md px-2 sm:px-3 py-1.5 sm:py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						:disabled="!customersLoaded"
 						@keydown="handleKeydown"
 						aria-label="Search customer in cart"
 					/>
+
+					<!-- Plus Button (NEW!) -->
+					<button
+						type="button"
+						@click="createNewCustomer"
+						class="absolute inset-y-0 right-0 pr-2 sm:pr-3 flex items-center hover:scale-110 active:scale-95 transition-transform touch-manipulation"
+						title="Create new customer"
+						aria-label="Create new customer"
+					>
+						<div class="w-7 h-7 sm:w-8 sm:h-8 bg-green-500 hover:bg-green-600 active:bg-green-700 rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition-all">
+							<svg class="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+							</svg>
+						</div>
+					</button>
 
 					<!-- Customer Dropdown -->
 					<div
@@ -392,7 +407,7 @@
 								
 
 									<div v-if="item.price_list_rate" class="flex items-center justify-between">
-										<span class="text-gray-400 text-xs sm:text-sm">List:</span>
+										<span class="text-gray-400 text-xs sm:text-sm">Original Price:</span>
 										<span class="font-medium text-gray-600 text-xs sm:text-sm">{{ formatCurrency(item.price_list_rate + item.price_list_rate * 0.15)  }}</span>
 									</div>
 									
@@ -576,53 +591,39 @@
 			</div>
 		</div>
 
-		<!-- Totals Summary -->
-		<div class="p-2 sm:p-2.5 bg-white border-t border-gray-200">
-			<!-- Summary Details -->
-			<div v-if="items.length > 0" class="mb-2.5">
-				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-1">
-					<span>Total Quantity</span>
-					<span class="font-medium text-gray-900">{{ totalQuantity }}</span>
-				</div>
-				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
-					<span>Subtotal</span>
-					<span class="font-medium text-gray-900">{{ formatCurrency(subtotal) }}</span>
-				</div>
-			</div>
+<!-- Totals Summary -->
+<div class="p-2 sm:p-2.5 bg-white border-t border-gray-200">
+	<!-- Summary Details -->
+	<div v-if="items.length > 0" class="mb-2.5 space-y-2">
 
-			<!-- Summary Details (continued) -->
-			<div v-if="items.length > 0" class="mb-2.5">
-				<!-- Discount Display - Highlighted -->
-				<div v-if="discountAmount > 0" class="flex items-center justify-between mb-1 bg-red-50 rounded px-1.5 py-1 -mx-0.5">
-					<div class="flex items-center space-x-1">
-						<svg class="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
-						</svg>
-						<span class="text-[10px] font-semibold text-red-700">Discount</span>
-					</div>
-					<span class="text-xs font-bold text-red-600">{{ formatCurrency(discountAmount) }}</span>
-				</div>
+		<!-- 1. TOTAL (Grand total) -->
+		<div class="flex items-center justify-between text-base bg-blue-50 rounded-lg px-2.5 py-2.5 -mx-0.5 border-2 border-blue-200">
+			<span class="font-bold text-gray-900">TOTAL</span>
+			<span class="text-xl font-bold text-blue-600">
+				{{ formatCurrency(grandTotal) }}
+			</span>
+		</div>
 
-				<div class="flex items-center justify-between text-[10px] text-gray-600 mb-2">
-					<div class="flex items-center space-x-1">
-						<svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-						</svg>
-						<span>Tax</span>
-					</div>
-					<span class="font-medium text-gray-900">{{ formatCurrency(taxAmount) }}</span>
-				</div>
-			</div>
+		<!-- 2. TAX (Total applied tax) -->
+		<div class="flex items-center justify-between text-sm">
+			<span class="font-semibold text-gray-900">TAX</span>
+			<span class="font-bold text-gray-900">{{ formatCurrency(taxAmount) }}</span>
+		</div>
 
-			<!-- Grand Total -->
-			<div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-2.5 mb-2.5">
-				<div class="flex items-center justify-between">
-					<span class="text-sm font-bold text-gray-900">Grand Total</span>
-					<span class="text-lg font-bold text-blue-600">
-						{{ formatCurrency(grandTotal) }}
-					</span>
-				</div>
-			</div>
+		<!-- 3. Net (Subtotal before tax) -->
+		<div class="flex items-center justify-between text-sm">
+			<span class="font-semibold text-gray-900">Net</span>
+			<span class="font-bold text-gray-900">{{ formatCurrency(subtotal) }}</span>
+		</div>
+
+		<!-- 4. TOTAL Quantity -->
+		<div class="flex items-center justify-between text-xs text-gray-700 pb-2 border-b border-gray-200">
+			<span class="font-semibold">TOTAL Quantity</span>
+			<span class="font-bold text-gray-900">{{ totalQuantity }}</span>
+		</div>
+
+
+	</div>
 
 			<!-- Action Buttons -->
 			<div class="flex gap-1.5 sm:gap-2">

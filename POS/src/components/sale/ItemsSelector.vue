@@ -329,7 +329,7 @@
 
 						<!-- Item Details -->
 						<div class="min-w-0">
-							<h3 class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
+							<h3 class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate max-w-[20ch] mb-0.5 leading-tight" :title="item.item_name">
 								{{ item.item_name }}
 							</h3>
 							<div class="text-[8px] sm:text-[9px] text-gray-500 leading-tight space-y-0.5">
@@ -444,7 +444,7 @@
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Image</th>
 							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Code</th>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Price</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Retail Price</th>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Qty</th>
 							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">UOM</th>
 						</tr>
@@ -484,10 +484,10 @@
 							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-black-500">{{ item.item_code }}</div></td>
 
 							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">
-								<!-- if item name length is greater than 40 then show the item to the index 0 to 40 characters -->
+								<!-- if item name length is greater than 20 then show the item to the index 0 to 20 characters -->
 								
-								<span v-if="item.item_name.length > 40">
-									{{ item.item_name.substring(0, 40) }}
+								<span v-if="item.item_name.length > 20">
+									{{ item.item_name.substring(0, 20) }}
 								</span>
 								<span v-else>
 									{{ item.item_name }}
