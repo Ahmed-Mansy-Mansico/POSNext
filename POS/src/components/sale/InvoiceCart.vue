@@ -421,7 +421,7 @@
 								<!-- Final Rate & UOM -->
 								<div class="flex items-center gap-1 border-t border-gray-200 pt-1">
 									<span class="text-sm sm:text-base font-bold text-blue-600">
-										{{ formatCurrency(item.rate + (item.rate * 0.15) ) }}
+										{{ formatCurrency(getFinalRatePerUnit(item)) }}
 									</span>
 									<span class="text-xs text-gray-500">/</span>
 									<span class="inline-flex items-center px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] sm:text-xs font-semibold">
@@ -581,7 +581,7 @@
 								<div class="text-right">
 									<div class="text-[10px] sm:text-xs text-gray-500 leading-none mb-0.5">Total</div>
 									<div class="text-sm sm:text-base font-bold text-blue-600 leading-none">
-										{{ formatCurrency(item.amount + (item.amount * 0.15) || item.rate * item.quantity + (item.rate * item.quantity * 0.15) ) }}
+										{{ formatCurrency(getItemTotal(item)) }}
 									</div>
 								</div>
 							</div>
@@ -600,26 +600,26 @@
 		<div class="flex items-center justify-between text-base bg-blue-50 rounded-lg px-2.5 py-2.5 -mx-0.5 border-2 border-blue-200">
 			<span class="font-bold text-gray-900">TOTAL</span>
 			<span class="text-xl font-bold text-blue-600">
-				{{ formatCurrency(grandTotal) }}
+				{{ formatCurrency(calculatedGrandTotal) }}
 			</span>
 		</div>
 
 		<!-- 2. TAX (Total applied tax) -->
 		<div class="flex items-center justify-between text-sm">
 			<span class="font-semibold text-gray-900">TAX</span>
-			<span class="font-bold text-gray-900">{{ formatCurrency(taxAmount) }}</span>
+			<span class="font-bold text-gray-900">{{ formatCurrency(calculatedTax) }}</span>
 		</div>
 
 		<!-- 3. Net (Subtotal before tax) -->
 		<div class="flex items-center justify-between text-sm">
 			<span class="font-semibold text-gray-900">Net</span>
-			<span class="font-bold text-gray-900">{{ formatCurrency(subtotal) }}</span>
+			<span class="font-bold text-gray-900">{{ formatCurrency(calculatedSubtotal) }}</span>
 		</div>
 
 		<!-- 4. TOTAL Quantity -->
 		<div class="flex items-center justify-between text-xs text-gray-700 pb-2 border-b border-gray-200">
 			<span class="font-semibold">TOTAL Quantity</span>
-			<span class="font-bold text-gray-900">{{ totalQuantity }}</span>
+			<span class="font-bold text-gray-900">{{ calculatedTotalQuantity }}</span>
 		</div>
 
 
@@ -722,6 +722,84 @@ const getDiscountAmount = (item) => {
 	
 	return discountAmount
 }
+
+// Calculate final rate per unit WITHOUT VAT (Original - Discount)
+const getFinalRatePerUnit = (item) => {
+	
+	const originalPrice = (item.price_list_rate + item.price_list_rate * 0.15) || item.rate || 0
+	
+	// Calculate discount per single unit
+	const discountPerUnit = (getDiscountAmount(item) + getDiscountAmount(item) * 0.15)
+	
+	const finalRate = originalPrice - discountPerUnit
+	
+	return finalRate
+}
+
+const getNetRatePerUnit = (item) => {
+	// Original price (NO VAT)
+	const originalPrice = item.price_list_rate || item.rate || 0
+	
+	let discountPerUnit = 0
+	
+	if (item.discount_percentage && item.discount_percentage > 0) {
+		// Use percentage to calculate discount per unit
+		discountPerUnit = originalPrice * (item.discount_percentage / 100)
+	} else if (item.discount_amount && item.discount_amount > 0) {
+		const totalDiscount = getDiscountAmount(item)
+		discountPerUnit = item.quantity > 0 ? totalDiscount / item.quantity : 0
+	}
+	
+	// Net rate = Original - Discount (NO VAT)
+	const netRate = originalPrice - discountPerUnit
+	
+	return netRate
+}
+
+// Calculate item total with VAT
+const getItemTotal = (item) => {
+	const finalRatePerUnit = getFinalRatePerUnit(item)
+	
+	const subtotal = finalRatePerUnit * item.quantity
+	
+	const totalWithVAT = subtotal 
+	
+	return totalWithVAT
+}
+
+const calculatedSubtotal = computed(() => {
+	return props.items.reduce((sum, item) => {
+		const netRatePerUnit = getNetRatePerUnit(item) 
+		const itemSubtotal = netRatePerUnit * item.quantity
+		return sum + itemSubtotal
+	}, 0)
+})
+
+const calculatedTax = computed(() => {
+	// Sum of all individual item taxes (calculated on net amount)
+	return props.items.reduce((sum, item) => {
+		const netRatePerUnit = getNetRatePerUnit(item)
+		
+		// Calculate net amount for this item
+		const itemNetAmount = netRatePerUnit * item.quantity
+		
+		// Calculate 15% tax on net amount
+		const itemTax = itemNetAmount * 0.15
+		
+		return sum + itemTax
+	}, 0)
+})
+
+// Calculate grand total (Subtotal + Tax)
+const calculatedGrandTotal = computed(() => {
+	return calculatedSubtotal.value + calculatedTax.value
+})
+
+// Calculate total quantity
+const calculatedTotalQuantity = computed(() => {
+	return props.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
+})
+
 
 const props = defineProps({
 	items: {
