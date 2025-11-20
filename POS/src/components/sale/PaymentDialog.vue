@@ -225,7 +225,7 @@
 										<span class="text-2xl mr-2">{{ getPaymentIcon(method.type) }}</span>
 										<div>
 											<div class="font-semibold text-sm text-gray-900">
-												{{ method.mode_of_payment }}
+												{{ method.mode_of_payment_display || method.mode_of_payment }}
 											</div>
 											<div class="text-xs text-gray-500">{{ method.type || "Cash" }}</div>
 										</div>
@@ -709,7 +709,6 @@ watch(show, (newVal) => {
 	}
 })
 
-// One-click payment - adds remaining amount with selected method
 function quickAddPayment(method) {
 	console.log('[PaymentDialog] Quick add payment:', {
 		method: method.mode_of_payment,
@@ -722,34 +721,21 @@ function quickAddPayment(method) {
 	lastSelectedMethod.value = method
 
 	paymentEntries.value.push({
-		mode_of_payment: method.mode_of_payment,
+		mode_of_payment: method.original_name || method.mode_of_payment, // ← USE ORIGINAL NAME
 		amount: Number.parseFloat(remainingAmount.value.toFixed(2)),
 		type: method.type || "Cash",
 	})
-
-	console.log('[PaymentDialog] Payment added, new entries:', paymentEntries.value)
-	customAmount.value = ""
 }
 
-// Add custom amount for a method
 function addCustomPayment(method, amount) {
-	console.log('[PaymentDialog] Add custom payment:', {
-		method: method.mode_of_payment,
-		amount: amount,
-		currentEntries: paymentEntries.value.length
-	})
-
 	const amt = Number.parseFloat(amount)
 	if (!amt || amt <= 0) return
 
 	paymentEntries.value.push({
-		mode_of_payment: method.mode_of_payment,
+		mode_of_payment: method.original_name || method.mode_of_payment, // ← USE ORIGINAL NAME
 		amount: amt,
 		type: method.type || "Cash",
 	})
-
-	console.log('[PaymentDialog] Payment added, new entries:', paymentEntries.value)
-	customAmount.value = ""
 }
 
 // Apply existing customer credit to payment
