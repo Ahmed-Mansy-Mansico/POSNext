@@ -12,6 +12,7 @@
 				:has-open-shift="shiftStore.hasOpenShift"
 				:profile-name="shiftStore.profileName"
 				:user-name="getCurrentUser()"
+				:user-image="getCurrentUserImage()"
 				:is-offline="offlineStore.isOffline"
 				:is-syncing="offlineStore.isSyncing"
 				:pending-invoices-count="offlineStore.pendingInvoicesCount"
@@ -283,8 +284,8 @@
 		<!-- Payment Dialog -->
 		<PaymentDialog
 			v-model="uiStore.showPaymentDialog"
-			:grand-total="cartStore.grandTotal"
-			:subtotal="cartStore.subtotal"
+			:grand-total="paymentGrandTotal"
+			:subtotal="paymentSubtotal"
 			:pos-profile="shiftStore.profileName"
 			:currency="shiftStore.profileCurrency"
 			:is-offline="offlineStore.isOffline"
@@ -733,6 +734,10 @@ const pendingPaymentAfterCustomer = ref(false)
 const logoutAfterClose = ref(false)
 const showClearCacheDialog = ref(false)
 const clearCacheOverlayRef = ref(null)
+
+// Payment dialog values 
+const paymentGrandTotal = ref(0)
+const paymentSubtotal = ref(0)
 
 // Debounce timer for offer reapplication
 const offerReapplyTimer = ref(null)
@@ -1483,6 +1488,33 @@ function handleProceedToPayment() {
 		pendingPaymentAfterCustomer.value = true
 		return
 	}
+		// Calculate Net (subtotal without VAT)
+	let calculatedNet = 0
+	cartStore.invoiceItems.forEach(item => {
+		const originalPrice = item.price_list_rate || item.rate || 0
+		const totalDiscount = item.discount_amount || 0
+		const discountPerUnit = item.quantity > 0 ? totalDiscount / item.quantity : 0
+		
+		let discountPerUnitFinal = 0
+		if (item.discount_percentage && item.discount_percentage > 0) {
+			discountPerUnitFinal = originalPrice * (item.discount_percentage / 100)
+		} else {
+			discountPerUnitFinal = discountPerUnit
+		}
+		
+		const netRatePerUnit = originalPrice - discountPerUnitFinal
+		calculatedNet += netRatePerUnit * item.quantity
+	})
+
+	// Calculate Tax 
+	const calculatedTax = calculatedNet * 0.15
+
+	// Calculate Grand Total 
+	const calculatedGrandTotal = calculatedNet + calculatedTax
+
+	// Set values for payment dialog
+	paymentGrandTotal.value = calculatedGrandTotal
+	paymentSubtotal.value = calculatedNet
 
 	uiStore.showPaymentDialog = true
 }
@@ -1762,6 +1794,13 @@ function getCurrentUser() {
 		)
 	}
 	return "User"
+}
+
+function getCurrentUserImage() {
+        if (typeof window !== "undefined" && window.frappe?.session) {
+                return window.frappe.session.user_image || null
+        }
+        return null
 }
 
 function confirmLogout() {

@@ -40,7 +40,8 @@
 							{{ localItem.item_code }}
 						</p>
 						<p class="text-sm text-gray-500 truncate">
-							{{ currency }} {{ formatNumber(localItem.price_list_rate || localItem.rate) }} / {{ localItem.stock_uom || 'Nos' }}
+							{{ currency }} {{ formatPriceWithVAT(localItem.price_list_rate || localItem.rate) }} / {{ localItem.stock_uom || 'Nos' }}
+							<span class="text-xs text-gray-400 ml-1">(incl. VAT)</span>
 						</p>
 					</div>
 				</div>
@@ -82,21 +83,22 @@
 							</div>
 						</div>
 
-						<!-- Rate -->
+						<!-- Rate (with VAT) -->
 						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-2">Rate</label>
-							<div class="relative h-10">
-								<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm font-medium">
-									{{ currency }}
-								</span>
-								<input
-									v-model.number="localRate"
-									type="number"
-									min="0"
-									step="0.01"
-									readonly
-									class="w-full h-10 border border-gray-300 rounded-lg pl-16 pr-3 text-sm font-semibold bg-gray-50 cursor-not-allowed"
-								/>
+							<label class="block text-sm font-medium text-gray-700 mb-2">Rate (incl. VAT)</label>
+							<div class="space-y-1">
+								<div class="relative h-10">
+									<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm font-medium">
+										{{ currency }}
+									</span>
+									<input
+										:value="formatPriceWithVAT(localRate)"
+										type="text"
+										readonly
+										class="w-full h-10 border border-gray-300 rounded-lg pl-16 pr-3 text-sm font-semibold bg-gray-50 cursor-not-allowed"
+									/>
+								</div>
+								<p class="text-xs text-gray-500">Base: {{ currency }} {{ formatNumber(localRate) }} + VAT 15%</p>
 							</div>
 						</div>
 					</div>
@@ -216,19 +218,36 @@
 					</div>
 				</div>
 
-				<!-- Totals -->
+				<!-- Totals (with VAT) -->
 				<div class="bg-gray-50 rounded-lg p-4 space-y-2">
+					<!-- Subtotal with VAT -->
 					<div class="flex items-center justify-between text-sm">
-						<span class="text-gray-600">Subtotal:</span>
-						<span class="font-semibold text-gray-900">{{ currency }} {{ formatNumber(calculatedSubtotal) }}</span>
+						<span class="text-gray-600">Subtotal (incl. VAT):</span>
+						<span class="font-semibold text-gray-900">{{ currency }} {{ formatPriceWithVAT(calculatedSubtotal) }}</span>
 					</div>
+					
+					<!-- Discount with VAT -->
 					<div v-if="calculatedDiscount > 0" class="flex items-center justify-between text-sm text-red-600">
-						<span>Discount:</span>
-						<span class="font-semibold">-{{ currency }} {{ formatNumber(calculatedDiscount) }}</span>
+						<span>Discount (incl. VAT):</span>
+						<span class="font-semibold">-{{ currency }} {{ formatPriceWithVAT(calculatedDiscount) }}</span>
 					</div>
-					<div class="flex items-center justify-between pt-2 border-t border-gray-200">
-						<span class="text-base font-bold text-gray-900">Total:</span>
-						<span class="text-lg font-bold text-blue-600">{{ currency }} {{ formatNumber(calculatedTotal) }}</span>
+					
+					<!-- VAT Breakdown -->
+					<div class="pt-2 border-t border-gray-200 space-y-1">
+						<div class="flex items-center justify-between text-xs text-gray-500">
+							<span>Base Amount:</span>
+							<span>{{ currency }} {{ formatNumber(calculatedTotal) }}</span>
+						</div>
+						<div class="flex items-center justify-between text-xs text-blue-600">
+							<span>VAT (15%):</span>
+							<span>{{ currency }} {{ formatNumber(calculatedTotal * VAT_RATE) }}</span>
+						</div>
+					</div>
+					
+					<!-- Total with VAT -->
+					<div class="flex items-center justify-between pt-2 border-t-2 border-gray-300">
+						<span class="text-base font-bold text-gray-900">Total (incl. VAT):</span>
+						<span class="text-lg font-bold text-blue-600">{{ currency }} {{ formatPriceWithVAT(calculatedTotal) }}</span>
 					</div>
 				</div>
 			</div>
@@ -431,8 +450,22 @@ function calculateTotals() {
 	calculateDiscount()
 }
 
+// VAT Configuration
+const VAT_RATE = 0.15 // 15%
+
+// Helper to add VAT to price
+function addVAT(price) {
+	const numPrice = parseFloat(price || 0)
+	return numPrice + (numPrice * VAT_RATE)
+}
+
 function formatNumber(num) {
 	return Number.parseFloat(num || 0).toFixed(2)
+}
+
+// Format price with VAT included
+function formatPriceWithVAT(price) {
+	return formatNumber(addVAT(price))
 }
 
 function updateItem() {
