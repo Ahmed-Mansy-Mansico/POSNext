@@ -71,7 +71,20 @@ def get_payment_methods(pos_profile):
 			ignore_permissions=True
 		)
 
-		# Get payment type for each method
+		# Translation map for Arabic to English payment method names
+		translation_map = {
+			"نقد": "Cash",
+			"تابي": "Tabi",
+			"تمارا": "Tamara",
+			"بطاقة": "Card",
+			"بطاقة ائتمان": "Credit Card",
+			"بطاقة مدين": "Debit Card",
+			"تحويل بنكي": "Bank Transfer",
+			"شيك": "Check",
+			"محفظة إلكترونية": "E-Wallet",
+		}
+
+		# Get payment type for each method and translate Arabic names
 		for method in payment_methods:
 			payment_type = frappe.db.get_value(
 				"Mode of Payment",
@@ -79,12 +92,20 @@ def get_payment_methods(pos_profile):
 				"type"
 			)
 			method["type"] = payment_type or "Cash"
+			
+			# Store original name FIRST (before translation)
+			method["original_name"] = method["mode_of_payment"]
+			
+			# Translate Arabic payment method names to English for display
+			if method["mode_of_payment"] in translation_map:
+				method["mode_of_payment_display"] = translation_map[method["mode_of_payment"]]
+			else:
+				method["mode_of_payment_display"] = method["mode_of_payment"]
 
 		return payment_methods
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get Payment Methods Error")
 		frappe.throw(_("Error fetching payment methods: {0}").format(str(e)))
-
 
 @frappe.whitelist()
 def get_taxes(pos_profile):

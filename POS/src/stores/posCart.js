@@ -57,9 +57,8 @@ export const usePOSCartStore = defineStore("posCart", () => {
 	const hasCustomer = computed(() => !!customer.value)
 
 	// Actions
-	function addItem(item, qty = 1, autoAdd = false, currentProfile = null) {
+	async function addItem(item, qty = 1, autoAdd = false, currentProfile = null) {
 		// Check stock availability before adding to cart
-		// Only enforce stock validation if negative stock is not allowed
 		if (currentProfile && !autoAdd && settingsStore.shouldEnforceStockValidation()) {
 			const warehouse = item.warehouse || currentProfile.warehouse
 			const actualQty =
@@ -86,9 +85,42 @@ export const usePOSCartStore = defineStore("posCart", () => {
 			}
 		}
 
-		// Add item to cart - no toast notification for performance
-		addItemToInvoice(item, qty)
+		// Fetch fresh pricing with pricing rules BEFORE adding to cart
+		try {
+			const itemDetails = await getItemDetailsResource.submit({
+				item_code: item.item_code,
+				pos_profile: posProfile.value,
+				customer: customer.value?.name || customer.value,
+				qty: qty,
+				uom: item.uom || item.stock_uom,
+			})
+
+			// Merge pricing rule data from server
+			const enrichedItem = {
+				...item,
+				rate: itemDetails.rate || item.rate,
+				price_list_rate: itemDetails.price_list_rate || item.price_list_rate,
+				discount_percentage: itemDetails.discount_percentage || 0,
+				discount_amount: itemDetails.discount_amount || 0,
+				pricing_rules: itemDetails.pricing_rules || [],
+			}
+
+			// Add enriched item to cart
+			addItemToInvoice(enrichedItem, qty)
+		} catch (error) {
+			console.error("Error fetching pricing rules:", error)
+			addItemToInvoice(item, qty)
+		}
 	}
+
+	function getAppliedPricingRuleName(item) {
+	if (!item.pricing_rules || item.pricing_rules.length === 0) {
+		return null
+	}
+	
+	// Return the first (highest priority) pricing rule
+	return item.pricing_rules[0].pricing_rule || item.pricing_rules[0]
+}
 
 	function clearCart() {
 		clearInvoiceCart()
@@ -636,5 +668,6 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		rebuildIncrementalCache,
 		applyOffersResource,
 		buildInvoiceDataForOffers,
+		getAppliedPricingRuleName,
 	}
 })

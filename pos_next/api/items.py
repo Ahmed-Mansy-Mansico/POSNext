@@ -1114,6 +1114,33 @@ def get_items_grouped_by_variant(search_term="", pos_profile=None):
 				attributes_map[attr.parent] = {}
 			attributes_map[attr.parent][attr.attribute] = attr.attribute_value
 	
+	# BUILD COLOR NAME MAPPING - CORRECT MAPPING
+	# attribute_value contains the code (385), abbr contains the name (OLIVE)
+	color_name_map = {}
+	all_color_codes = set()
+	
+	# Collect all unique color codes
+	for attrs in attributes_map.values():
+		if 'Color Code' in attrs:
+			all_color_codes.add(attrs['Color Code'])
+	
+	# Fetch color names from Item Attribute Value
+	if all_color_codes:
+		try:
+			color_values = frappe.db.sql("""
+				SELECT attribute_value, abbr
+				FROM `tabItem Attribute Value`
+				WHERE parent = 'Color Code'
+				AND attribute_value IN %(codes)s
+			""", {'codes': list(all_color_codes)}, as_dict=1)
+			
+			# Map: code (385) -> name (OLIVE)
+			color_name_map = {cv.attribute_value: cv.abbr.title() for cv in color_values}
+			
+		except Exception as e:
+			frappe.log_error(f"Error fetching color names: {str(e)}")
+			color_name_map = {}
+	
 	stock_map = {}
 	if all_variant_codes and pos_profile_doc.warehouse:
 		stocks = frappe.db.sql(
@@ -1152,15 +1179,24 @@ def get_items_grouped_by_variant(search_term="", pos_profile=None):
 			color_code = attrs.get('Color Code', 'NO_COLOR')
 			size = attrs.get('Size', '')
 			
-			# Extract color name from item code
-			color_name = _extract_color_name(variant.name, color_code, attrs)
+			# GET THE ACTUAL COLOR NAME from the mapping
+			# This will convert "385" to "Olive"
+			color_name = color_name_map.get(color_code, color_code)
+			
+			# If mapping failed, try extracting from item name as fallback
+			if color_name == color_code and color_code != 'NO_COLOR':
+				extracted = _extract_color_from_item(variant.item_name, variant.name)
+				if extracted:
+					color_name = extracted
+				else:
+					color_name = f"Color {color_code}"
 			
 			group_key = color_name
 			
 			# Initialize color group
 			if group_key not in templates[template_code]['colors']:
 				templates[template_code]['colors'][group_key] = {
-					'color_codes': [color_code],  # Store all codes for this color
+					'color_codes': [color_code],
 					'color_name': color_name,
 					'variants': []
 				}
@@ -1175,7 +1211,8 @@ def get_items_grouped_by_variant(search_term="", pos_profile=None):
 				'stock_uom': variant.stock_uom,
 				'size': size,
 				'actual_qty': stock_map.get(variant.name, 0),
-				'color_code': color_code  
+				'color_code': color_code,
+				'color_name': color_name
 			})
 	
 	for template in templates.values():
@@ -1187,6 +1224,31 @@ def get_items_grouped_by_variant(search_term="", pos_profile=None):
 	}
 	
 	return result
+
+
+def _extract_color_from_item(item_name, item_code):
+	"""
+	Helper function to extract color name from item name or code
+	"""
+	import re
+	
+	# Common color patterns
+	common_colors = [
+		'Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Purple',
+		'Pink', 'Brown', 'Gray', 'Grey', 'Navy', 'Beige', 'Maroon', 'Olive',
+		'Cyan', 'Magenta', 'Lime', 'Indigo', 'Violet', 'Gold', 'Silver',
+		'Cream', 'Tan', 'Khaki', 'Coral', 'Salmon', 'Peach', 'Mint', 'Lavender',
+		'Burgundy', 'Turquoise', 'Teal', 'Emerald', 'Ruby', 'Sapphire', 'Charcoal',
+		'Rose', 'Sky', 'Mauve'
+	]
+	
+	text = f"{item_name} {item_code}"
+	
+	for color in common_colors:
+		if re.search(rf'\b{color}\b', text, re.IGNORECASE):
+			return color
+	
+	return None
 
 
 def _extract_color_name(item_code, color_code, attributes=None):
