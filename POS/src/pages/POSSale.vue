@@ -11,8 +11,8 @@
 				:shift-duration="shiftStore.shiftDuration"
 				:has-open-shift="shiftStore.hasOpenShift"
 				:profile-name="shiftStore.profileName"
-				:user-name="getCurrentUser()"
-				:user-image="getCurrentUserImage()"
+				:user-name="currentUser"
+				:user-image="currentUserImage"
 				:is-offline="offlineStore.isOffline"
 				:is-syncing="offlineStore.isSyncing"
 				:pending-invoices-count="offlineStore.pendingInvoicesCount"
@@ -713,6 +713,23 @@ const itemStore = useItemSearchStore()
 const stockStore = useStockStore()
 const settingsStore = usePOSSettingsStore()
 
+// Reactive user data
+const currentUser = ref("User")
+const currentUserImage = ref(null)
+
+// Initialize user data
+const initializeUserData = async () => {
+	try {
+		const userData = await fetchUserData()
+		currentUser.value = userData.fullName
+		currentUserImage.value = userData.userImage
+	} catch (error) {
+		console.warn('Could not load user data:', error)
+		currentUser.value = "User"
+		currentUserImage.value = null
+	}
+}
+
 // Real-time stock updates
 const { onStockUpdate } = useRealtimeStock()
 
@@ -827,6 +844,9 @@ let resizeState = null
 let bodyStyleSnapshot = null
 
 onMounted(async () => {
+	// Initialize user data
+	await initializeUserData()
+
 	// Window resize listeners (passive for better performance)
 	const handleResize = () => {
 		uiStore.setWindowWidth(window.innerWidth)
@@ -1785,22 +1805,32 @@ function formatCurrency(amount) {
 	return Number.parseFloat(amount || 0).toFixed(2)
 }
 
-function getCurrentUser() {
-	if (typeof window !== "undefined" && window.frappe?.session) {
-		return (
-			window.frappe.session.user_fullname ||
-			window.frappe.session.user ||
-			"User"
-		)
+// Server call to get user data
+async function fetchUserData() {
+	try {
+		// Get the current user email first
+		const userResponse = await call('frappe.auth.get_logged_user')
+		const userEmail = userResponse.message || userResponse
+		
+		// Then fetch the User document to get full name and image
+		const userDoc = await call('frappe.client.get', {
+			doctype: 'User',
+			name: userEmail
+		})
+		
+		console.log('User data:', userDoc)
+		
+		return {
+			fullName: userDoc?.full_name || userDoc?.first_name || userEmail || 'User',
+			userImage: userDoc?.user_image || null
+		}
+	} catch (error) {
+		console.warn('Error fetching user data:', error)
+		return {
+			fullName: 'User',
+			userImage: null
+		}
 	}
-	return "User"
-}
-
-function getCurrentUserImage() {
-        if (typeof window !== "undefined" && window.frappe?.session) {
-                return window.frappe.session.user_image || null
-        }
-        return null
 }
 
 function confirmLogout() {
