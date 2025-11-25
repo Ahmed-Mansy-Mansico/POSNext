@@ -606,9 +606,147 @@ export const usePOSCartStore = defineStore("posCart", () => {
 				itemCodes: cachedItemCodes,
 				itemGroups: cachedItemGroups,
 				brands: cachedBrands,
+				items: invoiceItems.value
 			})
 		}
 	}
+	// NEW: Apply custom offer discounts to actual cart items
+	function applyCustomOffersToCart() {
+	
+		const offers = offersStore.customOffers
+		console.log('📋 Offers to apply:', offers)
+		
+		if (offers.length === 0) {
+			return
+		}
+		
+
+		// Prevent infinite loops
+		suppressOfferReapply.value = true
+		
+		offers.forEach(offer => {
+			if (offer.offer_type === 'any3for249') {
+
+				// Separate normal items from exception items
+				const normalItems = []
+				const exceptionItems = []
+				
+				invoiceItems.value.forEach((item, index) => {
+					const isException = offersStore.isExceptionItem(item.item_code)
+					console.log(`  ${index + 1}. ${item.item_code}: ${isException ? '🚫 EXCEPTION' : '✅ NORMAL'}`)
+					
+					if (isException) {
+						exceptionItems.push(item)
+					} else {
+						normalItems.push(item)
+					}
+				})
+				
+				
+				if (normalItems.length === 0) {
+					suppressOfferReapply.value = false
+					return
+				}
+				
+				// Calculate total quantity of normal items only
+				let totalNormalQty = 0
+				normalItems.forEach(item => {
+					totalNormalQty += item.quantity || 1
+				})
+				
+				
+				// Only apply if we have at least 3 normal items
+				if (totalNormalQty < 3) {
+					suppressOfferReapply.value = false
+					return
+				}
+				
+				// Calculate pricing
+				const sets = Math.floor(totalNormalQty / 3)
+				const remaining = totalNormalQty % 3
+				const pricePerSetNoVAT = 249 / 1.15
+				const setsTotal = sets * pricePerSetNoVAT
+				
+				// Calculate remaining items' total (at original price)
+				let remainingTotal = 0
+				let itemsInSets = 0
+				
+				normalItems.forEach(item => {
+					const itemQty = item.quantity || 1
+					const originalRate = item.price_list_rate || item.rate || 0
+					
+					if (itemsInSets + itemQty <= sets * 3) {
+						// This entire item is in a set
+						itemsInSets += itemQty
+					} else if (itemsInSets < sets * 3) {
+						// This item is partially in a set
+						const qtyInSets = (sets * 3) - itemsInSets
+						const qtyRemaining = itemQty - qtyInSets
+						remainingTotal += qtyRemaining * originalRate
+						itemsInSets += itemQty
+					} else {
+						// This entire item is NOT in any set
+						remainingTotal += itemQty * originalRate
+						itemsInSets += itemQty
+					}
+				})
+				
+				const grandTotal = setsTotal + remainingTotal
+				const newRatePerItem = grandTotal / totalNormalQty
+				
+				
+				//  IMPORTANT: Apply discount ONLY to normal items
+				// Exception items are left completely untouched
+				normalItems.forEach(item => {
+					const originalRate = item.price_list_rate || item.rate || 0
+					const discountAmount = originalRate - newRatePerItem
+					const discountPercentage = originalRate > 0 ? (discountAmount / originalRate) * 100 : 0
+					
+					
+					// Update item with new pricing
+					item.rate = newRatePerItem
+					item.discount_amount = discountAmount
+					item.discount_percentage = discountPercentage
+					
+					// Recalculate item totals
+					recalculateItem(item)
+				})
+				
+				
+				// Add offer to appliedOffers for display
+				const offerExists = appliedOffers.value.some(o => o.code === 'any3for249')
+				if (!offerExists) {
+					appliedOffers.value.push({
+						name: offer.message || 'Any 3 for 249 SAR',
+						code: 'any3for249',
+						offer: offer,
+						source: 'custom',
+						applied: true,
+						rules: ['any3for249']
+					})
+					console.log('\n Offer added to appliedOffers')
+				}
+			}
+		})
+		
+		// Rebuild cache after all changes
+		rebuildIncrementalCache()
+		
+		// Reset flag after a short delay
+		setTimeout(() => {
+			suppressOfferReapply.value = false
+		}, 100)
+		
+	}
+
+	// Watch custom offers and apply them automatically
+	watch(() => offersStore.customOffers, (newOffers) => {
+		if (newOffers && newOffers.length > 0) {
+			nextTick(() => {
+				applyCustomOffersToCart()
+			})
+		}
+	}, { deep: true })
 
 	// Watch for cart changes to update offer snapshot (min/max thresholds etc.)
 	// Optimized: Only watch length and subtotal, calculate hash inside the watcher

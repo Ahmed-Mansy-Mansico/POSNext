@@ -622,8 +622,37 @@
 			<span class="font-bold text-gray-900">{{ calculatedTotalQuantity }}</span>
 		</div>
 
+		<!-- ADD THIS: Custom Offers Section -->
+		<div v-if="offersStore.hasCustomOffers" class="mt-2 -mx-0.5">
+			<!-- Simple Offers Display -->
+			<div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg px-3 py-2.5 shadow-md">
+				<!-- Header with Icon -->
+				<div class="flex items-center gap-2 mb-1.5">
+					<div class="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+						<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clip-rule="evenodd"/>
+						</svg>
+					</div>
+					<span class="text-sm font-bold text-white">Special Offers Applied!</span>
+				</div>
+				
+				<!-- Offer Message -->
+				<div class="bg-white/10 rounded-md px-2.5 py-2 backdrop-blur-sm">
+					<div 
+						v-for="offer in offersStore.customOffers" 
+						:key="offer.offer_type"
+						class="flex items-center gap-2"
+					>
+						<svg class="w-4 h-4 text-white flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+						</svg>
+						<span class="text-sm font-semibold text-white">{{ offer.message }}</span>
+					</div>
+				</div>
+			</div>
+		</div>
 
-	</div>
+		</div>
 
 			<!-- Action Buttons -->
 			<div class="flex gap-1.5 sm:gap-2">
