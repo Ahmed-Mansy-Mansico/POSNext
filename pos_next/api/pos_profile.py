@@ -177,6 +177,76 @@ def get_warehouses(pos_profile):
 
 
 @frappe.whitelist()
+def get_tax_rate_from_category(pos_profile):
+	"""Get tax rate from tax_category field in POS Profile"""
+	try:
+		if not pos_profile:
+			frappe.logger().info(f"[Tax Rate API] No POS profile provided")
+			return 0
+
+		# Get the POS Profile
+		profile_doc = frappe.get_cached_doc("POS Profile", pos_profile)
+		tax_category = getattr(profile_doc, 'tax_category', None)
+		
+		# Log all relevant fields for debugging
+		frappe.logger().info(f"[Tax Rate API] POS Profile: {pos_profile}")
+		frappe.logger().info(f"[Tax Rate API] Tax Category field value: {tax_category} (type: {type(tax_category).__name__})")
+
+		if not tax_category:
+			frappe.logger().info(f"[Tax Rate API] No tax_category found in POS Profile {pos_profile}")
+			return 0
+
+		# Method 1: Check if tax_category is a string containing percentage (e.g., "15%")
+		if isinstance(tax_category, str) and '%' in tax_category:
+			try:
+				# Extract number from string like "15%" -> 15
+				rate_str = tax_category.replace('%', '').strip()
+				rate_value = float(rate_str)
+				frappe.logger().info(f"[Tax Rate API] Extracted rate from string '{tax_category}': {rate_value}%")
+				return rate_value
+			except (ValueError, AttributeError):
+				pass
+
+		# Method 2: Try to get tax rate from Tax Category doctype (if it's a link field)
+		# Check if Tax Category exists as a doctype
+		if frappe.db.exists("Tax Category", tax_category):
+			# Try different possible field names for tax rate
+			possible_fields = ['tax_rate', 'rate', 'tax_percentage', 'percentage']
+			
+			for field_name in possible_fields:
+				try:
+					tax_rate = frappe.db.get_value("Tax Category", tax_category, field_name)
+					if tax_rate is not None:
+						rate_value = float(tax_rate) or 0
+						if rate_value > 0:
+							frappe.logger().info(f"[Tax Rate API] Found rate in Tax Category '{tax_category}' field '{field_name}': {rate_value}%")
+							return rate_value
+				except Exception:
+					continue
+			
+			# If no direct field, try to get from tax rules in Tax Category
+			try:
+				tax_category_doc = frappe.get_doc("Tax Category", tax_category)
+				# Check if there's a default tax template or rate
+				if hasattr(tax_category_doc, 'tax_rate') and tax_category_doc.tax_rate:
+					rate_value = float(tax_category_doc.tax_rate) or 0
+					if rate_value > 0:
+						frappe.logger().info(f"[Tax Rate API] Found rate in Tax Category doc: {rate_value}%")
+						return rate_value
+			except Exception as e:
+				frappe.logger().info(f"[Tax Rate API] Could not get rate from Tax Category doc: {str(e)}")
+
+		# If all methods fail, return 0
+		frappe.logger().info(f"[Tax Rate API] Could not extract tax rate from tax_category '{tax_category}', returning 0")
+		return 0
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Tax Rate from Category Error")
+		frappe.logger().error(f"[Tax Rate API] Error: {str(e)}")
+		# Return 0 instead of throwing - tax is optional
+		return 0
+
+
+@frappe.whitelist()
 def update_warehouse(pos_profile, warehouse):
 	"""Update warehouse in POS Profile"""
 	try:

@@ -347,10 +347,10 @@
 								{{ item.item_name }}
 							</h3>
 							<div class="text-[8px] sm:text-[9px] text-gray-500 leading-tight space-y-0.5">
-								<!-- List Price -->
-								<div v-if="item.price_list_rate" class="flex items-center justify-between">
-									<span class="text-gray-400">List:</span>
-									<span class="font-medium text-gray-600">{{ formatCurrency(item.price_list_rate) }}</span>
+								<!-- Item Code -->
+								<div class="flex items-center justify-between">
+									<span class="text-gray-400">Code:</span>
+									<span class="font-medium text-gray-600">{{ item.item_code }}</span>
 								</div>
 								
 								<!-- Discount Amount -->
@@ -359,12 +359,12 @@
 									<span class="font-medium text-red-600">-{{ formatCurrency(item.discount_amount) }}</span>
 								</div>
 								
-								<!-- Final Rate -->
+								<!-- Final Rate with VAT -->
 								<div class="flex items-center justify-between border-t border-gray-200 pt-0.5">
 									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Price:</span>
 									<div class="text-right">
 										<div class="font-bold text-blue-600 text-[10px] sm:text-xs">
-											{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
+											{{ formatCurrency(getPriceWithVAT(item)) }}
 										</div>
 										<div class="text-gray-400 text-[8px]">/ {{ item.uom || item.stock_uom || 'Nos' }}</div>
 									</div>
@@ -514,14 +514,14 @@
 										List: <span class="font-medium">{{ formatCurrency(item.price_list_rate) }}</span>
 									</div> -->
 									
-									<!-- Discount Amount added to it tax 15% calculated -->
+									<!-- Discount Amount with VAT from tax_category -->
 									<div v-if="item.discount_amount && item.discount_amount > 0" class="text-red-600">
-										Discount: <span class="font-medium">-{{ formatCurrency(item.discount_amount) * 0.15 + item.discount_amount }}</span>
+										Discount: <span class="font-medium">-{{ formatCurrency(item.discount_amount * (1 + taxRate)) }}</span>
 									</div>
 									
-								<!-- Final Rate added to it 15% tax calculated and added to it discount amount -->
+								<!-- Final Rate with VAT from tax_category -->
 								<div class="font-bold text-red-600 text-sm">
-									{{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
+									{{ formatCurrency(getPriceWithVAT(item)) }}
 								</div>
 									
 								</div>
@@ -953,6 +953,67 @@ function formatCurrency(amount, currency) {
 	return formatCurrencyUtil(Number.parseFloat(amount || 0), currency || props.currency)
 }
 
+// Calculate price with VAT included
+function getPriceWithVAT(item) {
+	const basePrice = item.rate || item.price_list_rate || 0
+	const vatAmount = basePrice * taxRate.value
+	const finalPrice = basePrice + vatAmount
+	
+	// Console logs for debugging VAT calculation
+	console.log('[VAT Calculation]', {
+		item_code: item.item_code,
+		item_name: item.item_name,
+		basePrice: basePrice,
+		taxRate: taxRate.value,
+		taxRatePercentage: (taxRate.value * 100).toFixed(2) + '%',
+		vatAmount: vatAmount,
+		finalPrice: finalPrice,
+		calculation: `${basePrice} + (${basePrice} × ${(taxRate.value * 100).toFixed(2)}%) = ${finalPrice}`
+	})
+	
+	return finalPrice
+}
+
+// Tax rate state
+const taxRate = ref(0)
+
+// Load tax rate from tax_category
+const taxRateResource = createResource({
+	url: "pos_next.api.pos_profile.get_tax_rate_from_category",
+	makeParams() {
+		return {
+			pos_profile: props.posProfile || null,
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		// Handle both wrapped and direct response formats
+		const rate = data?.message !== undefined ? data.message : data
+		// Tax rate is stored as percentage (e.g., 15 for 15%), convert to decimal
+		const rawRate = Number.parseFloat(rate || 0)
+		taxRate.value = rawRate / 100 || 0
+		
+		// Console logs for debugging tax rate loading
+		console.log('[Tax Rate Loaded]', {
+			pos_profile: props.posProfile,
+			raw_response: data,
+			extracted_rate: rate,
+			raw_rate_percentage: rawRate,
+			tax_rate_decimal: taxRate.value,
+			tax_rate_percentage: (taxRate.value * 100).toFixed(2) + '%',
+			message: `Tax rate loaded: ${rawRate}% (${taxRate.value} as decimal)`
+		})
+	},
+	onError(error) {
+		console.error('[Tax Rate Error]', {
+			pos_profile: props.posProfile,
+			error: error,
+			message: 'Failed to load tax rate from tax_category'
+		})
+		taxRate.value = 0
+	},
+})
+
 // Load employee performance data
 const performanceResource = createResource({
 	url: "pos_next.api.invoices.get_employee_performance",
@@ -972,6 +1033,27 @@ const performanceResource = createResource({
 		performanceData.value = null
 	},
 })
+
+// Load tax rate when posProfile changes
+watch(
+	() => props.posProfile,
+	(newProfile) => {
+		if (newProfile) {
+			console.log('[Tax Rate Watch]', {
+				pos_profile: newProfile,
+				message: 'Loading tax rate from tax_category...'
+			})
+			taxRateResource.reload()
+		} else {
+			console.log('[Tax Rate Watch]', {
+				pos_profile: null,
+				message: 'No POS profile, tax rate set to 0'
+			})
+			taxRate.value = 0
+		}
+	},
+	{ immediate: true }
+)
 
 // Load performance data when component is mounted or posProfile changes
 watch(

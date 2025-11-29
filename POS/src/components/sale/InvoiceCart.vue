@@ -408,13 +408,13 @@
 
 									<div v-if="item.price_list_rate" class="flex items-center justify-between">
 										<span class="text-gray-400 text-xs sm:text-sm">Original Price:</span>
-										<span class="font-medium text-gray-600 text-xs sm:text-sm">{{ formatCurrency(item.price_list_rate + item.price_list_rate * 0.15)  }}</span>
+										<span class="font-medium text-gray-600 text-xs sm:text-sm">{{ formatCurrency(getPriceWithVAT(item.price_list_rate)) }}</span>
 									</div>
 									
 									<!-- Discount Amount - Check multiple possible fields -->
 									<div v-if="getDiscountAmount(item) > 0" class="flex items-center justify-between">
 										<span class="text-red-500 text-xs sm:text-sm">Discount:</span>
-										<span class="font-medium text-red-600 text-xs sm:text-sm">-{{ formatCurrency(getDiscountAmount(item) + getDiscountAmount(item) * 0.15) }}</span>
+										<span class="font-medium text-red-600 text-xs sm:text-sm">-{{ formatCurrency(getDiscountWithVAT(getDiscountAmount(item))) }}</span>
 									</div>
 								</div>
 
@@ -443,7 +443,7 @@
 											<!-- {{ item.discount_percentage }}% OFF -->
 										</span>
 										<span v-else>
-											{{ formatCurrency(getDiscountAmount(item) + getDiscountAmount(item) * 0.15 ) }} OFF
+											{{ formatCurrency(getDiscountWithVAT(getDiscountAmount(item))) }} OFF
 										</span>
 									</div>
 								</div>
@@ -717,6 +717,45 @@ const customerSearchStore = useCustomerSearchStore()
 const offersStore = usePOSOffersStore()
 const settingsStore = usePOSSettingsStore()
 
+// Tax rate state
+const taxRate = ref(0)
+
+// Calculate price with VAT included
+function getPriceWithVAT(price) {
+	const basePrice = Number.parseFloat(price || 0)
+	const vatAmount = basePrice * taxRate.value
+	const finalPrice = basePrice + vatAmount
+	
+	console.log('[InvoiceCart - getPriceWithVAT]', {
+		basePrice: basePrice,
+		taxRate: taxRate.value,
+		taxRatePercentage: (taxRate.value * 100).toFixed(2) + '%',
+		vatAmount: vatAmount,
+		finalPrice: finalPrice,
+		calculation: `${basePrice} + (${basePrice} × ${(taxRate.value * 100).toFixed(2)}%) = ${finalPrice}`
+	})
+	
+	return finalPrice
+}
+
+// Calculate discount with VAT included
+function getDiscountWithVAT(discountAmount) {
+	const baseDiscount = Number.parseFloat(discountAmount || 0)
+	const vatAmount = baseDiscount * taxRate.value
+	const finalDiscount = baseDiscount + vatAmount
+	
+	console.log('[InvoiceCart - getDiscountWithVAT]', {
+		baseDiscount: baseDiscount,
+		taxRate: taxRate.value,
+		taxRatePercentage: (taxRate.value * 100).toFixed(2) + '%',
+		vatAmount: vatAmount,
+		finalDiscount: finalDiscount,
+		calculation: `${baseDiscount} + (${baseDiscount} × ${(taxRate.value * 100).toFixed(2)}%) = ${finalDiscount}`
+	})
+	
+	return finalDiscount
+}
+
 // Helper method to extract discount amount from various possible fields
 const getDiscountAmount = (item) => {
 	// Check various fields where discount might be stored
@@ -752,15 +791,27 @@ const getDiscountAmount = (item) => {
 	return discountAmount
 }
 
-// Calculate final rate per unit WITHOUT VAT (Original - Discount)
+// Calculate final rate per unit WITH VAT (Original with VAT - Discount with VAT)
 const getFinalRatePerUnit = (item) => {
+	const basePrice = item.price_list_rate || item.rate || 0
+	const originalPrice = getPriceWithVAT(basePrice)
 	
-	const originalPrice = (item.price_list_rate + item.price_list_rate * 0.15) || item.rate || 0
-	
-	// Calculate discount per single unit
-	const discountPerUnit = (getDiscountAmount(item) + getDiscountAmount(item) * 0.15)
+	// Calculate discount per single unit with VAT
+	const discountAmount = getDiscountAmount(item)
+	const discountPerUnit = getDiscountWithVAT(discountAmount)
 	
 	const finalRate = originalPrice - discountPerUnit
+	
+	console.log('[InvoiceCart - getFinalRatePerUnit]', {
+		item_code: item.item_code,
+		basePrice: basePrice,
+		originalPriceWithVAT: originalPrice,
+		discountAmount: discountAmount,
+		discountPerUnitWithVAT: discountPerUnit,
+		finalRate: finalRate,
+		taxRate: taxRate.value,
+		calculation: `${originalPrice} - ${discountPerUnit} = ${finalRate}`
+	})
 	
 	return finalRate
 }
@@ -782,6 +833,14 @@ const getNetRatePerUnit = (item) => {
 	// Net rate = Original - Discount (NO VAT)
 	const netRate = originalPrice - discountPerUnit
 	
+	console.log('[InvoiceCart - getNetRatePerUnit]', {
+		item_code: item.item_code,
+		originalPrice: originalPrice,
+		discountPerUnit: discountPerUnit,
+		netRate: netRate,
+		note: 'This is WITHOUT VAT (used for tax calculation)'
+	})
+	
 	return netRate
 }
 
@@ -797,31 +856,82 @@ const getItemTotal = (item) => {
 }
 
 const calculatedSubtotal = computed(() => {
-	return props.items.reduce((sum, item) => {
+	const subtotal = props.items.reduce((sum, item) => {
 		const netRatePerUnit = getNetRatePerUnit(item) 
 		const itemSubtotal = netRatePerUnit * item.quantity
 		return sum + itemSubtotal
 	}, 0)
+	
+	console.log('[InvoiceCart - calculatedSubtotal]', {
+		subtotal: subtotal,
+		itemsCount: props.items.length,
+		items: props.items.map(item => ({
+			item_code: item.item_code,
+			quantity: item.quantity,
+			netRate: getNetRatePerUnit(item),
+			itemSubtotal: getNetRatePerUnit(item) * item.quantity
+		}))
+	})
+	
+	return subtotal
 })
 
 const calculatedTax = computed(() => {
 	// Sum of all individual item taxes (calculated on net amount)
-	return props.items.reduce((sum, item) => {
+	const tax = props.items.reduce((sum, item) => {
 		const netRatePerUnit = getNetRatePerUnit(item)
 		
 		// Calculate net amount for this item
 		const itemNetAmount = netRatePerUnit * item.quantity
 		
-		// Calculate 15% tax on net amount
-		const itemTax = itemNetAmount * 0.15
+		// Calculate tax on net amount using tax rate from tax_category
+		const itemTax = itemNetAmount * taxRate.value
+		
+		console.log('[InvoiceCart - calculatedTax (per item)]', {
+			item_code: item.item_code,
+			netRatePerUnit: netRatePerUnit,
+			quantity: item.quantity,
+			itemNetAmount: itemNetAmount,
+			taxRate: taxRate.value,
+			taxRatePercentage: (taxRate.value * 100).toFixed(2) + '%',
+			itemTax: itemTax,
+			calculation: `${itemNetAmount} × ${(taxRate.value * 100).toFixed(2)}% = ${itemTax}`
+		})
 		
 		return sum + itemTax
 	}, 0)
+	
+	console.log('[InvoiceCart - calculatedTax (TOTAL)]', {
+		totalTax: tax,
+		taxRate: taxRate.value,
+		taxRatePercentage: (taxRate.value * 100).toFixed(2) + '%',
+		itemsCount: props.items.length,
+		items: props.items.map(item => ({
+			item_code: item.item_code,
+			quantity: item.quantity,
+			netRate: getNetRatePerUnit(item)
+		}))
+	})
+	
+	return tax
 })
 
 // Calculate grand total (Subtotal + Tax)
 const calculatedGrandTotal = computed(() => {
-	return calculatedSubtotal.value + calculatedTax.value
+	const subtotal = calculatedSubtotal.value
+	const tax = calculatedTax.value
+	const grandTotal = subtotal + tax
+	
+	console.log('[InvoiceCart - calculatedGrandTotal]', {
+		subtotal: subtotal,
+		tax: tax,
+		grandTotal: grandTotal,
+		taxRate: taxRate.value,
+		taxRatePercentage: (taxRate.value * 100).toFixed(2) + '%',
+		calculation: `${subtotal} + ${tax} = ${grandTotal}`
+	})
+	
+	return grandTotal
 })
 
 // Calculate total quantity
@@ -883,6 +993,77 @@ const emit = defineEmits([
 	"edit-item",
 	"refresh-pricing",
 ])
+
+// Load tax rate from tax_category (must be after props definition)
+const taxRateResource = createResource({
+	url: "pos_next.api.pos_profile.get_tax_rate_from_category",
+	makeParams() {
+		return {
+			pos_profile: props.posProfile || null,
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		// Handle both wrapped and direct response formats
+		const rate = data?.message !== undefined ? data.message : data
+		// Tax rate is stored as percentage (e.g., 15 for 15%), convert to decimal
+		const rawRate = Number.parseFloat(rate || 0)
+		taxRate.value = rawRate / 100 || 0
+		
+		// Console logs for debugging tax rate loading
+		console.log('[InvoiceCart - Tax Rate Loaded]', {
+			pos_profile: props.posProfile,
+			raw_response: data,
+			extracted_rate: rate,
+			raw_rate_percentage: rawRate,
+			tax_rate_decimal: taxRate.value,
+			tax_rate_percentage: (taxRate.value * 100).toFixed(2) + '%',
+			message: `Tax rate loaded: ${rawRate}% (${taxRate.value} as decimal)`
+		})
+	},
+	onError(error) {
+		console.error('[InvoiceCart - Tax Rate Error]', {
+			pos_profile: props.posProfile,
+			error: error,
+			message: 'Failed to load tax rate from tax_category'
+		})
+		taxRate.value = 0
+	},
+})
+
+// Load tax rate when posProfile changes
+watch(
+	() => props.posProfile,
+	(newProfile) => {
+		if (newProfile) {
+			console.log('[InvoiceCart - Tax Rate Watch]', {
+				pos_profile: newProfile,
+				message: 'Loading tax rate from tax_category...'
+			})
+			taxRateResource.reload()
+		} else {
+			console.log('[InvoiceCart - Tax Rate Watch]', {
+				pos_profile: null,
+				message: 'No POS profile, tax rate set to 0'
+			})
+			taxRate.value = 0
+		}
+	},
+	{ immediate: true }
+)
+
+// Watch taxRate changes to debug
+watch(
+	() => taxRate.value,
+	(newRate, oldRate) => {
+		console.log('[InvoiceCart - Tax Rate Value Changed]', {
+			oldRate: oldRate,
+			newRate: newRate,
+			newRatePercentage: (newRate * 100).toFixed(2) + '%',
+			message: `Tax rate changed from ${(oldRate * 100).toFixed(2)}% to ${(newRate * 100).toFixed(2)}%`
+		})
+	}
+)
 
 const customerSearch = ref("")
 const customerSearchContainer = ref(null)
