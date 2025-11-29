@@ -1327,6 +1327,27 @@ function handleShiftClosed() {
 	}
 }
 
+// Get effective stock for an item - if it's a template, sum all variants' stock
+function getItemEffectiveStock(item) {
+	if (!item) return 0
+	
+	// If item has variants (is a template), calculate sum of all variant stocks
+	if (item.has_variants) {
+		const allItems = itemStore.allItems || []
+		const variants = allItems.filter(i => i.variant_of === item.item_code)
+		if (variants.length > 0) {
+			let total = 0
+			for (const variant of variants) {
+				total += Math.floor(variant.actual_qty ?? variant.stock_qty ?? 0)
+			}
+			return total
+		}
+	}
+	
+	// Regular item or variant - return its own stock
+	return Math.floor(item.actual_qty ?? item.stock_qty ?? 0)
+}
+
 async function handleItemSelected(item, autoAdd = false) {
 	// Auto-add mode
 	if (autoAdd) {
@@ -1344,8 +1365,9 @@ async function handleItemSelected(item, autoAdd = false) {
 
 	// Check stock availability first (before any dialogs)
 	// Only enforce if negative stock is not allowed
+	// For template items, use sum of all variants' stock
 	if (settingsStore.shouldEnforceStockValidation()) {
-		const actualQty = Math.floor(item.actual_qty ?? item.stock_qty ?? 0)
+		const actualQty = getItemEffectiveStock(item)
 
 		if (actualQty <= 0) {
 			showError(`"${item.item_name}" cannot be added to cart. Allow Negative Stock is disabled.`)

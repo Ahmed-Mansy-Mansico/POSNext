@@ -290,12 +290,12 @@
 								'px-2 sm:px-2.5 py-1 sm:py-1',
 								'text-[10px] sm:text-xs font-bold',
 								'border-2 border-white',
-								getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).color,
-								getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).textColor
+								getStockStatus(getItemEffectiveStock(item)).color,
+								getStockStatus(getItemEffectiveStock(item)).textColor
 							]"
-							:title="`${getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).label}: ${Math.floor(item.actual_qty ?? item.stock_qty ?? 0)} ${item.uom || item.stock_uom || 'Nos'}`"
+							:title="`${getStockStatus(getItemEffectiveStock(item)).label}: ${getItemEffectiveStock(item)} ${item.uom || item.stock_uom || 'Nos'}${item.has_variants ? ' (total)' : ''}`"
 						>
-							{{ Math.floor(item.actual_qty ?? item.stock_qty ?? 0) }}
+							{{ getItemEffectiveStock(item) }}
 						</div>
 
 						<!-- Item Image -->
@@ -521,7 +521,7 @@
 									
 								<!-- Final Rate added to it 15% tax calculated and added to it discount amount -->
 								<div class="font-bold text-red-600 text-sm">
-									Price: {{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
+									{{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
 								</div>
 									
 								</div>
@@ -531,12 +531,12 @@
 									:class="[
 										'inline-block px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md shadow-sm',
 										'text-xs sm:text-sm font-bold',
-										getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).color,
-										getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).textColor
+										getStockStatus(getItemEffectiveStock(item)).color,
+										getStockStatus(getItemEffectiveStock(item)).textColor
 									]"
-									:title="`${getStockStatus(item.actual_qty ?? item.stock_qty ?? 0).label}: ${Math.floor(item.actual_qty ?? item.stock_qty ?? 0)} ${item.uom || item.stock_uom || 'Nos'}`"
+									:title="`${getStockStatus(getItemEffectiveStock(item)).label}: ${getItemEffectiveStock(item)} ${item.uom || item.stock_uom || 'Nos'}${item.has_variants ? ' (total)' : ''}`"
 								>
-									{{ Math.floor(item.actual_qty ?? item.stock_qty ?? 0) }}
+									{{ getItemEffectiveStock(item) }}
 								</span>
 							</td>
                                                         <td class="hidden md:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.uom || item.stock_uom || 'Nos' }}</div></td>
@@ -672,6 +672,17 @@
 									<h3 class="text-sm font-semibold text-gray-900 truncate">{{ template.template_name }}</h3>
 									<p class="text-xs text-gray-500">{{ template.colors.length }} colors</p>
 								</div>
+
+								<!-- Template Total Stock Badge -->
+								<span
+									:class="[
+										'px-2.5 py-1 rounded-md text-xs font-bold flex-shrink-0',
+										getTemplateTotalStock(template) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+									]"
+									:title="`Total stock: ${getTemplateTotalStock(template)}`"
+								>
+									{{ getTemplateTotalStock(template) }}
+								</span>
 							</div>
 						</button>
 
@@ -716,6 +727,17 @@
 											<p class="text-xs font-medium text-gray-900">{{ color.color_name }}</p>
 											<p class="text-[10px] text-gray-500">{{ color.variants.length }} sizes</p>
 										</div>
+
+										<!-- Color Total Stock Badge -->
+										<span
+											:class="[
+												'px-2 py-0.5 rounded text-[10px] font-bold flex-shrink-0',
+												getColorTotalStock(color) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+											]"
+											:title="`Color stock: ${getColorTotalStock(color)}`"
+										>
+											{{ getColorTotalStock(color) }}
+										</span>
 									</div>
 								</button>
 
@@ -1236,8 +1258,8 @@ async function handleItemClick(itemCode) {
 		return
 	}
 
-	// Check stock availability
-	const qty = Math.floor(item.actual_qty ?? item.stock_qty ?? 0)
+	// Check stock availability (use effective stock for templates)
+	const qty = getItemEffectiveStock(item)
 	if (qty <= 0 && settingsStore.shouldEnforceStockValidation()) {
 		showError(`"${item.item_name}" cannot be added to cart. Allow Negative Stock is disabled.`)
 		return
@@ -1484,6 +1506,51 @@ function toggleColor(templateCode, colorName) {
 function isColorExpanded(templateCode, colorName) {
 	const key = `${templateCode}-${colorName}`
 	return expandedColors.value.has(key)
+}
+
+// Calculate total stock for a template (sum of all variant quantities)
+function getTemplateTotalStock(template) {
+	if (!template || !template.colors) return 0
+	let total = 0
+	for (const color of template.colors) {
+		if (color.variants) {
+			for (const variant of color.variants) {
+				total += Math.floor(variant.actual_qty || 0)
+			}
+		}
+	}
+	return total
+}
+
+// Get effective stock for an item - if it's a template, sum all variants' stock
+function getItemEffectiveStock(item) {
+	if (!item) return 0
+	
+	// If item has variants (is a template), calculate sum of all variant stocks
+	if (item.has_variants) {
+		// Find all variants of this template in filteredItems
+		const variants = filteredItems.value?.filter(i => i.variant_of === item.item_code) || []
+		if (variants.length > 0) {
+			let total = 0
+			for (const variant of variants) {
+				total += Math.floor(variant.actual_qty ?? variant.stock_qty ?? 0)
+			}
+			return total
+		}
+	}
+	
+	// Regular item or variant - return its own stock
+	return Math.floor(item.actual_qty ?? item.stock_qty ?? 0)
+}
+
+// Calculate total stock for a color group (sum of all variant quantities in that color)
+function getColorTotalStock(color) {
+	if (!color || !color.variants) return 0
+	let total = 0
+	for (const variant of color.variants) {
+		total += Math.floor(variant.actual_qty || 0)
+	}
+	return total
 }
 
 async function loadTreeViewData() {
