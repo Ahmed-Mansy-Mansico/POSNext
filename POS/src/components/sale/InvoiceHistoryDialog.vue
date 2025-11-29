@@ -85,7 +85,7 @@
 									{{ formatCurrency(invoice.grand_total) }}
 								</p>
 								<div class="flex items-center space-x-1 mt-2">
-									<button
+									<!-- <button
 										@click="viewInvoice(invoice)"
 										class="p-1.5 hover:bg-blue-50 rounded transition-colors"
 										title="View Details"
@@ -94,9 +94,9 @@
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
 										</svg>
-									</button>
+									</button> -->
 									<button
-										@click="printInvoice(invoice)"
+										@click="printInvoiceFromPrintview(invoice)"
 										class="p-1.5 hover:bg-green-50 rounded transition-colors"
 										title="Print"
 									>
@@ -153,7 +153,7 @@
 </template>
 
 <script setup>
-import { printInvoiceByName } from "@/utils/printInvoice"
+import { printInvoiceByName, printInvoiceFromPrintView } from "@/utils/printInvoice"
 import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
@@ -271,6 +271,18 @@ function viewInvoice(invoice) {
 async function printInvoice(invoice) {
 	try {
 		await printInvoiceByName(invoice.name)
+	} catch (error) {
+		console.error("Error printing invoice:", error)
+		window.frappe.msgprint({
+			title: "Error",
+			message: "Failed to print invoice",
+			indicator: "red",
+		})
+	}
+}
+async function printInvoiceFromPrintview(invoice) {
+	try {
+		await printInvoiceFromPrintView(invoice,'POS Sales Invoice Print')
 	} catch (error) {
 		console.error("Error printing invoice:", error)
 		window.frappe.msgprint({

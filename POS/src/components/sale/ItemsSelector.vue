@@ -1,7 +1,7 @@
 <template>
 	<div class="flex flex-col h-full bg-gray-50">
 		<!-- Item Groups Filter Tabs -->
-		<div class="px-1.5 sm:px-3 pt-1.5 sm:pt-3 pb-1.5 sm:pb-2 bg-white border-b border-gray-200">
+		<!-- <div class="px-1.5 sm:px-3 pt-1.5 sm:pt-3 pb-1.5 sm:pb-2 bg-white border-b border-gray-200">
 			<div class="flex items-center space-x-1 sm:space-x-2 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory">
 				<button
 					@click="itemStore.setSelectedItemGroup(null)"
@@ -31,7 +31,7 @@
 					<span>{{ group.item_group }}</span>
 				</button>
 			</div>
-		</div>
+		</div> -->
 
 		<!-- Cache Sync Indicator -->
 		<div v-if="cacheSyncing" class="px-1.5 sm:px-3 py-1 bg-blue-50 border-b border-blue-200">
@@ -143,6 +143,20 @@
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
 						</svg>
 					</button>
+					<!--  Tree View Button  -->
+					<button
+						@click="setViewMode('tree')"
+						:class="[
+							'p-1.5 sm:p-2 rounded transition-[background-color,box-shadow] duration-75 touch-manipulation',
+							viewMode === 'tree' ? 'bg-white shadow-sm' : 'hover:bg-gray-200 active:bg-gray-300'
+						]"
+						title="Tree View - Group by Color"
+						:aria-label="'Switch to tree view'"
+					>
+						<svg class="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+						</svg>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -152,6 +166,76 @@
 			<div class="text-center py-8">
 				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
 				<p class="mt-3 text-xs text-gray-500">Loading items...</p>
+			</div>
+		</div>
+
+		<!-- Employee Performance Display when search bar is empty -->
+		<div
+			v-else-if="!hasSearchTerm"
+			class="flex-1 overflow-y-auto p-3 sm:p-4 bg-white"
+		>
+			<div v-if="performanceLoading" class="flex items-center justify-center py-8">
+				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+			</div>
+			<div v-else-if="performanceData" class="max-w-2xl mx-auto">
+				<!-- Employee Header -->
+				<div class="mb-4 sm:mb-6">
+					<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-2">Employee</p>
+					<div class="flex items-center space-x-3">
+						<div class="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+							<svg class="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+							</svg>
+						</div>
+						<h3 class="text-sm sm:text-base font-bold text-gray-900">{{ performanceData.employee_name }}</h3>
+					</div>
+				</div>
+
+				<!-- Hours at work Section -->
+				<div class="mb-4 sm:mb-6">
+					<h4 class="text-xs sm:text-sm font-bold text-gray-900 mb-3">Hours at work</h4>
+					<div class="grid grid-cols-4 gap-2 sm:gap-3">
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Today</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.today }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Yesterday</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.yesterday }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Week</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.week }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Month</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ performanceData.hours_at_work.month }}</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Sales Section -->
+				<div>
+					<h4 class="text-xs sm:text-sm font-bold text-gray-900 mb-3">Sales {{ performanceData.currency }}</h4>
+					<div class="grid grid-cols-4 gap-2 sm:gap-3">
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Today</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.today, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Yesterday</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.yesterday, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Week</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.week, performanceData.currency) }}</p>
+						</div>
+						<div class="text-center">
+							<p class="text-[10px] sm:text-xs text-gray-400 uppercase mb-1 sm:mb-2">Month</p>
+							<p class="text-xs sm:text-sm font-semibold text-gray-900">{{ formatCurrency(performanceData.sales.month, performanceData.currency) }}</p>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -182,7 +266,7 @@
 		</div>
 
 		<!-- Grid View -->
-		<div v-if="viewMode === 'grid'" key="grid" class="flex-1 flex flex-col overflow-hidden">
+		<div v-else-if="viewMode === 'grid' && hasSearchTerm" key="grid" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="gridScrollContainer"
 				class="flex-1 overflow-y-auto p-1.5 sm:p-3"
@@ -259,7 +343,7 @@
 
 						<!-- Item Details -->
 						<div class="min-w-0">
-							<h3 class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate mb-0.5 leading-tight">
+							<h3 class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate max-w-[20ch] mb-0.5 leading-tight" :title="item.item_name">
 								{{ item.item_name }}
 							</h3>
 							<div class="text-[8px] sm:text-[9px] text-gray-500 leading-tight space-y-0.5">
@@ -277,7 +361,7 @@
 								
 								<!-- Final Rate -->
 								<div class="flex items-center justify-between border-t border-gray-200 pt-0.5">
-									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Rate:</span>
+									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Price:</span>
 									<div class="text-right">
 										<div class="font-bold text-blue-600 text-[10px] sm:text-xs">
 											{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
@@ -364,18 +448,17 @@
 		</div>
 
 		<!-- Table View -->
-		<div v-if="viewMode === 'list'" key="list" class="flex-1 flex flex-col overflow-hidden">
+		<div v-else-if="viewMode === 'list' && hasSearchTerm" key="list" class="flex-1 flex flex-col overflow-hidden">
 			<div
 				ref="listScrollContainer"
-				class="flex-1 overflow-x-auto overflow-y-auto"
-			>
+				class="flex-1 overflow-x-auto overflow-y-auto">
 				<table v-if="paginatedItems.length > 0" class="min-w-full divide-y divide-gray-200">
 					<thead class="bg-gray-50 sticky top-0 z-10">
 						<tr>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Image</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
 							<th scope="col" class="hidden sm:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Code</th>
-							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Rate</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Name</th>
+							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Retail Price</th>
 							<th scope="col" class="px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">Qty</th>
 							<th scope="col" class="hidden md:table-cell px-2 sm:px-3 py-2 sm:py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-50 border-b-2 border-gray-200 sticky top-0 z-10">UOM</th>
 						</tr>
@@ -411,24 +494,36 @@
 									</svg>
 								</div>
 							</td>
-							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{{ item.item_name }}</div></td>
-							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-gray-500">{{ item.item_code }}</div></td>
+
+							<td class="hidden sm:table-cell px-2 sm:px-3 py-2 whitespace-nowrap"><div class="text-xs sm:text-sm text-black-500">{{ item.item_code }}</div></td>
+
+							<td class="px-2 sm:px-3 py-2"><div class="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">
+								<!-- if item name length is greater than 20 then show the item to the index 0 to 20 characters -->
+								
+								<span v-if="item.item_name.length > 20">
+									{{ item.item_name.substring(0, 20) }}
+								</span>
+								<span v-else>
+									{{ item.item_name }}
+								</span>
+							</div></td>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
 								<div class="text-xs space-y-1">
 									<!-- List Price -->
-									<div v-if="item.price_list_rate" class="text-gray-500">
+									<!-- <div v-if="item.price_list_rate" class="text-gray-500">
 										List: <span class="font-medium">{{ formatCurrency(item.price_list_rate) }}</span>
-									</div>
+									</div> -->
 									
-									<!-- Discount Amount -->
+									<!-- Discount Amount added to it tax 15% calculated -->
 									<div v-if="item.discount_amount && item.discount_amount > 0" class="text-red-600">
-										Discount: <span class="font-medium">-{{ formatCurrency(item.discount_amount) }}</span>
+										Discount: <span class="font-medium">-{{ formatCurrency(item.discount_amount) * 0.15 + item.discount_amount }}</span>
 									</div>
 									
-									<!-- Final Rate -->
-									<div class="font-semibold text-blue-600 text-sm">
-										Rate: {{ formatCurrency(item.rate || item.price_list_rate || 0) }}
-									</div>
+								<!-- Final Rate added to it 15% tax calculated and added to it discount amount -->
+								<div class="font-bold text-red-600 text-sm">
+									Price: {{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
+								</div>
+									
 								</div>
 							</td>
 							<td class="px-2 sm:px-3 py-2 whitespace-nowrap">
@@ -521,6 +616,185 @@
 				</div>
 			</div>
 		</div>
+		<div v-else-if="viewMode === 'tree' && hasSearchTerm" key="tree" class="flex-1 flex flex-col overflow-hidden">
+			<div
+				ref="treeScrollContainer"
+				class="flex-1 overflow-y-auto p-1.5 sm:p-3"
+			>
+				<!-- Loading State -->
+				<div v-if="treeLoading" class="flex items-center justify-center py-8">
+					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+					<p class="ml-2 text-xs text-gray-500">Loading tree view...</p>
+				</div>
+
+				<!-- Tree Content -->
+				<div v-else-if="groupedTreeItems && groupedTreeItems.grouped_items" class="space-y-2">
+					<!-- Template Item -->
+					<div
+						v-for="template in groupedTreeItems.grouped_items"
+						:key="template.template_code"
+						class="bg-white border border-gray-200 rounded-lg overflow-hidden"
+					>
+						<!-- Template Header -->
+						<button
+							@click="toggleTemplate(template.template_code)"
+							class="w-full px-3 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors touch-manipulation"
+						>
+							<div class="flex items-center space-x-2 flex-1 min-w-0">
+								<!-- Expand Icon -->
+								<svg
+									:class="[
+										'w-4 h-4 text-gray-500 transition-transform flex-shrink-0',
+										expandedTemplates.includes(template.template_code) ? 'transform rotate-90' : ''
+									]"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+								</svg>
+
+								<!-- Template Image -->
+								<div class="w-10 h-10 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
+									<img
+										v-if="template.image"
+										:src="template.image"
+										:alt="template.template_name"
+										class="w-full h-full object-cover"
+									/>
+									<svg v-else class="w-6 h-6 text-gray-300 m-auto mt-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+									</svg>
+								</div>
+
+								<!-- Template Info -->
+								<div class="flex-1 text-left min-w-0">
+									<h3 class="text-sm font-semibold text-gray-900 truncate">{{ template.template_name }}</h3>
+									<p class="text-xs text-gray-500">{{ template.colors.length }} colors</p>
+								</div>
+							</div>
+						</button>
+
+						<!-- Colors -->
+						<div v-show="expandedTemplates.includes(template.template_code)" class="bg-gray-50">
+							<div
+								v-for="color in template.colors"
+								:key="`${template.template_code}-${color.color_name}`"
+								class="border-t border-gray-200"
+							>
+								<!-- Color Header -->
+								<button
+									@click="toggleColor(template.template_code, color.color_name)"
+									class="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-100 transition-colors touch-manipulation"
+								>
+									<div class="flex items-center space-x-2 flex-1 min-w-0">
+										<!-- Color Expand Icon -->
+										<svg
+											:class="[
+												'w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0 ml-2',
+												isColorExpanded(template.template_code, color.color_name) ? 'transform rotate-90' : ''
+											]"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+										</svg>
+
+										<!-- Color Image -->
+										<div class="w-8 h-8 bg-white rounded border border-gray-200 flex-shrink-0 overflow-hidden">
+											<img
+												v-if="color.image"
+												:src="color.image"
+												:alt="color.color_name"
+												class="w-full h-full object-cover"
+											/>
+										</div>
+
+										<!-- Color Info -->
+										<div class="flex-1 text-left min-w-0">
+											<p class="text-xs font-medium text-gray-900">{{ color.color_name }}</p>
+											<p class="text-[10px] text-gray-500">{{ color.variants.length }} sizes</p>
+										</div>
+									</div>
+								</button>
+
+								<!-- Variants -->
+								<div v-show="isColorExpanded(template.template_code, color.color_name)" class="bg-white">
+									<div
+										v-for="variant in color.variants"
+										:key="variant.item_code"
+										@click="handleItemClick(variant.item_code)"
+										class="px-6 py-2 ml-6 border-t border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors touch-manipulation flex items-center justify-between"
+									>
+										<div class="flex items-center space-x-2 flex-1 min-w-0">
+											<!-- Variant Image -->
+											<div class="w-6 h-6 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
+												<img
+													v-if="variant.image"
+													:src="variant.image"
+													:alt="variant.item_name"
+													class="w-full h-full object-cover"
+												/>
+											</div>
+
+											<!-- Variant Info -->
+											<div class="flex-1 min-w-0">
+												<p class="text-xs text-gray-900 truncate">Size: {{ variant.size || 'N/A' }}</p>
+												<p class="text-[10px] text-gray-500">{{ variant.item_code }}</p>
+											</div>
+										</div>
+
+										<!-- Stock Badge -->
+										<div class="flex items-center space-x-2 flex-shrink-0">
+											<span
+												:class="[
+													'px-2 py-0.5 rounded text-[10px] font-medium',
+													variant.actual_qty > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+												]"
+											>
+												{{ Math.floor(variant.actual_qty) }} {{ variant.stock_uom }}
+											</span>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Standalone Items -->
+					<div v-if="groupedTreeItems.standalone_items && groupedTreeItems.standalone_items.length > 0" class="mt-4">
+						<h3 class="text-xs font-semibold text-gray-700 px-2 mb-2">Regular Items</h3>
+						<div class="space-y-1">
+							<div
+								v-for="item in groupedTreeItems.standalone_items"
+								:key="item.item_code"
+								@click="handleItemClick(item.item_code)"
+								class="bg-white border border-gray-200 rounded-lg px-3 py-2 hover:bg-blue-50 cursor-pointer transition-colors touch-manipulation flex items-center space-x-2"
+							>
+								<div class="w-8 h-8 bg-gray-100 rounded flex-shrink-0 overflow-hidden">
+									<img
+										v-if="item.image"
+										:src="item.image"
+										:alt="item.item_name"
+										class="w-full h-full object-cover"
+									/>
+								</div>
+								<div class="flex-1 min-w-0">
+									<p class="text-xs font-medium text-gray-900 truncate">{{ item.item_name }}</p>
+									<p class="text-[10px] text-gray-500">{{ item.item_code }}</p>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Empty State -->
+				<div v-else class="flex items-center justify-center py-8">
+					<p class="text-xs text-gray-500">No items to display in tree view</p>
+				</div>
+			</div>
+		</div>
 	</div>
 </template>
 
@@ -531,6 +805,9 @@ import { usePOSSettingsStore } from "@/stores/posSettings"
 import { useStock } from "@/composables/useStock"
 import { formatCurrency as formatCurrencyUtil } from "@/utils/currency"
 import { useToast } from "@/composables/useToast"
+import { toast } from "frappe-ui"
+import { createResource } from "frappe-ui"
+import { call } from "frappe-ui"
 import { storeToRefs } from "pinia"
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import {
@@ -575,7 +852,7 @@ const {
 } = storeToRefs(itemStore)
 
 // Local state
-const viewMode = ref("grid")
+const viewMode = ref("tree")
 const lastKeyTime = ref(0)
 const barcodeBuffer = ref("")
 const searchInputRef = ref(null)
@@ -598,6 +875,13 @@ const scrollCleanupFns = ref([])
 // Pagination state (for client-side display)
 const currentPage = ref(1)
 const itemsPerPage = ref(20)
+
+//  Tree view state -
+const treeScrollContainer = ref(null)
+const groupedTreeItems = ref(null)
+const treeLoading = ref(false)
+const expandedTemplates = ref([])
+const expandedColors = ref(new Set())
 
 // Computed paginated items
 // filteredItems is already reactive and includes live stock from stockStore
@@ -632,6 +916,60 @@ const searchMode = computed(() => {
 })
 
 const searchPlaceholder = computed(() => SEARCH_PLACEHOLDERS[searchMode.value])
+
+// Check if search term has a value
+const hasSearchTerm = computed(() => {
+	return searchTerm.value && typeof searchTerm.value === 'string' && searchTerm.value.trim().length > 0
+})
+
+// Performance data state
+const performanceData = ref(null)
+const performanceLoading = ref(false)
+
+// Format currency helper
+function formatCurrency(amount, currency) {
+	return formatCurrencyUtil(Number.parseFloat(amount || 0), currency || props.currency)
+}
+
+// Load employee performance data
+const performanceResource = createResource({
+	url: "pos_next.api.invoices.get_employee_performance",
+	makeParams() {
+		return {
+			pos_profile: props.posProfile || null,
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		performanceData.value = data?.message || data || null
+		performanceLoading.value = false
+	},
+	onError(error) {
+		console.error("Error loading employee performance:", error)
+		performanceLoading.value = false
+		performanceData.value = null
+	},
+})
+
+// Load performance data when component is mounted or posProfile changes
+watch(
+	() => props.posProfile,
+	(newProfile) => {
+		if (newProfile && !hasSearchTerm.value) {
+			performanceLoading.value = true
+			performanceResource.reload()
+		}
+	},
+	{ immediate: true }
+)
+
+// Reload performance data when search term becomes empty
+watch(hasSearchTerm, (hasTerm) => {
+	if (!hasTerm && props.posProfile) {
+		performanceLoading.value = true
+		performanceResource.reload()
+	}
+})
 
 // Watch for cart items and pos profile changes (optimized - uses length + hash instead of deep watch)
 // Tracks: length, item_code, quantity, and amount to detect all cart changes including array replacements
@@ -860,13 +1198,45 @@ function getOptimizedClickHandler(item) {
 	return optimizedClickHandlers.get(key)
 }
 
-function handleItemClick(itemCode) {
-	// Find the current item by code to get latest stock values
-	const item = filteredItems.value.find(i => i.item_code === itemCode)
-	if (!item) return
+async function handleItemClick(itemCode) {
+	// For tree view, we might not have full item details, so fetch them
+	let item = filteredItems.value?.find(i => i.item_code === itemCode)
+	
+	// If not found in filtered items (tree view case), search in tree data
+	if (!item && viewMode.value === 'tree' && groupedTreeItems.value) {
+		// Search in grouped items
+		for (const template of groupedTreeItems.value.grouped_items || []) {
+			for (const color of template.colors || []) {
+				const variant = color.variants?.find(v => v.item_code === itemCode)
+				if (variant) {
+				
+					item = {
+						item_code: variant.item_code,
+						item_name: variant.item_name,
+						image: variant.image,
+						stock_uom: variant.stock_uom,
+						actual_qty: variant.actual_qty,
+						rate: variant.rate || 0,
+						...variant
+					}
+					break
+				}
+			}
+			if (item) break
+		}
+		
+		// Check standalone items too
+		if (!item && groupedTreeItems.value.standalone_items) {
+			item = groupedTreeItems.value.standalone_items.find(i => i.item_code === itemCode)
+		}
+	}
+	
+	if (!item) {
+		showError('Item not found')
+		return
+	}
 
-	// Check stock availability and show error if needed, but still emit the event
-	// The parent component (POSSale.vue) will handle the actual validation
+	// Check stock availability
 	const qty = Math.floor(item.actual_qty ?? item.stock_qty ?? 0)
 	if (qty <= 0 && settingsStore.shouldEnforceStockValidation()) {
 		showError(`"${item.item_name}" cannot be added to cart. Allow Negative Stock is disabled.`)
@@ -1039,10 +1409,6 @@ function toggleAutoAdd() {
 	}
 }
 
-function formatCurrency(amount) {
-	return formatCurrencyUtil(Number.parseFloat(amount || 0), props.currency)
-}
-
 // Expose methods for parent component
 defineExpose({
 	loadItems: () => itemStore.loadAllItems(props.posProfile),
@@ -1051,8 +1417,7 @@ defineExpose({
 })
 
 // Watch for view mode changes and rebind scroll listeners
-watch(viewMode, async () => {
-	// Wait for DOM to update
+watch(viewMode, async (newMode) => {
 	await nextTick()
 
 	// Clean up existing listeners
@@ -1060,7 +1425,7 @@ watch(viewMode, async () => {
 	scrollCleanupFns.value = []
 
 	// Rebind listeners to the new active container
-	if (viewMode.value === 'grid' && gridScrollContainer.value) {
+	if (newMode === 'grid' && gridScrollContainer.value) {  
 		const cleanup = addPassiveListener(
 			gridScrollContainer.value,
 			'scroll',
@@ -1068,7 +1433,7 @@ watch(viewMode, async () => {
 			{ passive: true }
 		)
 		scrollCleanupFns.value.push(cleanup)
-	} else if (viewMode.value === 'list' && listScrollContainer.value) {
+	} else if (newMode === 'list' && listScrollContainer.value) {  
 		const cleanup = addPassiveListener(
 			listScrollContainer.value,
 			'scroll',
@@ -1077,12 +1442,69 @@ watch(viewMode, async () => {
 		)
 		scrollCleanupFns.value.push(cleanup)
 	}
+	
+	// Load tree view data when switching to tree mode
+	if (newMode === 'tree' && hasSearchTerm.value) {  
+		await loadTreeViewData()
+	}
+})
+
+//  Watch for search term changes in tree view
+watch([searchTerm, () => props.posProfile], async () => {
+	if (viewMode.value === 'tree' && hasSearchTerm.value) {
+		await loadTreeViewData()
+	}
 })
 
 // View mode functions
 function setViewMode(mode) {
 	viewMode.value = mode
 	userManuallySetView.value = true
+}
+//  Tree view functions 
+function toggleTemplate(templateCode) {
+	const index = expandedTemplates.value.indexOf(templateCode)
+	if (index > -1) {
+		expandedTemplates.value.splice(index, 1)
+	} else {
+		expandedTemplates.value.push(templateCode)
+	}
+}
+
+function toggleColor(templateCode, colorName) {
+	const key = `${templateCode}-${colorName}`
+	if (expandedColors.value.has(key)) {
+		expandedColors.value.delete(key)
+	} else {
+		expandedColors.value.add(key)
+	}
+	expandedColors.value = new Set(expandedColors.value)
+}
+
+function isColorExpanded(templateCode, colorName) {
+	const key = `${templateCode}-${colorName}`
+	return expandedColors.value.has(key)
+}
+
+async function loadTreeViewData() {
+	if (!props.posProfile) return
+	
+	treeLoading.value = true
+	
+	try {
+		const response = await call('pos_next.api.items.get_items_grouped_by_variant', {
+			search_term: searchTerm.value || '',
+			pos_profile: props.posProfile
+		})
+		
+		groupedTreeItems.value = response
+		
+	} catch (error) {
+		showError('Failed to load tree view')
+		groupedTreeItems.value = null
+	} finally {
+		treeLoading.value = false
+	}
 }
 
 // Pagination functions

@@ -45,6 +45,7 @@ export const usePOSUIStore = defineStore("posUI", () => {
 
 	// Customer dialog state
 	const initialCustomerName = ref("")
+	const initialCustomerPhone = ref("")
 
 	// Mobile responsiveness
 	const mobileActiveTab = ref("items") // 'items' or 'cart'
@@ -104,6 +105,10 @@ export const usePOSUIStore = defineStore("posUI", () => {
 
 	function setInitialCustomerName(name) {
 		initialCustomerName.value = name
+	}
+
+	function setInitialCustomerPhone(phone) {
+		initialCustomerPhone.value = phone
 	}
 
 	// Layout actions
@@ -194,6 +199,7 @@ export const usePOSUIStore = defineStore("posUI", () => {
 		lastInvoiceName,
 		lastInvoiceTotal,
 		initialCustomerName,
+		initialCustomerPhone,
 		mobileActiveTab,
 		windowWidth,
 		leftPanelWidth,
@@ -210,10 +216,11 @@ export const usePOSUIStore = defineStore("posUI", () => {
 		clearError,
 		showSuccess,
 		setInitialCustomerName,
+		setInitialCustomerPhone,
+		clampLeftPanelWidth,
 		setLeftPanelWidth,
 		setResizing,
 		updateLayoutBounds,
-		clampLeftPanelWidth,
 		resetAllDialogs,
 	}
 })

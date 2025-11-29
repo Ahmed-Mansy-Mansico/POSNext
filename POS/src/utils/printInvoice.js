@@ -6,6 +6,55 @@ import { call } from "@/utils/apiWrapper"
  * @param {string} printFormat - The print format name (optional)
  * @param {string} letterhead - The letterhead name (optional)
  */
+
+
+export async function printInvoiceFromPrintView(
+	invoiceData,
+	printFormat = null,
+	letterhead = null,
+) {
+	try {
+		if (!invoiceData || !invoiceData.name) {
+			throw new Error("Invalid invoice data")
+		}
+
+		const doctype = invoiceData.doctype || "Sales Invoice"
+		const format = printFormat 
+
+		// Build HTML print URL (more reliable than PDF)
+		const params = new URLSearchParams({
+			doctype: doctype,
+			name: invoiceData.name,
+			format: format,
+			// no_letterhead: letterhead ? 0 : 1,
+			no_letterhead: letterhead ? 1 : 0,
+			_lang: "en",
+			trigger_print: 1,
+			letterhead: letterhead || "",
+		})
+
+		// Try HTML print view first (more reliable, doesn't require wkhtmltopdf)
+		const printUrl = `/printview?${params.toString()}`
+		const printWindow = window.open(printUrl, "width=800,height=600")
+
+		if (!printWindow) {
+			throw new Error(
+				"Failed to open print window. Please check your popup blocker settings.",
+			)
+		}
+
+		return true
+	} catch (error) {
+		console.error("Error printing with Frappe print format:", error)
+		// Fallback to custom print format
+		return printInvoiceCustom(invoiceData)
+	}
+}
+
+
+
+
+
 export async function printInvoice(
 	invoiceData,
 	printFormat = null,

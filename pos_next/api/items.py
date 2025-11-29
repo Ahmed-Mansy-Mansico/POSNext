@@ -568,6 +568,33 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			params.extend(score_params)
 			params.extend([limit, start])
 			items = frappe.db.sql(query, tuple(params), as_dict=1)
+			
+			# When searching for template items, also include their variants in results
+			# Check if any of the search results are template items (has_variants=1)
+			template_items = [item for item in items if item.get("has_variants")]
+			if template_items:
+				# Get all variants for template items that match the search
+				template_codes = [item["item_code"] for item in template_items]
+				variant_filters = {
+					"variant_of": ["in", template_codes],
+					"disabled": 0,
+					"is_sales_item": 1,
+				}
+				
+				# Add company filter for variants
+				if pos_profile_doc.company:
+					variant_filters["ifnull(custom_company, '')"] = ["in", [pos_profile_doc.company, ""]]
+				
+				variants = frappe.get_all(
+					"Item",
+					filters=variant_filters,
+					fields=ITEM_RESULT_FIELDS,
+					order_by="item_name asc",
+				)
+				
+				# Add variants to the search results
+				if variants:
+					items.extend(variants)
 		else:
 			# No search term - return all items with base filters
 			items = frappe.get_list(
@@ -928,3 +955,321 @@ def get_stock_quantities(item_codes, warehouse):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Get Stock Quantities Error")
 		frappe.throw(_("Error fetching stock quantities: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_item_stock_all_warehouses(item_code):
+	"""
+	Get stock quantity for an item across all warehouses.
+	
+	Args:
+		item_code: Item code to get stock for
+		
+	Returns:
+		List of dicts with warehouse, warehouse_name, and actual_qty
+	"""
+	try:
+		if not item_code:
+			return []
+		
+		# Get all warehouses (excluding group warehouses, only ship or branch warehouses)
+		warehouses = frappe.db.sql(
+			"""
+			SELECT name, warehouse_name
+			FROM `tabWarehouse`
+			WHERE is_group = 0
+			AND (is_ship_warehouse = 1 OR is_branch_warehouse = 1)
+			ORDER BY warehouse_name ASC, name ASC
+			""",
+			as_dict=1,
+		)
+		
+		if not warehouses:
+			return []
+		
+		warehouse_names = [w["name"] for w in warehouses]
+		
+		# Get stock for the item across all warehouses
+		stock_rows = frappe.db.sql(
+			"""
+			SELECT
+				warehouse,
+				COALESCE(SUM(actual_qty), 0) AS actual_qty
+			FROM `tabBin`
+			WHERE item_code = %(item_code)s
+			AND warehouse IN %(warehouses)s
+			GROUP BY warehouse
+			""",
+			{
+				"item_code": item_code,
+				"warehouses": tuple(warehouse_names),
+			},
+			as_dict=1,
+		)
+		
+		# Create a lookup for warehouses that have stock
+		stock_lookup = {row["warehouse"]: row["actual_qty"] for row in stock_rows}
+		
+		# Build result with all warehouses (0 if no stock)
+		result = []
+		for warehouse in warehouses:
+			actual_qty = flt(stock_lookup.get(warehouse["name"], 0))
+			result.append({
+				"warehouse": warehouse["name"],
+				"warehouse_name": warehouse["warehouse_name"] or warehouse["name"],
+				"actual_qty": actual_qty,
+				"stock_qty": actual_qty,  # Alias for frontend convenience
+			})
+		
+		return result
+		
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get Item Stock All Warehouses Error")
+		frappe.throw(_("Error fetching stock across warehouses: {0}").format(str(e)))
+
+@frappe.whitelist()
+def get_items_grouped_by_variant(search_term="", pos_profile=None):
+
+	from collections import defaultdict
+	
+	if not pos_profile:
+		frappe.throw(_("POS Profile is required"))
+	
+	pos_profile_doc = frappe.get_cached_doc('POS Profile', pos_profile)
+	
+	item_groups = []
+	if pos_profile_doc.item_groups:
+		item_groups = [ig.item_group for ig in pos_profile_doc.item_groups]
+	
+	filters = {
+		'disabled': 0,
+		'is_sales_item': 1,
+	}
+	
+	if pos_profile_doc.company:
+		filters['ifnull(custom_company, "")'] = ['in', [pos_profile_doc.company, '']]
+	
+	if item_groups:
+		filters['item_group'] = ['in', item_groups]
+	
+	or_filters = None
+	if search_term:
+		search_term_pattern = f"%{search_term}%"
+		or_filters = [
+			['item_code', 'like', search_term_pattern],
+			['item_name', 'like', search_term_pattern],
+			['variant_of', 'like', search_term_pattern]
+		]
+	
+	items = frappe.get_all(
+		'Item',
+		filters=filters,
+		or_filters=or_filters,
+		fields=[
+			'name', 'item_code', 'item_name', 'item_group',
+			'image', 'stock_uom', 'variant_of', 'has_variants',
+			'is_stock_item'
+		],
+		limit=1000
+	)
+	
+	templates = {}
+	variants_by_template = defaultdict(list)
+	standalone_items = []
+	
+	for item in items:
+		if item.has_variants:
+			templates[item.name] = {
+				'template_code': item.name,
+				'template_name': item.item_name,
+				'image': item.image,
+				'item_group': item.item_group,
+				'colors': {}
+			}
+		elif item.variant_of:
+			variants_by_template[item.variant_of].append(item)
+		else:
+			standalone_items.append({
+				'item_code': item.name,
+				'item_name': item.item_name,
+				'image': item.image,
+				'item_group': item.item_group,
+				'stock_uom': item.stock_uom,
+				'is_standalone': True
+			})
+	
+	all_variant_codes = []
+	for variants in variants_by_template.values():
+		all_variant_codes.extend([v.name for v in variants])
+	
+	attributes_map = {}
+	if all_variant_codes:
+		attributes = frappe.get_all(
+			'Item Variant Attribute',
+			filters={'parent': ['in', all_variant_codes]},
+			fields=['parent', 'attribute', 'attribute_value']
+		)
+		for attr in attributes:
+			if attr.parent not in attributes_map:
+				attributes_map[attr.parent] = {}
+			attributes_map[attr.parent][attr.attribute] = attr.attribute_value
+	
+	# BUILD COLOR NAME MAPPING - CORRECT MAPPING
+	# attribute_value contains the code (385), abbr contains the name (OLIVE)
+	color_name_map = {}
+	all_color_codes = set()
+	
+	# Collect all unique color codes
+	for attrs in attributes_map.values():
+		if 'Color Code' in attrs:
+			all_color_codes.add(attrs['Color Code'])
+	
+	# Fetch color names from Item Attribute Value
+	if all_color_codes:
+		try:
+			color_values = frappe.db.sql("""
+				SELECT attribute_value, abbr
+				FROM `tabItem Attribute Value`
+				WHERE parent = 'Color Code'
+				AND attribute_value IN %(codes)s
+			""", {'codes': list(all_color_codes)}, as_dict=1)
+			
+			# Map: code (385) -> name (OLIVE)
+			color_name_map = {cv.attribute_value: cv.abbr.title() for cv in color_values}
+			
+		except Exception as e:
+			frappe.log_error(f"Error fetching color names: {str(e)}")
+			color_name_map = {}
+	
+	stock_map = {}
+	if all_variant_codes and pos_profile_doc.warehouse:
+		stocks = frappe.db.sql(
+			"""
+			SELECT item_code, actual_qty
+			FROM `tabBin`
+			WHERE item_code IN %s AND warehouse = %s
+			""",
+			[all_variant_codes, pos_profile_doc.warehouse],
+			as_dict=1
+		)
+		stock_map = {s.item_code: s.actual_qty for s in stocks}
+	
+	for template_code, variants in variants_by_template.items():
+		if template_code not in templates:
+			template_item = frappe.db.get_value(
+				'Item',
+				template_code,
+				['item_name', 'image', 'item_group'],
+				as_dict=True
+			)
+			if template_item:
+				templates[template_code] = {
+					'template_code': template_code,
+					'template_name': template_item.item_name,
+					'image': template_item.image,
+					'item_group': template_item.item_group,
+					'colors': {}
+				}
+		
+		if template_code not in templates:
+			continue
+		
+		for variant in variants:
+			attrs = attributes_map.get(variant.name, {})
+			color_code = attrs.get('Color Code', 'NO_COLOR')
+			size = attrs.get('Size', '')
+			
+			# GET THE ACTUAL COLOR NAME from the mapping
+			# This will convert "385" to "Olive"
+			color_name = color_name_map.get(color_code, color_code)
+			
+			# If mapping failed, try extracting from item name as fallback
+			if color_name == color_code and color_code != 'NO_COLOR':
+				extracted = _extract_color_from_item(variant.item_name, variant.name)
+				if extracted:
+					color_name = extracted
+				else:
+					color_name = f"Color {color_code}"
+			
+			group_key = color_name
+			
+			# Initialize color group
+			if group_key not in templates[template_code]['colors']:
+				templates[template_code]['colors'][group_key] = {
+					'color_codes': [color_code],
+					'color_name': color_name,
+					'variants': []
+				}
+			else:
+				if color_code not in templates[template_code]['colors'][group_key]['color_codes']:
+					templates[template_code]['colors'][group_key]['color_codes'].append(color_code)
+			
+			templates[template_code]['colors'][group_key]['variants'].append({
+				'item_code': variant.name,
+				'item_name': variant.item_name,
+				'image': variant.image,
+				'stock_uom': variant.stock_uom,
+				'size': size,
+				'actual_qty': stock_map.get(variant.name, 0),
+				'color_code': color_code,
+				'color_name': color_name
+			})
+	
+	for template in templates.values():
+		template['colors'] = list(template['colors'].values())
+	
+	result = {
+		'grouped_items': list(templates.values()),
+		'standalone_items': standalone_items
+	}
+	
+	return result
+
+
+def _extract_color_from_item(item_name, item_code):
+	"""
+	Helper function to extract color name from item name or code
+	"""
+	import re
+	
+	# Common color patterns
+	common_colors = [
+		'Black', 'White', 'Red', 'Blue', 'Green', 'Yellow', 'Orange', 'Purple',
+		'Pink', 'Brown', 'Gray', 'Grey', 'Navy', 'Beige', 'Maroon', 'Olive',
+		'Cyan', 'Magenta', 'Lime', 'Indigo', 'Violet', 'Gold', 'Silver',
+		'Cream', 'Tan', 'Khaki', 'Coral', 'Salmon', 'Peach', 'Mint', 'Lavender',
+		'Burgundy', 'Turquoise', 'Teal', 'Emerald', 'Ruby', 'Sapphire', 'Charcoal',
+		'Rose', 'Sky', 'Mauve'
+	]
+	
+	text = f"{item_name} {item_code}"
+	
+	for color in common_colors:
+		if re.search(rf'\b{color}\b', text, re.IGNORECASE):
+			return color
+	
+	return None
+
+
+def _extract_color_name(item_code, color_code, attributes=None):
+
+	import re
+	
+	if '-' in item_code:
+		parts = item_code.split('-')
+		if len(parts) >= 3:
+			color_part = parts[-1].strip()
+			if not color_part.isdigit():
+				return color_part.replace('_', ' ').replace('-', ' ').title()
+	
+	#  Alphanumeric (CODE+COLOR)
+	match = re.match(r'^(\d+)([A-Z\s]+)$', item_code)
+	if match:
+		color_text = match.group(2).strip()
+		return color_text.title()
+	
+	# Fallback
+	if color_code and color_code != 'NO_COLOR':
+		return f"Color {color_code}"
+	
+	return "Unknown"

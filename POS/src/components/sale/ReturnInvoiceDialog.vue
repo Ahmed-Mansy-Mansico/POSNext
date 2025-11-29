@@ -1,4 +1,5 @@
 <template>
+	<div>
 	<Dialog
         v-model="show"
         :options="{ title: 'Create Return Invoice', size: 'xl' }"
@@ -297,11 +298,13 @@
 			</div>
 		</template>
 	</Dialog>
+	</div>
 </template>
 
 <script setup>
 import { Button, Dialog, Input, createResource, toast } from "frappe-ui"
 import { computed, onMounted, reactive, ref, watch } from "vue"
+import { printInvoiceByName, printInvoiceFromPrintView } from "@/utils/printInvoice"
 
 const props = defineProps({
 	modelValue: Boolean,
@@ -515,6 +518,18 @@ const createReturnResource = createResource({
 			icon: "check",
 			iconClasses: "text-green-600",
 		})
+
+		// Open print view for the return invoice in a new tab
+		if (data && data.name) {
+			setTimeout(() => {
+				// printInvoiceByName(data.name,'POS Sales Invoice Print')
+				printInvoiceFromPrintView(data.name,'POS Sales Return Invoice Print')
+					.catch((error) => {
+						console.error("Error opening print view:", error)
+						// Don't show error to user as the return was successful
+					})
+			}, 500) // Small delay to ensure invoice is fully processed
+		}
 	},
 	onError(error) {
 		isSubmitting.value = false

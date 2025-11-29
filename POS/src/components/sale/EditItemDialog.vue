@@ -35,8 +35,13 @@
 						<h3 class="text-base font-semibold text-gray-900 truncate">
 							{{ localItem.item_name }}
 						</h3>
+						<!-- show item code under the item name -->
 						<p class="text-sm text-gray-500 truncate">
-							{{ currency }} {{ formatNumber(localItem.price_list_rate || localItem.rate) }} / {{ localItem.stock_uom || 'Nos' }}
+							{{ localItem.item_code }}
+						</p>
+						<p class="text-sm text-gray-500 truncate">
+							{{ currency }} {{ formatPriceWithVAT(localItem.price_list_rate || localItem.rate) }} / {{ localItem.stock_uom || 'Nos' }}
+							<span class="text-xs text-gray-400 ml-1">(incl. VAT)</span>
 						</p>
 					</div>
 				</div>
@@ -78,21 +83,22 @@
 							</div>
 						</div>
 
-						<!-- Rate -->
+						<!-- Rate (with VAT) -->
 						<div>
-							<label class="block text-sm font-medium text-gray-700 mb-2">Rate</label>
-							<div class="relative h-10">
-								<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm font-medium">
-									{{ currency }}
-								</span>
-								<input
-									v-model.number="localRate"
-									type="number"
-									min="0"
-									step="0.01"
-									readonly
-									class="w-full h-10 border border-gray-300 rounded-lg pl-16 pr-3 text-sm font-semibold bg-gray-50 cursor-not-allowed"
-								/>
+							<label class="block text-sm font-medium text-gray-700 mb-2">Rate (incl. VAT)</label>
+							<div class="space-y-1">
+								<div class="relative h-10">
+									<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm font-medium">
+										{{ currency }}
+									</span>
+									<input
+										:value="formatPriceWithVAT(localRate)"
+										type="text"
+										readonly
+										class="w-full h-10 border border-gray-300 rounded-lg pl-16 pr-3 text-sm font-semibold bg-gray-50 cursor-not-allowed"
+									/>
+								</div>
+								<p class="text-xs text-gray-500">Base: {{ currency }} {{ formatNumber(localRate) }} + VAT 15%</p>
 							</div>
 						</div>
 					</div>
@@ -143,6 +149,38 @@
 					</div>
 				</div>
 
+				<!-- Stock Information Section -->
+				<div class="border-t border-gray-200 pt-4">
+					<label class="block text-sm font-medium text-gray-700 mb-3">Stock Information</label>
+					<div v-if="loadingStock" class="flex items-center justify-center py-4">
+						<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+						<span class="ml-2 text-sm text-gray-500">Loading stock information...</span>
+					</div>
+					<div v-else-if="stockInfo.length > 0" class="border border-gray-200 rounded-lg overflow-hidden">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Warehouse</th>
+									<th scope="col" class="px-3 py-2 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Qty In Stock</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200">
+								<tr v-for="stock in stockInfo" :key="stock.warehouse" class="hover:bg-gray-50">
+									<td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+										{{ stock.warehouse_name }}
+									</td>
+									<td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">
+										{{ formatNumber(stock.actual_qty) }}
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+					<div v-else class="text-center py-4 text-sm text-gray-500">
+						No stock information available
+					</div>
+				</div>
+
 				<!-- Item Discount Section (only if allowed by POS Profile) -->
 				<div v-if="settingsStore.allowItemDiscount" class="border-t border-gray-200 pt-4">
 					<label class="block text-sm font-medium text-gray-700 mb-3">Item Discount</label>
@@ -180,19 +218,24 @@
 					</div>
 				</div>
 
-				<!-- Totals -->
+				<!-- Totals  -->
 				<div class="bg-gray-50 rounded-lg p-4 space-y-2">
+					<!-- Subtotal = price_list_rate + VAT -->
 					<div class="flex items-center justify-between text-sm">
-						<span class="text-gray-600">Subtotal:</span>
-						<span class="font-semibold text-gray-900">{{ currency }} {{ formatNumber(calculatedSubtotal) }}</span>
+						<span class="text-gray-600">Subtotal (incl. VAT):</span>
+						<span class="font-semibold text-gray-900">{{ currency }} {{ formatNumber((localRate) + (localRate * 0.15)) }}</span>
 					</div>
+					
+					<!-- Discount with VAT -->
 					<div v-if="calculatedDiscount > 0" class="flex items-center justify-between text-sm text-red-600">
-						<span>Discount:</span>
-						<span class="font-semibold">-{{ currency }} {{ formatNumber(calculatedDiscount) }}</span>
+						<span>Discount (incl. VAT):</span>
+						<span class="font-semibold">-{{ currency }} {{ formatNumber(calculatedDiscount + calculatedDiscount * 0.15) }}</span>
 					</div>
-					<div class="flex items-center justify-between pt-2 border-t border-gray-200">
-						<span class="text-base font-bold text-gray-900">Total:</span>
-						<span class="text-lg font-bold text-blue-600">{{ currency }} {{ formatNumber(calculatedTotal) }}</span>
+					
+					<!-- Total = Subtotal - Discount -->
+					<div class="flex items-center justify-between pt-2 border-t-2 border-gray-300">
+						<span class="text-base font-bold text-gray-900">Total (incl. VAT):</span>
+						<span class="text-lg font-bold text-blue-600">{{ currency }} {{ formatNumber(((localRate) + (localRate * 0.15)) - (calculatedDiscount + calculatedDiscount * 0.15)) }}</span>
 					</div>
 				</div>
 			</div>
@@ -219,6 +262,7 @@
 import { useToast } from "@/composables/useToast"
 import { usePOSSettingsStore } from "@/stores/posSettings"
 import { getItemStock } from "@/utils/stockValidator"
+import { call } from "@/utils/apiWrapper"
 import { Button, Dialog } from "frappe-ui"
 import { computed, ref, watch } from "vue"
 
@@ -248,11 +292,11 @@ const localRate = ref(0)
 const localWarehouse = ref("")
 const discountType = ref("percentage")
 const discountValue = ref(0)
-const calculatedSubtotal = ref(0)
 const calculatedDiscount = ref(0)
-const calculatedTotal = ref(0)
 const hasStock = ref(true)
 const isCheckingStock = ref(false)
+const stockInfo = ref([])
+const loadingStock = ref(false)
 
 const show = computed({
 	get: () => props.modelValue,
@@ -266,6 +310,60 @@ const availableUoms = computed(() => {
 	)
 })
 
+// VAT Configuration
+const VAT_RATE = 0.15 // 15%
+
+// Helper to round to 2 decimal places
+function roundTo2(num) {
+	return Math.round((parseFloat(num || 0) + Number.EPSILON) * 100) / 100
+}
+
+// Format number to 2 decimal places
+function formatNumber(num) {
+	return roundTo2(num).toFixed(2)
+}
+function addVAT(price) {
+	return roundTo2(price * (1 + VAT_RATE))
+}
+
+function formatPriceWithVAT(price) {
+	return formatNumber(addVAT(price))
+}
+
+
+// Base Amount = price_list_rate × quantity (WITHOUT VAT) - from item master
+const baseAmount = computed(() => {
+	return roundTo2(localRate.value * localQuantity.value)
+})
+
+// 2. VAT Amount = baseAmount × 15%
+const vatAmount = computed(() => {
+	return roundTo2(baseAmount.value * VAT_RATE)
+})
+
+// 3. Subtotal = Base + VAT 
+const subtotalWithVAT = computed(() => {
+	return roundTo2(baseAmount.value + vatAmount.value)
+})
+
+// 4. Discount Amount (with VAT included)
+const discountAmountWithVAT = computed(() => {
+	if (discountType.value === 'percentage') {
+		// Calculate discount on base, then add VAT to discount
+		const discountOnBase = roundTo2(baseAmount.value * (discountValue.value / 100))
+		const discountVAT = roundTo2(discountOnBase * VAT_RATE)
+		return roundTo2(discountOnBase + discountVAT)
+	} else {
+		// Fixed amount discount (user enters amount with VAT)
+		return roundTo2(discountValue.value)
+	}
+})
+
+// 5. Total = Subtotal - Discount (with VAT)
+const totalWithVAT = computed(() => {
+	return roundTo2(subtotalWithVAT.value - discountAmountWithVAT.value)
+})
+
 // Initialize local state when item changes
 watch(
 	() => props.item,
@@ -274,17 +372,18 @@ watch(
 			localItem.value = { ...newItem }
 			localQuantity.value = newItem.quantity || 1
 			localUom.value = newItem.uom || newItem.stock_uom || "Nos"
-			localRate.value = newItem.rate || 0
+			localRate.value = newItem.price_list_rate || newItem.rate || 0
 			localWarehouse.value =
 				newItem.warehouse || props.warehouses[0]?.name || ""
 
-			// Initialize discount
+			// Initialize discount - ROUND TO 2 DECIMALS
 			if (newItem.discount_percentage && newItem.discount_percentage > 0) {
 				discountType.value = "percentage"
-				discountValue.value = newItem.discount_percentage
+				discountValue.value = roundTo2(newItem.discount_percentage)
 			} else if (newItem.discount_amount && newItem.discount_amount > 0) {
 				discountType.value = "amount"
-				discountValue.value = newItem.discount_amount
+				// Discount amount already includes VAT in cart
+				discountValue.value = roundTo2(newItem.discount_amount + newItem.discount_amount * VAT_RATE)
 			} else {
 				discountType.value = "percentage"
 				discountValue.value = 0
@@ -294,7 +393,10 @@ watch(
 			hasStock.value = true
 			isCheckingStock.value = false
 
-			calculateTotals()
+			calculateDiscount()
+			
+			// Load stock information for all warehouses
+			loadStockInfo()
 		}
 	},
 	{ immediate: true },
@@ -302,13 +404,11 @@ watch(
 
 function incrementQuantity() {
 	localQuantity.value++
-	calculateTotals()
 }
 
 function decrementQuantity() {
 	if (localQuantity.value > 1) {
 		localQuantity.value--
-		calculateTotals()
 	}
 }
 
@@ -316,13 +416,11 @@ function validateQuantity() {
 	if (localQuantity.value < 1) {
 		localQuantity.value = 1
 	}
-	calculateTotals()
 }
 
 function handleUomChange() {
 	// When UOM changes, we need to fetch new rate from server
 	// For now, we'll just recalculate with current rate
-	calculateTotals()
 }
 
 async function handleWarehouseChange() {
@@ -363,51 +461,80 @@ async function handleWarehouseChange() {
 function handleDiscountTypeChange() {
 	// Reset discount value when type changes
 	discountValue.value = 0
-	calculateTotals()
 }
 
 function calculateDiscount() {
-	if (discountType.value === "percentage") {
-		// Ensure percentage doesn't exceed 100
+	// Round discount value to 2 decimals
+	discountValue.value = roundTo2(discountValue.value)
+	
+	const subtotal = localRate.value * localQuantity.value
+	
+	if (discountType.value === 'percentage') {
+		// Validate percentage
 		if (discountValue.value > 100) {
 			discountValue.value = 100
 		}
-		calculatedDiscount.value =
-			(calculatedSubtotal.value * discountValue.value) / 100
-	} else {
-		// Ensure amount doesn't exceed subtotal
-		if (discountValue.value > calculatedSubtotal.value) {
-			discountValue.value = calculatedSubtotal.value
+		if (discountValue.value < 0) {
+			discountValue.value = 0
 		}
-		calculatedDiscount.value = discountValue.value
+		// Calculate discount amount from percentage
+		calculatedDiscount.value = roundTo2((subtotal * discountValue.value) / 100)
+	} else {
+		// Amount discount
+		const maxDiscount = subtotal
+		if (discountValue.value > maxDiscount) {
+			discountValue.value = roundTo2(maxDiscount)
+		}
+		if (discountValue.value < 0) {
+			discountValue.value = 0
+		}
+		calculatedDiscount.value = roundTo2(discountValue.value)
 	}
-	calculatedTotal.value = calculatedSubtotal.value - calculatedDiscount.value
-}
-
-function calculateTotals() {
-	calculatedSubtotal.value = localRate.value * localQuantity.value
-	calculateDiscount()
-}
-
-function formatNumber(num) {
-	return Number.parseFloat(num || 0).toFixed(2)
 }
 
 function updateItem() {
+	// Calculate discount amount WITHOUT VAT for backend
+	let discountAmountForBackend = 0
+	if (discountType.value === 'percentage') {
+		// Percentage of base amount (no VAT)
+		discountAmountForBackend = roundTo2(baseAmount.value * (discountValue.value / 100))
+	} else {
+		// Remove VAT from the amount user entered
+		discountAmountForBackend = roundTo2(discountValue.value / (1 + VAT_RATE))
+	}
+	
 	const updatedItem = {
 		...localItem.value,
 		quantity: localQuantity.value,
 		uom: localUom.value,
 		rate: localRate.value,
 		warehouse: localWarehouse.value,
-		discount_percentage:
-			discountType.value === "percentage" ? discountValue.value : 0,
-		discount_amount:
-			discountType.value === "amount" ? discountValue.value : 0,
+		discount_percentage: discountType.value === "percentage" ? roundTo2(discountValue.value) : 0,
+		discount_amount: discountType.value === "amount" ? discountAmountForBackend : 0,
 	}
 
 	emit("update-item", updatedItem)
 	show.value = false
+}
+
+async function loadStockInfo() {
+	if (!localItem.value || !localItem.value.item_code) {
+		stockInfo.value = []
+		return
+	}
+	
+	loadingStock.value = true
+	try {
+		const result = await call("pos_next.api.items.get_item_stock_all_warehouses", {
+			item_code: localItem.value.item_code,
+		})
+		stockInfo.value = result?.message || result || []
+	} catch (error) {
+		console.error("Error loading stock information:", error)
+		stockInfo.value = []
+	} finally {
+		loadingStock.value = false
+	}
 }
 
 function cancel() {

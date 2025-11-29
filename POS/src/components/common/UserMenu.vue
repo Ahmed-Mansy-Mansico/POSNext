@@ -7,8 +7,14 @@
 			<div class="text-right hidden sm:block">
 				<p class="text-sm font-semibold text-gray-900">{{ userName }}</p>
 			</div>
-			<div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md">
-				<span class="text-sm font-bold text-white">{{ userInitials }}</span>
+			<div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-md overflow-hidden">
+				<img 
+					v-if="userImage" 
+					:src="userImage" 
+					:alt="userName"
+					class="w-full h-full object-cover"
+				/>
+				<span v-else class="text-sm font-bold text-white">{{ userInitials }}</span>
 			</div>
 			<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -63,6 +69,10 @@ const props = defineProps({
 	userName: {
 		type: String,
 		required: true,
+	},
+	userImage: {
+		type: String,
+		default: null,
 	},
 	profileName: {
 		type: String,

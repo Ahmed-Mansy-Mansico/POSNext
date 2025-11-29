@@ -12,7 +12,7 @@ function getCurrencySymbolOnly(currency) {
 	// Manual mapping for currencies that don't have good symbols in en-US
 	const symbolMap = {
 		EGP: "E£",
-		SAR: "\u00EA",
+		SAR: "SAR",
 		AED: "د.إ",
 		INR: "₹",
 		EUR: "€",

@@ -225,7 +225,7 @@
 										<span class="text-2xl mr-2">{{ getPaymentIcon(method.type) }}</span>
 										<div>
 											<div class="font-semibold text-sm text-gray-900">
-												{{ method.mode_of_payment }}
+												{{ method.mode_of_payment_display || method.mode_of_payment }}
 											</div>
 											<div class="text-xs text-gray-500">{{ method.type || "Cash" }}</div>
 										</div>
@@ -568,6 +568,20 @@ async function loadPaymentMethods() {
 	}
 }
 
+// Helper function to compare amounts with tolerance for floating-point precision
+function isAmountPaid(greaterThanOrEqual, paid, total) {
+	// Round both amounts to 2 decimal places (standard currency precision)
+	// This handles cases like 399.456 or 329.00005 by normalizing to 2 decimal places
+	const roundedPaid = Math.round(paid * 100) / 100
+	const roundedTotal = Math.round(total * 100) / 100
+	
+	// Use a small tolerance (0.01) to handle any remaining floating-point precision issues
+	// If the difference is less than 0.01, consider them equal
+	const tolerance = 0.01
+	const difference = Math.abs(roundedPaid - roundedTotal)
+	return greaterThanOrEqual ? roundedPaid >= roundedTotal || difference < tolerance : roundedPaid < roundedTotal && difference >= tolerance
+}
+
 const totalPaid = computed(() => {
 	return paymentEntries.value.reduce(
 		(sum, entry) => sum + (entry.amount || 0),
@@ -596,8 +610,8 @@ const canComplete = computed(() => {
 	if (props.allowPartialPayment) {
 		return totalPaid.value > 0 && paymentEntries.value.length > 0
 	}
-	// Otherwise require full payment
-	return totalPaid.value >= props.grandTotal && paymentEntries.value.length > 0
+	// Otherwise require full payment (use tolerance-based comparison)
+	return isAmountPaid(true, totalPaid.value, props.grandTotal) && paymentEntries.value.length > 0
 })
 
 const paymentButtonText = computed(() => {
@@ -605,10 +619,12 @@ const paymentButtonText = computed(() => {
 		totalPaid: totalPaid.value,
 		grandTotal: props.grandTotal,
 		allowPartialPayment: props.allowPartialPayment,
-		canComplete: canComplete.value
+		canComplete: canComplete.value,
+		difference: Math.abs(totalPaid.value - props.grandTotal)
 	})
 
-	if (totalPaid.value >= props.grandTotal) {
+	// Use tolerance-based comparison to handle floating-point precision
+	if (isAmountPaid(true, totalPaid.value, props.grandTotal)) {
 		return "Complete Payment"
 	}
 	if (props.allowPartialPayment && totalPaid.value > 0) {
@@ -693,7 +709,6 @@ watch(show, (newVal) => {
 	}
 })
 
-// One-click payment - adds remaining amount with selected method
 function quickAddPayment(method) {
 	console.log('[PaymentDialog] Quick add payment:', {
 		method: method.mode_of_payment,
@@ -706,34 +721,21 @@ function quickAddPayment(method) {
 	lastSelectedMethod.value = method
 
 	paymentEntries.value.push({
-		mode_of_payment: method.mode_of_payment,
+		mode_of_payment: method.original_name || method.mode_of_payment, // ← USE ORIGINAL NAME
 		amount: Number.parseFloat(remainingAmount.value.toFixed(2)),
 		type: method.type || "Cash",
 	})
-
-	console.log('[PaymentDialog] Payment added, new entries:', paymentEntries.value)
-	customAmount.value = ""
 }
 
-// Add custom amount for a method
 function addCustomPayment(method, amount) {
-	console.log('[PaymentDialog] Add custom payment:', {
-		method: method.mode_of_payment,
-		amount: amount,
-		currentEntries: paymentEntries.value.length
-	})
-
 	const amt = Number.parseFloat(amount)
 	if (!amt || amt <= 0) return
 
 	paymentEntries.value.push({
-		mode_of_payment: method.mode_of_payment,
+		mode_of_payment: method.original_name || method.mode_of_payment, // ← USE ORIGINAL NAME
 		amount: amt,
 		type: method.type || "Cash",
 	})
-
-	console.log('[PaymentDialog] Payment added, new entries:', paymentEntries.value)
-	customAmount.value = ""
 }
 
 // Apply existing customer credit to payment
@@ -818,7 +820,8 @@ function completePayment() {
 		return
 	}
 
-	const isPartial = totalPaid.value < props.grandTotal
+	// Use tolerance-based comparison to handle floating-point precision
+	const isPartial = !isAmountPaid(true, totalPaid.value, props.grandTotal)
 
 	const paymentData = {
 		payments: paymentEntries.value,

@@ -5,15 +5,19 @@
 		<div class="flex py-2 sm:py-3">
 			<!-- POS Icon - Aligned with Management Sidebar (64px) -->
 			<div class="w-16 flex-shrink-0 flex items-center justify-center">
-				<button
-					class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0 hover:from-blue-600 hover:to-blue-700 active:scale-95 transition-all"
-					:aria-label="'POS Next'"
-					title="POS Next"
+				<div
+					class="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md flex-shrink-0 overflow-hidden border border-gray-200"
+					:aria-label="'Vandy Vellucci'"
+					title="Vandy Vellucci"
 				>
-					<svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-						<path d="M20 7h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM10 4h4v3h-4V4zm10 16H4V9h16v11z"/>
-					</svg>
-				</button>
+					        <img 
+								:src="logoUrl" 
+								alt="Vandy Vellucci"
+								class="w-full h-full object-contain p-1"
+								@error="handleLogoError"
+								loading="eager"
+							/>
+				</div>
 			</div>
 
 			<!-- Main Header Content -->
@@ -22,7 +26,7 @@
 				<div class="flex items-center space-x-1 sm:space-x-4 min-w-0 flex-1">
 					<div class="min-w-0">
 						<div class="flex items-center gap-2">
-							<h1 class="text-xs sm:text-base font-bold text-gray-900 truncate">POS Next</h1>
+							<h1 class="text-xs sm:text-base font-bold text-gray-900 truncate">Vandy Vellucci</h1>
 							<span class="relative inline-flex items-center px-2 py-0.5 text-[9px] sm:text-[10px] font-bold bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-md shadow-sm hover:shadow-md transition-shadow">
 								<span class="absolute inset-0 bg-white/20 rounded-md animate-pulse"></span>
 								<span class="relative">v{{ appVersion }}</span>
@@ -218,6 +222,7 @@
 					<!-- User Menu -->
 					<UserMenu
 						:user-name="userName"
+						:user-image="userImage"
 						:profile-name="profileName"
 						@logout="$emit('logout')"
 						@menu-opened="$emit('menu-opened')"
@@ -242,6 +247,7 @@ import StatusBadge from "@/components/common/StatusBadge.vue"
 import UserMenu from "@/components/common/UserMenu.vue"
 import { ref } from "vue"
 import { version } from "../../../package.json"
+const logoUrl = '/files/vandy_logo_-Photoroom.avif'
 
 const showCacheTooltip = ref(false)
 const appVersion = version
@@ -291,6 +297,10 @@ const props = defineProps({
 	userName: {
 		type: String,
 		required: true,
+	},
+		userImage: {
+		type: String,
+		default: null,
 	},
 	isOffline: {
 		type: Boolean,

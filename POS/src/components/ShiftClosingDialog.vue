@@ -205,7 +205,7 @@
                       <span class="text-base md:text-xl">{{ getPaymentIcon(payment.mode_of_payment).icon }}</span>
                     </div>
                     <div>
-                      <h4 class="text-sm md:text-base font-semibold text-gray-900">{{ payment.mode_of_payment }}</h4>
+                      <h4 class="text-sm md:text-base font-semibold text-gray-900">{{ getPaymentMethodDisplayName(payment.mode_of_payment) }}</h4>
                       <p class="text-xs md:text-sm text-gray-600">
                         Expected: <span class="font-medium">{{ formatCurrency(payment.expected_amount) }}</span>
                       </p>
@@ -625,5 +625,24 @@ function getPaymentIcon(method) {
 		return { icon: "💰", color: "bg-gray-500" }
 	}
 }
+// Payment method name mapping
+const paymentMethodNames = {
+			"نقد": "Cash",
+			"تابي": "Tabi",
+			"تمارا": "Tamara",
+			"بطاقة": "Card",
+			"بطاقة ائتمان": "Credit Card",
+			"بطاقة مدين": "Debit Card",
+			"تحويل بنكي": "Bank Transfer",
+			"شيك": "Check",
+			"محفظة إلكترونية": "E-Wallet",
+}
+
+// Function to get display name
+function getPaymentMethodDisplayName(systemName) {
+	return paymentMethodNames[systemName] || systemName
+}
+
+
 </script>
 

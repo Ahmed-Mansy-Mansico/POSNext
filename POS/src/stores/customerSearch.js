@@ -66,7 +66,7 @@ export const useCustomerSearchStore = defineStore("customerSearch", () => {
 	// Getters - ULTRA OPTIMIZED for zero delay
 	const filteredCustomers = computed(() => {
 		const startTime = performance.now()
-		const term = searchTerm.value.trim()
+		const term = searchTerm.value.trim().toLowerCase()
 
 		// Show recent/frequent customers when no search term (CACHED)
 		if (!term) {
@@ -116,15 +116,26 @@ export const useCustomerSearchStore = defineStore("customerSearch", () => {
 		const maxResults = 50
 		let scanned = 0
 
+		console.log(`🔍 SEARCH: Looking for "${term}" in ${allCustomers.value.length} customers`)
+
 		// First pass: Get exact and high-scoring matches ONLY
 		for (const cust of allCustomers.value) {
 			scanned++
 			const score = quickMatch(term, cust)
 
+			// Log first few and any matches for debugging
+			if (scanned <= 3 || score > 0) {
+				console.log(`  [${scanned}] "${cust.customer_name}" (mobile: ${cust.mobile_no}) → score: ${score}`)
+			}
+
 			if (score >= 240) {
 				// High priority matches
+				console.log(`  ✅ MATCH (score ${score}): "${cust.customer_name}"`)
 				results.push({ customer: cust, score })
-				if (results.length >= maxResults) break // Exit immediately when we have enough
+				if (results.length >= maxResults) {
+					console.log(`  🛑 Found ${maxResults} results, stopping`)
+					break
+				}
 			}
 		}
 
@@ -255,22 +266,80 @@ export const useCustomerSearchStore = defineStore("customerSearch", () => {
 
 	async function addCustomerToCache(customer) {
 		try {
-			// Add to local array
+			console.log("📝 addCustomerToCache called for:", customer.customer_name)
+
+			// Add to local array (at the beginning for fast access)
 			const existingWithoutNew = allCustomers.value.filter(
 				(cust) => cust.name !== customer.name,
 			)
 			allCustomers.value = [customer, ...existingWithoutNew]
+			console.log("   Added to allCustomers array, total:", allCustomers.value.length)
 
 			// Cache in worker
 			await offlineWorker.cacheCustomers([customer])
+			console.log("   Cached in offline worker")
 
-			// Clear result cache to include new customer
+			// CRITICAL: Pre-build search index entry for the new customer
+			// This ensures it appears in searches immediately without waiting for lazy evaluation
+			const searchIndexEntry = {
+				name: (customer.customer_name || "").toLowerCase(),
+				mobile: (customer.mobile_no || "").toLowerCase(),
+				email: (customer.email_id || "").toLowerCase(),
+				id: (customer.name || "").toLowerCase(),
+				nameWords: (customer.customer_name || "").toLowerCase().split(" "),
+			}
+			searchIndex.value.set(customer.name, searchIndexEntry)
+			console.log("   Built search index entry")
+
+			// CRITICAL: Clear ALL result caches to force fresh search results
+			// This ensures the new customer appears in any search results
 			resultCache.value.clear()
+			console.log("   Cleared result cache")
 
-			console.log("✓ New customer cached for instant search")
+			// CRITICAL: Force Vue to re-evaluate filteredCustomers by clearing all cached results
+			// This ensures any active searches will re-run and find the new customer
+			// We do this by clearing the "empty" cache too (for no-search-term results)
+			resultCache.value.delete("empty")
+			console.log("   Cleared empty cache for no-search results")
+
+			// CRITICAL: Force re-trigger of the search if there's an active search term
+			// This forces Vue to re-compute filteredCustomers
+			if (searchTerm.value && searchTerm.value.trim().length > 0) {
+				console.log("   Triggering search refresh for active term:", searchTerm.value)
+				// Temporarily clear search term, then set it back to force re-computation
+				const originalTerm = searchTerm.value
+				searchTerm.value = ""
+				// Use nextTick to ensure Vue processes the change
+				await new Promise(resolve => setTimeout(resolve, 0))
+				searchTerm.value = originalTerm
+				console.log("   ✅ Search refresh triggered for term:", originalTerm)
+			} else {
+				console.log("   No active search term, cache will be rebuilt on next search")
+			}
+
+			// Also update recommendations to include new customer
+			// This helps in quick-access scenarios
+			recentSearches.value = [customer.name, ...recentSearches.value].slice(0, 10)
+			console.log("   Updated recent searches")
+
+			console.log("✅ New customer fully cached and indexed for instant search:", {
+				customerName: customer.customer_name,
+				mobile: customer.mobile_no,
+				allCustomersCount: allCustomers.value.length,
+				searchIndexSize: searchIndex.value.size,
+				resultCacheSize: resultCache.value.size,
+			})
 		} catch (error) {
-			console.error("Error caching newly created customer:", error)
+			console.error("❌ Error caching newly created customer:", error)
 		}
+	}
+
+	function clearSearchIndexForCustomer(customerName) {
+		// Note: This function is now redundant since addCustomerToCache pre-builds the index
+		// But kept for backwards compatibility and explicit clearing if needed
+		searchIndex.value.delete(customerName)
+		resultCache.value.clear()
+		console.log("✓ Search index cleared for customer:", customerName)
 	}
 
 	function setSearchTerm(term) {
@@ -353,6 +422,7 @@ export const useCustomerSearchStore = defineStore("customerSearch", () => {
 		// Actions
 		loadAllCustomers,
 		addCustomerToCache,
+		clearSearchIndexForCustomer,
 		setSearchTerm,
 		clearSearch,
 		setSelectedIndex,

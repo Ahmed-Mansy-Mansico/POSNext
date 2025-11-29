@@ -1,4 +1,5 @@
 <template>
+	<div>
 	<!-- Full Page Overlay -->
 	<Transition name="fade">
 		<div
@@ -479,7 +480,7 @@
 														</svg>
 													</button>
 													<button
-														@click="$emit('print-invoice', invoice)"
+														@click="$emit('print-invoice-from-print-view', invoice)"
 														class="p-1.5 hover:bg-green-50 rounded transition-colors"
 														title="Print"
 													>
@@ -510,6 +511,7 @@
 		:allow-partial-payment="true"
 		@payment-completed="handlePaymentCompleted"
 	/>
+	</div>
 </template>
 
 <script setup>

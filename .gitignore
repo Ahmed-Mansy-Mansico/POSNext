@@ -60,4 +60,6 @@ dev-dist/
 # Vite
 .vite/
 *.png
+# Allow flag images for country code selector
+!POS/public/flags/*.png
 .playwright-mcp/*

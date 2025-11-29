@@ -11,7 +11,8 @@
 				:shift-duration="shiftStore.shiftDuration"
 				:has-open-shift="shiftStore.hasOpenShift"
 				:profile-name="shiftStore.profileName"
-				:user-name="getCurrentUser()"
+				:user-name="currentUser"
+				:user-image="currentUserImage"
 				:is-offline="offlineStore.isOffline"
 				:is-syncing="offlineStore.isSyncing"
 				:pending-invoices-count="offlineStore.pendingInvoicesCount"
@@ -227,6 +228,12 @@
 						@remove-offer="offer => cartStore.removeOffer(offer, shiftStore.currentProfile, offersDialogRef.value)"
 						@update-uom="cartStore.changeItemUOM"
 						@edit-item="handleEditItem"
+						@view-shift="showInvoiceManagement = true"
+						@show-drafts="uiStore.showDraftDialog = true"
+						@show-history="uiStore.showHistoryDialog = true"
+						@show-return="uiStore.showReturnDialog = true"
+						@close-shift="uiStore.showCloseShiftDialog = true"
+						@logout="uiStore.showLogoutDialog = true"
 					/>
 				</div>
 			</keep-alive>
@@ -277,8 +284,8 @@
 		<!-- Payment Dialog -->
 		<PaymentDialog
 			v-model="uiStore.showPaymentDialog"
-			:grand-total="cartStore.grandTotal"
-			:subtotal="cartStore.subtotal"
+			:grand-total="paymentGrandTotal"
+			:subtotal="paymentSubtotal"
 			:pos-profile="shiftStore.profileName"
 			:currency="shiftStore.profileCurrency"
 			:is-offline="offlineStore.isOffline"
@@ -399,6 +406,7 @@
 			v-model="uiStore.showCreateCustomerDialog"
 			:pos-profile="shiftStore.profileName"
 			:initial-name="uiStore.initialCustomerName"
+			:initial-phone="uiStore.initialCustomerPhone"
 			@customer-created="handleCustomerCreated"
 		/>
 
@@ -428,6 +436,7 @@
 			:draft-invoices="draftsStore.drafts"
 			@view-invoice="handleViewInvoice"
 			@print-invoice="handlePrintInvoiceFromManagement"
+			@print-invoice-from-print-view="handlePrintInvoiceFromPrintView"
 			@load-draft="handleLoadDraftFromManagement"
 			@delete-draft="handleDeleteDraft"
 			@refresh-history="loadInvoiceHistoryData"
@@ -582,7 +591,11 @@
 					<Button variant="subtle" @click="uiStore.showSuccessDialog = false">
 						Close
 					</Button>
-					<Button variant="solid" theme="blue" @click="handlePrintInvoice">
+					<!-- <Button variant="solid" theme="blue" @click="handlePrintInvoice">
+						Print Invoice
+					</Button> -->
+					<!-- replace with print invoice from print view -->
+					<Button variant="solid" theme="blue" @click="handlePrintInvoiceFromPrintView">
 						Print Invoice
 					</Button>
 				</div>
@@ -670,7 +683,7 @@ import { usePOSEvents } from "@/composables/usePOSEvents"
 import { session } from "@/data/session"
 import { parseError } from "@/utils/errorHandler"
 import { offlineWorker } from "@/utils/offline/workerClient"
-import { printInvoiceByName } from "@/utils/printInvoice"
+import { printInvoiceByName, printInvoiceFromPrintView } from "@/utils/printInvoice"
 import { Button, Dialog, createResource, toast } from "frappe-ui"
 import { call } from "@/utils/apiWrapper"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
@@ -678,6 +691,7 @@ import { useToast } from "@/composables/useToast"
 
 import { useItemSearchStore } from "@/stores/itemSearch"
 import { useStockStore } from "@/stores/stock"
+import { useCustomerSearchStore } from "@/stores/customerSearch"
 // Pinia Stores
 import { usePOSCartStore } from "@/stores/posCart"
 import { usePOSDraftsStore } from "@/stores/posDrafts"
@@ -691,12 +705,30 @@ import { logger } from "@/utils/logger"
 const cartStore = usePOSCartStore()
 const shiftStore = usePOSShiftStore()
 const uiStore = usePOSUIStore()
+const customerSearchStore = useCustomerSearchStore()
 const offlineStore = usePOSSyncStore()
 const draftsStore = usePOSDraftsStore()
 const posSettingsStore = usePOSSettingsStore()
 const itemStore = useItemSearchStore()
 const stockStore = useStockStore()
 const settingsStore = usePOSSettingsStore()
+
+// Reactive user data
+const currentUser = ref("User")
+const currentUserImage = ref(null)
+
+// Initialize user data
+const initializeUserData = async () => {
+	try {
+		const userData = await fetchUserData()
+		currentUser.value = userData.fullName
+		currentUserImage.value = userData.userImage
+	} catch (error) {
+		console.warn('Could not load user data:', error)
+		currentUser.value = "User"
+		currentUserImage.value = null
+	}
+}
 
 // Real-time stock updates
 const { onStockUpdate } = useRealtimeStock()
@@ -719,6 +751,10 @@ const pendingPaymentAfterCustomer = ref(false)
 const logoutAfterClose = ref(false)
 const showClearCacheDialog = ref(false)
 const clearCacheOverlayRef = ref(null)
+
+// Payment dialog values 
+const paymentGrandTotal = ref(0)
+const paymentSubtotal = ref(0)
 
 // Debounce timer for offer reapplication
 const offerReapplyTimer = ref(null)
@@ -808,6 +844,9 @@ let resizeState = null
 let bodyStyleSnapshot = null
 
 onMounted(async () => {
+	// Initialize user data
+	await initializeUserData()
+
 	// Window resize listeners (passive for better performance)
 	const handleResize = () => {
 		uiStore.setWindowWidth(window.innerWidth)
@@ -1321,28 +1360,28 @@ async function handleItemSelected(item, autoAdd = false) {
 		return
 	}
 
-	// Check for UOMs
-	if (item.item_uoms && item.item_uoms.length > 0) {
-		cartStore.setPendingItem(item, 1, "uom")
-		uiStore.showItemSelectionDialog = true
-		return
-	}
-
+	// Skip UOM dialog - automatically use stock UOM and add to cart directly
 	// Check for batch/serial
 	if (item.has_batch_no || item.has_serial_no) {
 		cartStore.setPendingItem(item, 1)
 		uiStore.showBatchSerialDialog = true
 		return
 	}
-
+	// Check for UOMs
+    // if (item.item_uoms && item.item_uoms.length > 0) {
+    //     cartStore.setPendingItem(item, 1, "uom")
+    //     uiStore.showItemSelectionDialog = true
+    //     return
+    // }
 	// Fetch item details with pricing rules before adding to cart
+	// Use stock UOM by default (bypass UOM selection dialog)
 	try {
 		const itemDetails = await cartStore.getItemDetailsResource.submit({
 			item_code: item.item_code,
 			pos_profile: shiftStore.currentProfile?.name || cartStore.posProfile,
 			customer: cartStore.customer?.name || cartStore.customer,
 			qty: 1,
-			uom: item.uom || item.stock_uom,
+			uom: item.uom || item.stock_uom, // Use stock UOM by default
 		})
 
 		// Merge the fetched pricing details with the original item
@@ -1410,8 +1449,40 @@ function handleCustomerSelected(selectedCustomer) {
 }
 
 function handleCreateCustomer(searchValue) {
-	uiStore.setInitialCustomerName(searchValue || "")
+	const value = (searchValue || "").trim()
+	
+	// Check if it's a phone number
+	const isPhone = isPhoneNumberValue(value)
+	
+	if (isPhone) {
+		// It's a phone number - set initialPhone, not initialName
+		uiStore.setInitialCustomerPhone(value)
+		uiStore.setInitialCustomerName("")
+		console.log("✅ handleCreateCustomer: Setting as PHONE:", value)
+	} else {
+		// It's a name - set initialName, not initialPhone
+		uiStore.setInitialCustomerName(value)
+		uiStore.setInitialCustomerPhone("")
+		console.log("✅ handleCreateCustomer: Setting as NAME:", value)
+	}
+	
 	uiStore.showCreateCustomerDialog = true
+}
+
+// Helper function to check if value is a phone number
+function isPhoneNumberValue(term) {
+	if (!term || typeof term !== 'string') {
+		return false
+	}
+	
+	const cleanTerm = term.trim().replace(/\s+/g, "")
+	if (cleanTerm.length === 0) {
+		return false
+	}
+	
+	// Pattern: optional +, followed by 5+ digits
+	const phonePattern = /^\+?\d{5,}$/
+	return phonePattern.test(cleanTerm)
 }
 
 function handleProceedToPayment() {
@@ -1437,6 +1508,33 @@ function handleProceedToPayment() {
 		pendingPaymentAfterCustomer.value = true
 		return
 	}
+		// Calculate Net (subtotal without VAT)
+	let calculatedNet = 0
+	cartStore.invoiceItems.forEach(item => {
+		const originalPrice = item.price_list_rate || item.rate || 0
+		const totalDiscount = item.discount_amount || 0
+		const discountPerUnit = item.quantity > 0 ? totalDiscount / item.quantity : 0
+		
+		let discountPerUnitFinal = 0
+		if (item.discount_percentage && item.discount_percentage > 0) {
+			discountPerUnitFinal = originalPrice * (item.discount_percentage / 100)
+		} else {
+			discountPerUnitFinal = discountPerUnit
+		}
+		
+		const netRatePerUnit = originalPrice - discountPerUnitFinal
+		calculatedNet += netRatePerUnit * item.quantity
+	})
+
+	// Calculate Tax 
+	const calculatedTax = calculatedNet * 0.15
+
+	// Calculate Grand Total 
+	const calculatedGrandTotal = calculatedNet + calculatedTax
+
+	// Set values for payment dialog
+	paymentGrandTotal.value = calculatedGrandTotal
+	paymentSubtotal.value = calculatedNet
 
 	uiStore.showPaymentDialog = true
 }
@@ -1707,15 +1805,32 @@ function formatCurrency(amount) {
 	return Number.parseFloat(amount || 0).toFixed(2)
 }
 
-function getCurrentUser() {
-	if (typeof window !== "undefined" && window.frappe?.session) {
-		return (
-			window.frappe.session.user_fullname ||
-			window.frappe.session.user ||
-			"User"
-		)
+// Server call to get user data
+async function fetchUserData() {
+	try {
+		// Get the current user email first
+		const userResponse = await call('frappe.auth.get_logged_user')
+		const userEmail = userResponse.message || userResponse
+		
+		// Then fetch the User document to get full name and image
+		const userDoc = await call('frappe.client.get', {
+			doctype: 'User',
+			name: userEmail
+		})
+		
+		console.log('User data:', userDoc)
+		
+		return {
+			fullName: userDoc?.full_name || userDoc?.first_name || userEmail || 'User',
+			userImage: userDoc?.user_image || null
+		}
+	} catch (error) {
+		console.warn('Error fetching user data:', error)
+		return {
+			fullName: 'User',
+			userImage: null
+		}
 	}
-	return "User"
 }
 
 function confirmLogout() {
@@ -1824,7 +1939,18 @@ function handleCreateReturnFromHistory(invoice) {
 	})
 }
 
-function handleCustomerCreated(newCustomer) {
+async function handleCustomerCreated(newCustomer) {
+	// Add the newly created customer to the search cache
+	// so it appears in search results immediately without refresh
+	if (newCustomer && newCustomer.customer_name) {
+		await customerSearchStore.addCustomerToCache(newCustomer)
+		
+		console.log("✅ POSSale handleCustomerCreated: Customer added to search cache:", {
+			name: newCustomer.customer_name,
+			mobile: newCustomer.mobile_no,
+		})
+	}
+	
 	cartStore.setCustomer(newCustomer)
 	uiStore.showCreateCustomerDialog = false
 	toast.create({
@@ -2187,6 +2313,38 @@ function handleViewInvoice(invoice) {
 // Note: handlePrintInvoice already exists above, will reuse it for invoice param
 function handlePrintInvoiceFromManagement(invoice) {
 	printInvoiceByName(invoice.name, shiftStore.profileName)
+}
+
+async function handlePrintInvoiceFromPrintView(invoice) {
+	try {
+		// If invoice is provided (from event), use it; otherwise use last invoice from success dialog
+		const invoiceData = invoice.name|| (uiStore.lastInvoiceName ? { name: uiStore.lastInvoiceName, doctype: "Sales Invoice" } : null)
+		
+		if (!invoiceData) {
+			toast.create({
+				title: "Print Error",
+				text: "No invoice available to print",
+				icon: "alert-circle",
+				iconClasses: "text-red-600",
+			})
+			return
+		}
+
+		await printInvoiceFromPrintView(invoiceData,'POS Sales Invoice Print')
+		
+		// Close success dialog if it's open
+		if (uiStore.showSuccessDialog) {
+			uiStore.showSuccessDialog = false
+		}
+	} catch (error) {
+		log.error("Error printing invoice:", error)
+		toast.create({
+			title: "Print Error",
+			text: "Failed to print invoice. Please try again.",
+			icon: "alert-circle",
+			iconClasses: "text-red-600",
+		})
+	}
 }
 
 // Note: handleLoadDraft already exists above, will delegate to it
