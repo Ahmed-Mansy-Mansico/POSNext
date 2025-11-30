@@ -343,30 +343,38 @@
 
 						<!-- Item Details -->
 						<div class="min-w-0">
-							<h3 class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate max-w-[20ch] mb-0.5 leading-tight" :title="item.item_name">
+							<!-- Item Name -->
+							<h3 class="text-[10px] sm:text-xs font-semibold text-gray-900 truncate max-w-[20ch] mb-1 leading-tight" :title="item.item_name">
 								{{ item.item_name }}
 							</h3>
+							
+							<!-- Pricing Section -->
 							<div class="text-[8px] sm:text-[9px] text-gray-500 leading-tight space-y-0.5">
-								<!-- List Price -->
-								<div v-if="item.price_list_rate" class="flex items-center justify-between">
-									<span class="text-gray-400">List:</span>
-									<span class="font-medium text-gray-600">{{ formatCurrency(item.price_list_rate) }}</span>
+								<!-- Item Code -->
+								<div class="flex items-center justify-between">
+									<span class="text-gray-400">Code:</span>
+									<span class="font-medium text-gray-600 truncate ml-1 text-[9px]" :title="item.item_code">
+										{{ item.item_code }}
+									</span>
 								</div>
 								
-								<!-- Discount Amount -->
+								<!-- Discount Amount (if applicable) -->
 								<div v-if="item.discount_amount && item.discount_amount > 0" class="flex items-center justify-between">
 									<span class="text-red-500">Discount:</span>
 									<span class="font-medium text-red-600">-{{ formatCurrency(item.discount_amount) }}</span>
 								</div>
 								
-								<!-- Final Rate -->
-								<div class="flex items-center justify-between border-t border-gray-200 pt-0.5">
-									<span class="font-semibold text-blue-600 text-[9px] sm:text-[10px]">Price:</span>
+								<!-- Final Rate with VAT -->
+								<div class="border-t border-gray-200 pt-1 mt-1">
 									<div class="text-right">
-										<div class="font-bold text-blue-600 text-[10px] sm:text-xs">
-											{{ formatCurrency(item.rate || item.price_list_rate || 0) }}
+										<!-- Price with VAT included -->
+										<div class="font-bold text-blue-600 text-[11px] sm:text-sm">
+											{{ formatCurrencyWithVAT(item.rate || item.price_list_rate || 0) }}
 										</div>
-										<div class="text-gray-400 text-[8px]">/ {{ item.uom || item.stock_uom || 'Nos' }}</div>
+										<!-- VAT Info -->
+										<div class="text-gray-400 text-[8px]">
+											(Incl. {{ getVATPercentage() }}% VAT)
+										</div>
 									</div>
 								</div>
 							</div>
@@ -380,13 +388,13 @@
 					<p class="ml-2 text-xs text-gray-500">Loading more items...</p>
 				</div>
 
-				<!-- End of Results Indicator - Only show when browsing (not searching) -->
-				<div v-else-if="!hasMore && filteredItems.length > 0 && !searchTerm" class="flex justify-center items-center py-3">
+				<!-- End of Results Indicator -->
+				<div v-else-if="!hasMore && filteredItems && filteredItems.length > 0 && !searchTerm" class="flex justify-center items-center py-3">
 					<p class="text-xs text-gray-400">All items loaded</p>
 				</div>
 
 				<!-- Search Results Count -->
-				<div v-else-if="searchTerm && filteredItems.length > 0" class="flex justify-center items-center py-3">
+				<div v-else-if="searchTerm && filteredItems && filteredItems.length > 0" class="flex justify-center items-center py-3">
 					<p class="text-xs text-gray-500">{{ filteredItems.length }} items found</p>
 				</div>
 			</div>
@@ -931,6 +939,47 @@ function formatCurrency(amount, currency) {
 	return formatCurrencyUtil(Number.parseFloat(amount || 0), currency || props.currency)
 }
 
+// VAT percentage state (will be loaded from POS Profile)
+const vatPercentage = ref(15) // Default 15%, will be updated from POS Profile
+
+// Get VAT percentage from POS Profile
+function getVATPercentage() {
+	return vatPercentage.value || 15
+}
+
+// Format currency with VAT included
+function formatCurrencyWithVAT(amount) {
+	const baseAmount = Number.parseFloat(amount || 0)
+	const vatRate = getVATPercentage()
+	const vatAmount = baseAmount * (vatRate / 100)
+	const totalWithVAT = baseAmount + vatAmount
+	return formatCurrencyUtil(totalWithVAT, props.currency)
+}
+
+// Load VAT from POS Profile
+async function loadVATFromProfile() {
+	if (!props.posProfile) return
+	
+	try {
+		const profile = await call('frappe.client.get', {
+			doctype: 'POS Profile',
+			name: props.posProfile
+		})
+		
+		// Try to get tax rate from the profile
+		if (profile && profile.taxes && profile.taxes.length > 0) {
+			// Get the first tax row's rate
+			const firstTax = profile.taxes[0]
+			if (firstTax.rate) {
+				vatPercentage.value = Number.parseFloat(firstTax.rate)
+			}
+		}
+	} catch (error) {
+		console.warn('Could not load VAT from POS Profile, using default 15%:', error)
+		vatPercentage.value = 15
+	}
+}
+
 // Load employee performance data
 const performanceResource = createResource({
 	url: "pos_next.api.invoices.get_employee_performance",
@@ -987,6 +1036,7 @@ watch(
 	(newProfile) => {
 		if (newProfile) {
 			itemStore.setPosProfile(newProfile)
+			loadVATFromProfile()
 		}
 	},
 	{ immediate: true },
@@ -1071,6 +1121,7 @@ onMounted(() => {
 	if (props.posProfile) {
 		itemStore.loadAllItems(props.posProfile)
 		itemStore.loadItemGroups()
+		loadVATFromProfile()
 	}
 
 	// Add passive scroll listeners for better performance

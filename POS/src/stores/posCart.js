@@ -9,6 +9,7 @@ import {
 import { useToast } from "@/composables/useToast"
 import { defineStore } from "pinia"
 import { computed, nextTick, ref, watch } from "vue"
+import { call } from 'frappe-ui'
 
 export const usePOSCartStore = defineStore("posCart", () => {
 	// Use the existing invoice composable for core functionality
@@ -570,6 +571,79 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		}
 	}
 
+	// Apply backend custom offers before submitting invoice
+	async function applyBackendCustomOffers() {
+		if (offersStore.customOffers.length === 0) {
+			console.log(' No custom offers to apply')
+			return true
+		}
+		
+		console.log(' Syncing custom offers with backend...')
+		
+		try {
+			// Build invoice doc for backend
+			const invoiceDoc = {
+				doctype: "Sales Invoice",
+				is_pos: 1,
+				pos_profile: posProfile.value,
+				customer: customer.value?.name || customer.value,
+				items: invoiceItems.value.map(item => ({
+					item_code: item.item_code,
+					item_name: item.item_name,
+					qty: item.quantity,
+					rate: item.rate,
+					price_list_rate: item.price_list_rate || item.rate,
+					discount_percentage: item.discount_percentage || 0,
+					discount_amount: item.discount_amount || 0,
+					uom: item.uom,
+					warehouse: item.warehouse,
+					conversion_factor: item.conversion_factor || 1
+				}))
+			}
+			
+			const response = await call('pos_next.api.pos_offers.apply_any3for249_to_invoice', {
+				doc: JSON.stringify(invoiceDoc)
+			})
+			
+			if (response) {
+				const updatedDoc = response
+				
+				// Update cart items with backend-calculated pricing
+				if (updatedDoc.items && Array.isArray(updatedDoc.items)) {
+					
+					updatedDoc.items.forEach((backendItem, index) => {
+						if (invoiceItems.value[index]) {
+							const cartItem = invoiceItems.value[index]
+							
+							
+							// Apply backend pricing
+							cartItem.rate = backendItem.rate
+							cartItem.discount_amount = backendItem.discount_amount
+							cartItem.discount_percentage = backendItem.discount_percentage
+							cartItem.amount = backendItem.amount
+							
+							// Recalculate
+							recalculateItem(cartItem)
+						}
+					})
+					
+					// Rebuild cache
+					rebuildIncrementalCache()
+					
+				}
+				
+				return true
+			}
+			
+			return false
+			
+		} catch (error) {
+			console.error(' Error applying backend custom offers:', error)
+			showError('Failed to apply promotional pricing. Please try again.')
+			return false
+		}
+	}
+
 	// Performance: Cache previous item codes hash to avoid unnecessary recalculations
 	let previousItemCodesHash = ""
 	let cachedItemCodes = []
@@ -761,6 +835,24 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		{ immediate: true, flush: "post" },
 	)
 
+	async function submitInvoiceWithBackendOffers(...args) {
+
+		if (offersStore.customOffers.length > 0) {
+			
+			const success = await applyBackendCustomOffers()
+			
+			if (!success) {
+				console.warn(' Backend pricing failed, but continuing with frontend pricing...')
+				
+			}
+		} else {
+			console.log(' No custom offers, proceeding with normal submit')
+		}
+		
+		
+		return await submitInvoice(...args)
+	}
+
 	return {
 		// State
 		invoiceItems,
@@ -793,7 +885,8 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		setPendingItem,
 		clearPendingItem,
 		loadTaxRules,
-		submitInvoice,
+		submitInvoice: submitInvoiceWithBackendOffers,
+		applyBackendCustomOffers,
 		applyDiscountToCart,
 		removeDiscountFromCart,
 		applyOffer,

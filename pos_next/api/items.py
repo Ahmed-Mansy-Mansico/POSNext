@@ -510,13 +510,7 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			"ifnull(variant_of, '')": "",  # Exclude items that are variants of a template
 		}
 
-		# IMPORTANT: Filtering logic explained:
-		# - Template items (has_variants=1) are shown → users select variants via dialog
-		# - Regular items (has_variants=0, variant_of is null) are shown → direct add to cart
-		# - Variant items (has_variants=0, variant_of is not null) are HIDDEN from main list
-
 		# Add company filter - show items for specific company + global items (empty company)
-		# Global items (custom_company is empty) are available to all companies
 		if pos_profile_doc.company:
 			filters["ifnull(custom_company, '')"] = ["in", [pos_profile_doc.company, ""]]
 
@@ -570,7 +564,6 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			items = frappe.db.sql(query, tuple(params), as_dict=1)
 			
 			# When searching for template items, also include their variants in results
-			# Check if any of the search results are template items (has_variants=1)
 			template_items = [item for item in items if item.get("has_variants")]
 			if template_items:
 				# Get all variants for template items that match the search
@@ -600,20 +593,7 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			items = frappe.get_list(
 				"Item",
 				filters=filters,
-				fields=[
-					"name as item_code",
-					"item_name",
-					"description",
-					"stock_uom",
-					"image",
-					"is_stock_item",
-					"has_batch_no",
-					"has_serial_no",
-					"item_group",
-					"brand",
-					"has_variants",
-					"custom_company",
-				],
+				fields=ITEM_RESULT_FIELDS,
 				start=start,
 				page_length=limit,
 				order_by="item_name asc",
@@ -671,10 +651,38 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			for price in prices:
 				uom_prices_map.setdefault(price["item_code"], {})[price["uom"]] = price["price_list_rate"]
 
-		# Batch query stock for all items at once (performance optimization)
+		# **NEW: Get template items for quantity aggregation**
+		template_items = [item for item in items if item.get("has_variants")]
+		template_codes = [item["item_code"] for item in template_items] if template_items else []
+		
+		# **NEW: Batch query aggregated quantities for template items**
+		template_qty_map = {}
+		template_variant_count_map = {}
+		if template_codes and pos_profile_doc.warehouse:
+			# Get aggregated quantities from all variants
+			aggregated_qty = frappe.db.sql(
+				"""
+				SELECT 
+					i.variant_of as template_code,
+					COALESCE(SUM(b.actual_qty), 0) as total_qty,
+					COUNT(DISTINCT i.name) as variant_count
+				FROM `tabItem` i
+				LEFT JOIN `tabBin` b ON b.item_code = i.name AND b.warehouse = %s
+				WHERE i.variant_of IN %s
+				AND i.disabled = 0
+				AND i.is_sales_item = 1
+				GROUP BY i.variant_of
+				""",
+				[pos_profile_doc.warehouse, template_codes],
+				as_dict=1,
+			)
+			template_qty_map = {row["template_code"]: row["total_qty"] for row in aggregated_qty}
+			template_variant_count_map = {row["template_code"]: row["variant_count"] for row in aggregated_qty}
+
+		# Batch query stock for regular items (non-templates)
 		stock_map = {}
 		if item_codes and pos_profile_doc.warehouse:
-			stock_items = [item["item_code"] for item in items if item.get("is_stock_item")]
+			stock_items = [item["item_code"] for item in items if item.get("is_stock_item") and not item.get("has_variants")]
 			if stock_items:
 				stocks = frappe.db.sql(
 					"""
@@ -690,6 +698,17 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 		# Enrich items with price, stock, barcode, and UOM data
 		for item in items:
 			stock_uom = item.get("stock_uom")
+
+			# **NEW: Handle template items with aggregated quantity**
+			if item.get("has_variants"):
+				# Use aggregated quantity from all variants
+				item["actual_qty"] = template_qty_map.get(item["item_code"], 0)
+				item["is_aggregated"] = True
+				item["variant_count"] = template_variant_count_map.get(item["item_code"], 0)
+			else:
+				# Regular item - use pre-loaded stock map
+				item["actual_qty"] = stock_map.get(item["item_code"], 0) if item.get("is_stock_item") else 0
+				item["is_aggregated"] = False
 
 			# Use pre-loaded price map instead of per-item queries
 			price_row = None
@@ -756,9 +775,6 @@ def get_items(pos_profile, search_term=None, item_group=None, start=0, limit=20)
 			item["price_uom"] = display_uom
 			item["conversion_factor"] = 1
 			item["price_list_rate_price_uom"] = display_rate
-
-			# Stock - use pre-loaded stock map (performance optimization)
-			item["actual_qty"] = stock_map.get(item["item_code"], 0) if item.get("is_stock_item") else 0
 
 			# Add warehouse to item (needed for stock validation)
 			item["warehouse"] = pos_profile_doc.warehouse

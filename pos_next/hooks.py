@@ -188,6 +188,8 @@ doc_events = {
 	"Sales Invoice": {
 		"on_submit": "pos_next.realtime_events.emit_stock_update_event",
 		"on_cancel": "pos_next.realtime_events.emit_stock_update_event",
+		"before_save": "pos_next.api.pos_offers.auto_apply_any3for249",
+        "validate": "pos_next.api.pos_offers.auto_apply_any3for249",
 		"after_insert": "pos_next.realtime_events.emit_invoice_created_event"
 	}
 }
