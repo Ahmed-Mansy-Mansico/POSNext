@@ -161,6 +161,8 @@ export const usePOSOffersStore = defineStore("posOffers", () => {
 	async function calculateCustomOffers() {
 		
 		const items = cartSnapshot.value.items || []
+
+		customOffers.value = []
 		
 		if (items.length === 0) {
 			customOffers.value = []

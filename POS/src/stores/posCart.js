@@ -48,6 +48,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 	const appliedCoupon = ref(null)
 	const selectionMode = ref("uom") // 'uom' or 'variant'
 	const suppressOfferReapply = ref(false)
+	const originalItemPricing = ref(new Map())
 
 	// Toast composable
 	const { showSuccess, showError, showWarning } = useToast()
@@ -128,6 +129,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		customer.value = null
 		appliedOffers.value = []
 		appliedCoupon.value = null
+		originalItemPricing.value.clear()
 	}
 
 	function setCustomer(selectedCustomer) {
@@ -686,14 +688,38 @@ export const usePOSCartStore = defineStore("posCart", () => {
 	}
 	// NEW: Apply custom offer discounts to actual cart items
 	function applyCustomOffersToCart() {
-	
 		const offers = offersStore.customOffers
-		console.log('📋 Offers to apply:', offers)
 		
+		//  CRITICAL: If no offers, RESTORE original pricing (don't just reset to zero)
 		if (offers.length === 0) {
+			console.log(' No offers available - restoring original pricing')
+			
+			// Remove offer from appliedOffers display
+			appliedOffers.value = appliedOffers.value.filter(o => o.code !== 'any3for249')
+			
+			// Restore all items to their ORIGINAL pricing (before custom offers)
+			invoiceItems.value.forEach(item => {
+				const originalPricing = originalItemPricing.value.get(item.item_code)
+				
+				if (originalPricing) {
+					console.log(`  Restoring ${item.item_code} to original pricing:`, originalPricing)
+					
+					// Restore original pricing
+					item.rate = originalPricing.rate
+					item.discount_amount = originalPricing.discount_amount
+					item.discount_percentage = originalPricing.discount_percentage
+					item.pricing_rules = originalPricing.pricing_rules
+					
+					// Recalculate with restored values
+					recalculateItem(item)
+				} else {
+					console.log(`  No original pricing stored for ${item.item_code}, skipping`)
+				}
+			})
+			
+			rebuildIncrementalCache()
 			return
 		}
-		
 
 		// Prevent infinite loops
 		suppressOfferReapply.value = true
@@ -707,7 +733,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 				
 				invoiceItems.value.forEach((item, index) => {
 					const isException = offersStore.isExceptionItem(item.item_code)
-					console.log(`  ${index + 1}. ${item.item_code}: ${isException ? '🚫 EXCEPTION' : '✅ NORMAL'}`)
+					console.log(`  ${index + 1}. ${item.item_code}: ${isException ? ' EXCEPTION' : ' NORMAL'}`)
 					
 					if (isException) {
 						exceptionItems.push(item)
@@ -715,7 +741,6 @@ export const usePOSCartStore = defineStore("posCart", () => {
 						normalItems.push(item)
 					}
 				})
-				
 				
 				if (normalItems.length === 0) {
 					suppressOfferReapply.value = false
@@ -728,12 +753,24 @@ export const usePOSCartStore = defineStore("posCart", () => {
 					totalNormalQty += item.quantity || 1
 				})
 				
-				
-				// Only apply if we have at least 3 normal items
+				//  CRITICAL CHECK: Only apply if we have at least 3 normal items
 				if (totalNormalQty < 3) {
+					console.log(` Not enough items (need 3, have ${totalNormalQty}) - SKIPPING offer`)
 					suppressOfferReapply.value = false
 					return
 				}
+				
+				//  SAVE ORIGINAL PRICING before applying custom offer
+				normalItems.forEach(item => {
+					if (!originalItemPricing.value.has(item.item_code)) {
+						originalItemPricing.value.set(item.item_code, {
+							rate: item.rate,
+							discount_amount: item.discount_amount || 0,
+							discount_percentage: item.discount_percentage || 0,
+							pricing_rules: item.pricing_rules ? [...item.pricing_rules] : []
+						})
+					}
+				})
 				
 				// Calculate pricing
 				const sets = Math.floor(totalNormalQty / 3)
@@ -769,13 +806,13 @@ export const usePOSCartStore = defineStore("posCart", () => {
 				const newRatePerItem = grandTotal / totalNormalQty
 				
 				
-				//  IMPORTANT: Apply discount ONLY to normal items
 				// Exception items are left completely untouched
 				normalItems.forEach(item => {
 					const originalRate = item.price_list_rate || item.rate || 0
 					const discountAmount = originalRate - newRatePerItem
 					const discountPercentage = originalRate > 0 ? (discountAmount / originalRate) * 100 : 0
 					
+					console.log(`  ${item.item_code}: ${originalRate.toFixed(2)} → ${newRatePerItem.toFixed(2)} (${discountPercentage.toFixed(1)}% off)`)
 					
 					// Update item with new pricing
 					item.rate = newRatePerItem
@@ -798,7 +835,6 @@ export const usePOSCartStore = defineStore("posCart", () => {
 						applied: true,
 						rules: ['any3for249']
 					})
-					console.log('\n Offer added to appliedOffers')
 				}
 			}
 		})
@@ -810,12 +846,15 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		setTimeout(() => {
 			suppressOfferReapply.value = false
 		}, 100)
-		
 	}
 
 	// Watch custom offers and apply them automatically
 	watch(() => offersStore.customOffers, (newOffers) => {
 		if (newOffers && newOffers.length > 0) {
+			nextTick(() => {
+				applyCustomOffersToCart()
+			})
+		} else {
 			nextTick(() => {
 				applyCustomOffersToCart()
 			})
@@ -871,6 +910,7 @@ export const usePOSCartStore = defineStore("posCart", () => {
 		appliedCoupon,
 		selectionMode,
 		suppressOfferReapply,
+		originalItemPricing,
 		// Computed
 		itemCount,
 		isEmpty,

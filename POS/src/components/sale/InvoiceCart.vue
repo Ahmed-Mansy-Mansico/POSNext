@@ -616,7 +616,18 @@
 			<span class="font-bold text-gray-900">{{ formatCurrency(calculatedSubtotal) }}</span>
 		</div>
 
-		<!-- 4. TOTAL Quantity -->
+		<!-- 4. Total Discount (NEW!) -->
+		<div v-if="calculatedTotalDiscount > 0" class="flex items-center justify-between text-sm bg-green-50 rounded-lg px-2.5 py-1.5 -mx-0.5 border border-green-200">
+			<div class="flex items-center gap-1.5">
+				<svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+					<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+				</svg>
+				<span class="font-semibold text-green-700">Total Discount</span>
+			</div>
+			<span class="font-bold text-green-600">-{{ formatCurrency(calculatedTotalDiscount) }}</span>
+		</div>
+
+		<!-- 5. TOTAL Quantity -->
 		<div class="flex items-center justify-between text-xs text-gray-700 pb-2 border-b border-gray-200">
 			<span class="font-semibold">TOTAL Quantity</span>
 			<span class="font-bold text-gray-900">{{ calculatedTotalQuantity }}</span>
@@ -827,6 +838,15 @@ const calculatedGrandTotal = computed(() => {
 // Calculate total quantity
 const calculatedTotalQuantity = computed(() => {
 	return props.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
+})
+
+// Calculate total discount amount (sum of all individual item discounts with VAT)
+const calculatedTotalDiscount = computed(() => {
+	return props.items.reduce((sum, item) => {
+		const discountPerUnit = getDiscountAmount(item) + getDiscountAmount(item) * 0.15
+		const itemTotalDiscount = discountPerUnit * item.quantity
+		return sum + itemTotalDiscount
+	}, 0)
 })
 
 
