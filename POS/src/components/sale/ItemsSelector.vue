@@ -529,7 +529,7 @@
 									
 								<!-- Final Rate added to it 15% tax calculated and added to it discount amount -->
 								<div class="font-bold text-red-600 text-sm">
-									Price: {{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
+									{{ formatCurrency((item.rate || item.price_list_rate || 0) +  (item.rate || item.price_list_rate || 0) * 0.15) }}
 								</div>
 									
 								</div>

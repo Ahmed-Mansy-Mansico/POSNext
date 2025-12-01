@@ -311,6 +311,6 @@ function formatDateTime(date, time) {
 }
 
 function formatCurrency(amount) {
-	return Number.parseFloat(amount || 0).toFixed(2)
+	return Number.parseFloat(amount || 0).toFixed(1)
 }
 </script>
