@@ -98,10 +98,12 @@
 	<!-- Main Content: Responsive Layout -->
 	<div
 		v-if="shiftStore.hasOpenShift"
-		class="flex-1 flex overflow-hidden relative"
-	>
-		<!-- Icon-Only Management Slider - Always Visible -->
-		<ManagementSlider @menu-clicked="handleManagementMenuClick" />
+		class="flex-1 flex overflow-hidden relative">
+		 <!-- Icon-Only Management Slider - Always Visible -->
+		 <!-- <ManagementSlider @menu-clicked="handleManagementMenuClick" /> -->
+	
+		<!-- Icon-Only Management Slider - Hidden -->
+		<ManagementSlider v-if="false" @menu-clicked="handleManagementMenuClick" />
 
 		<!-- Main Content Container -->
 		<div ref="containerRef" class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
@@ -1592,6 +1594,11 @@ async function handlePaymentCompleted(paymentData) {
 			})
 		}
 
+		// Store sales person if provided
+		if (paymentData.sales_person) {
+			cartStore.salesPerson = paymentData.sales_person
+		}
+
 		if (offlineStore.isOffline) {
 			const invoiceData = {
 				pos_profile: cartStore.posProfile,
@@ -1602,6 +1609,7 @@ async function handlePaymentCompleted(paymentData) {
 				grand_total: cartStore.grandTotal,
 				total_tax: cartStore.totalTax,
 				total_discount: cartStore.totalDiscount,
+				custom_sales_person: paymentData.sales_person || null,
 			}
 
 			await offlineStore.saveInvoiceOffline(invoiceData)

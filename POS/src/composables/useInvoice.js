@@ -1,6 +1,7 @@
 import { createResource } from "frappe-ui"
 import { computed, ref } from "vue"
 import { isOffline } from "@/utils/offline"
+import { usePOSCartStore } from "@/stores/posCart"
 
 export function useInvoice() {
 	// State
@@ -581,6 +582,10 @@ export function useInvoice() {
 		 */
 		try {
 			// Step 1: Create invoice draft
+			// Get sales person from cart store if available
+			const cartStore = usePOSCartStore()
+			const salesPersonValue = cartStore.salesPerson || null
+
 			const invoiceData = {
 				doctype: "Sales Invoice",
 				pos_profile: posProfile.value,
@@ -606,6 +611,7 @@ export function useInvoice() {
 				})),
 				discount_amount: additionalDiscount.value || 0,
 				coupon_code: couponCode.value,
+				custom_sales_person: salesPersonValue,
 				is_pos: 1,
 				update_stock: 1, // Critical: Ensures stock is updated
 			}

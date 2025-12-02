@@ -424,13 +424,44 @@ def get_item_variants(template_item, pos_profile):
 				filters={"parent": ["in", variant_codes]},
 				fields=["parent", "attribute", "attribute_value"],
 			)
+			# Get custom_season_code for all variants in one query
+			season_codes_map = {}
+			if variant_codes:
+				items_with_season = frappe.get_all(
+					"Item",
+					filters={"name": ["in", variant_codes]},
+					fields=["name", "custom_season_code"],
+				)
+				season_codes_map = {item["name"]: item.get("custom_season_code") for item in items_with_season}
+			
 			for attr in attributes:
 				if attr["parent"] not in attributes_map:
 					attributes_map[attr["parent"]] = {}
-				attributes_map[attr["parent"]][attr["attribute"]] = {
-					"title": frappe.db.get_value(attr["attribute"], attr["attribute_value"], "title"),
-					"value": attr["attribute_value"]
-				}
+				
+				# For Season attribute, use custom_season_code and extract last 3 digits
+				if attr["attribute"] == "Season":
+					season_code = season_codes_map.get(attr["parent"])
+					if season_code:
+						# Extract last 3 digits from season code
+						season_str = str(season_code).strip()
+						display_value = season_str[-3:] if len(season_str) >= 3 else season_str
+						attributes_map[attr["parent"]][attr["attribute"]] = {
+							"title": display_value,
+							"value": attr["attribute_value"]  # Keep original for matching
+						}
+					else:
+						# Fallback to attribute_value if custom_season_code not available
+						attr_value_str = str(attr["attribute_value"]).strip()
+						display_value = attr_value_str[-3:] if len(attr_value_str) >= 3 else attr_value_str
+						attributes_map[attr["parent"]][attr["attribute"]] = {
+							"title": display_value,
+							"value": attr["attribute_value"]
+						}
+				else:
+					attributes_map[attr["parent"]][attr["attribute"]] = {
+						"title": frappe.db.get_value(attr["attribute"], attr["attribute_value"], "title"),
+						"value": attr["attribute_value"]
+					}
 
 		# Batch query stock for all variants at once (performance optimization)
 		stock_map = {}
@@ -994,6 +1025,7 @@ def get_item_stock_all_warehouses(item_code):
 			SELECT name, warehouse_name
 			FROM `tabWarehouse`
 			WHERE is_group = 0
+			AND disabled = 0
 			AND (is_ship_warehouse = 1 OR is_branch_warehouse = 1)
 			ORDER BY warehouse_name ASC, name ASC
 			""",
@@ -1084,7 +1116,7 @@ def get_items_grouped_by_variant(search_term="", pos_profile=None):
 		fields=[
 			'name', 'item_code', 'item_name', 'item_group',
 			'image', 'stock_uom', 'variant_of', 'has_variants',
-			'is_stock_item'
+			'is_stock_item', 'custom_size'
 		],
 		limit=1000
 	)
@@ -1193,7 +1225,32 @@ def get_items_grouped_by_variant(search_term="", pos_profile=None):
 		for variant in variants:
 			attrs = attributes_map.get(variant.name, {})
 			color_code = attrs.get('Color Code', 'NO_COLOR')
-			size = attrs.get('Size', '')
+			# Get size from attributes first, fallback to custom_size field, then extract from item code
+			# Try to get custom_size using the same access pattern as other fields
+			custom_size = ''
+			if hasattr(variant, 'custom_size'):
+				custom_size = variant.custom_size or ''
+			elif isinstance(variant, dict) and 'custom_size' in variant:
+				custom_size = variant['custom_size'] or ''
+			
+			size = attrs.get('Size', '') or custom_size
+			
+			# If size is still empty, try to extract from item code
+			# Pattern: {template}-{size}-{color} or {template}-{season}-{color}-{size}
+			if not size:
+				item_code = variant.name if hasattr(variant, 'name') else variant.get('name', '')
+				if item_code and '-' in item_code:
+					parts = item_code.split('-')
+					# Check each part to find a numeric size value
+					for part in parts:
+						part_clean = part.strip()
+						# Check if it's a numeric size (typically 2-3 digits, common sizes: 36, 38, 40, 42, 44, 46, etc.)
+						if part_clean.isdigit() and len(part_clean) >= 2 and len(part_clean) <= 3:
+							size_value = int(part_clean)
+							# Common clothing sizes are typically between 30-60
+							if 30 <= size_value <= 60:
+								size = part_clean
+								break
 			
 			# GET THE ACTUAL COLOR NAME from the mapping
 			# This will convert "385" to "Olive"
