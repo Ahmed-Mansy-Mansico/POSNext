@@ -200,6 +200,24 @@
 					</div>
 				</div>
 
+				<!-- Sales Person Selection -->
+				<div v-if="posProfile" class="bg-white rounded-lg p-4 border border-gray-200">
+					<label class="block text-sm font-semibold text-gray-700 mb-2">Sales Person</label>
+					<select
+						v-model="selectedSalesPerson"
+						class="w-full h-10 border border-gray-300 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+					>
+						<option value="">Select Sales Person</option>
+						<option
+							v-for="user in posProfileUsers"
+							:key="user.name"
+							:value="user.name"
+						>
+							{{ user.full_name || user.email }}
+						</option>
+					</select>
+				</div>
+
 				<!-- Payment Methods Grid -->
 				<div>
 					<h3 class="text-sm font-semibold text-gray-700 mb-3">Payment Methods</h3>
@@ -464,6 +482,8 @@ const paymentEntries = ref([])
 const customerCredit = ref([])
 const customerBalance = ref({ total_outstanding: 0, total_credit: 0, net_balance: 0 })
 const loadingCredit = ref(false)
+const selectedSalesPerson = ref("")
+const posProfileUsers = ref([])
 
 // Additional discount state
 const localAdditionalDiscount = ref(0)
@@ -487,6 +507,19 @@ const paymentMethodsResource = createResource({
 			const defaultMethod = paymentMethods.value.find((m) => m.default)
 			lastSelectedMethod.value = defaultMethod || paymentMethods.value[0]
 		}
+	},
+})
+
+const posProfileUsersResource = createResource({
+	url: "pos_next.api.pos_profile.get_pos_profile_users",
+	makeParams() {
+		return {
+			pos_profile: props.posProfile,
+		}
+	},
+	auto: false,
+	onSuccess(data) {
+		posProfileUsers.value = data?.message || data || []
 	},
 })
 
@@ -688,9 +721,10 @@ watch(show, (newVal) => {
 			posProfile: props.posProfile
 		})
 
-		// Load payment methods
+		// Load payment methods and users
 		if (props.posProfile) {
 			loadPaymentMethods()
+			posProfileUsersResource.fetch()
 		}
 
 		// Load customer credit and balance if enabled and customer is selected
@@ -783,6 +817,7 @@ function addCreditAccountPayment() {
 		is_credit_sale: true,  // Mark as credit sale
 		paid_amount: 0,
 		outstanding_amount: props.grandTotal,
+		sales_person: selectedSalesPerson.value || null,
 	}
 
 	console.log('[PaymentDialog] Emitting credit sale payment-completed:', paymentData)
@@ -829,6 +864,7 @@ function completePayment() {
 		is_partial_payment: isPartial,
 		paid_amount: totalPaid.value,
 		outstanding_amount: isPartial ? remainingAmount.value : 0,
+		sales_person: selectedSalesPerson.value || null,
 	}
 
 	console.log('[PaymentDialog] Emitting payment-completed:', paymentData)

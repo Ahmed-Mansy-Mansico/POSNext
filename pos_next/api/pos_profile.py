@@ -221,3 +221,34 @@ def update_warehouse(pos_profile, warehouse):
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Update Warehouse Error")
 		frappe.throw(_("Error updating warehouse: {0}").format(str(e)))
+
+
+@frappe.whitelist()
+def get_pos_profile_users(pos_profile):
+	"""Get all users assigned to the same POS Profile with full names"""
+	try:
+		if not pos_profile:
+			frappe.throw(_("POS Profile is required"))
+
+		# Get all users assigned to this POS Profile
+		users = frappe.db.sql(
+			"""
+			SELECT DISTINCT 
+				u.user as name,
+				usr.full_name,
+				usr.name as email,
+				usr.enabled
+			FROM `tabPOS Profile User` u
+			INNER JOIN `tabUser` usr ON usr.name = u.user
+			WHERE u.parent = %s
+			AND usr.enabled = 1
+			ORDER BY usr.full_name ASC
+			""",
+			pos_profile,
+			as_dict=1,
+		)
+
+		return users
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "Get POS Profile Users Error")
+		frappe.throw(_("Error fetching users: {0}").format(str(e)))
