@@ -86,6 +86,7 @@
 							<p class="text-xs text-gray-500 mb-1">Total Amount</p>
 							<p class="text-2xl font-bold text-gray-900">
 								{{ formatCurrency(originalInvoice.grand_total) }}
+								<span v-if="taxCategory" class="text-sm font-normal text-gray-500 ml-2">({{ taxCategory }})</span>
 							</p>
 						</div>
 					</div>
@@ -117,74 +118,81 @@
 									: 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
 							]"
 						>
-							<div class="flex items-center space-x-4">
-								<!-- Checkbox -->
-								<input
-									type="checkbox"
-									v-model="item.selected"
-									class="h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
-								/>
+							<div class="space-y-3">
+								<!-- First Row: Checkbox, Item Info, and Rate & Amount -->
+								<div class="flex items-center space-x-4">
+									<!-- Checkbox -->
+									<input
+										type="checkbox"
+										v-model="item.selected"
+										class="h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+									/>
 
-								<!-- Item Info -->
-								<div class="flex-1 min-w-0">
-									<div class="flex items-start justify-between">
-										<div class="flex-1">
-											<h4 class="text-sm font-bold text-gray-900 truncate">
-												{{ item.item_name }}
-											</h4>
-											<p class="text-xs text-gray-500 mt-0.5">
-												{{ item.item_code }}
-											</p>
-											<p v-if="item.already_returned > 0" class="text-xs text-amber-600 mt-1">
-												⚠️ {{ item.already_returned }} already returned
-											</p>
+									<!-- Item Info -->
+									<div class="flex-1 min-w-0">
+										<div class="flex items-start justify-between">
+											<div class="flex-1 pr-2">
+												<h4 class="text-sm font-bold text-gray-900 break-words">
+													{{ item.item_name }}
+												</h4>
+												<p class="text-xs text-gray-500 mt-0.5">
+													{{ item.item_code }}
+												</p>
+												<p v-if="item.already_returned > 0" class="text-xs text-amber-600 mt-1">
+													⚠️ {{ item.already_returned }} already returned
+												</p>
+											</div>
 										</div>
 									</div>
-								</div>
 
-								<!-- Quantity Controls -->
-								<div class="flex items-center space-x-3 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-									<span class="text-xs font-medium text-gray-600">Qty:</span>
-									<div class="flex items-center space-x-2">
-										<button
-											@click="decrementQty(item)"
-											:disabled="!item.selected || item.return_qty <= 1"
-											class="w-6 h-6 rounded-full bg-white border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-										>
-											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
-											</svg>
-										</button>
-									<input
-										v-model.number="item.return_qty"
-										:max="item.qty"
-										:disabled="!item.selected"
-										type="number"
-										min="1"
-										step="1"
-										@change="normalizeItemQty(item)"
-										@blur="normalizeItemQty(item)"
-										class="w-14 px-2 py-1 border border-gray-300 rounded-lg text-sm text-center font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-									/>
-										<button
-											@click="incrementQty(item)"
-											:disabled="!item.selected || item.return_qty >= item.qty"
-											class="w-6 h-6 rounded-full bg-white border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-										>
-											<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-											</svg>
-										</button>
+									<!-- Rate & Amount -->
+									<div class="text-right min-w-[100px]">
+										<p class="text-sm font-bold text-gray-900">
+											{{ formatCurrency(getItemAmountWithTax(item)) }}
+										</p>
+										<p class="text-xs text-gray-500 mt-0.5">
+											@ {{ formatCurrency(getItemRateWithTax(item)) }}/{{ item.uom }}
+										</p>
 									</div>
-									<span class="text-xs text-gray-500">/ {{ item.qty }}</span>
 								</div>
 
-								<!-- Rate & Amount -->
-								<div class="text-right min-w-[100px]">
-									<p class="text-sm font-bold text-gray-900">
-										{{ formatCurrency(item.rate * item.return_qty) }}
-									</p>
-									<p class="text-xs text-gray-500 mt-0.5">@ {{ formatCurrency(item.rate) }}/{{ item.uom }}</p>
+								<!-- Second Row: Quantity Controls -->
+								<div class="flex items-center justify-center">
+									<div class="flex items-center space-x-3 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+										<span class="text-xs font-medium text-gray-600">Qty:</span>
+										<div class="flex items-center space-x-2">
+											<button
+												@click="decrementQty(item)"
+												:disabled="!item.selected || item.return_qty <= 1"
+												class="w-6 h-6 rounded-full bg-white border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+											>
+												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+												</svg>
+											</button>
+											<input
+												v-model.number="item.return_qty"
+												:max="item.qty"
+												:disabled="!item.selected"
+												type="number"
+												min="1"
+												step="1"
+												@change="normalizeItemQty(item)"
+												@blur="normalizeItemQty(item)"
+												class="w-14 px-2 py-1 border border-gray-300 rounded-lg text-sm text-center font-semibold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+											/>
+											<button
+												@click="incrementQty(item)"
+												:disabled="!item.selected || item.return_qty >= item.qty"
+												class="w-6 h-6 rounded-full bg-white border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+											>
+												<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+												</svg>
+											</button>
+										</div>
+										<span class="text-xs text-gray-500">/ {{ item.qty }}</span>
+									</div>
 								</div>
 							</div>
 						</div>
@@ -232,6 +240,7 @@
 							<span class="text-base font-semibold text-gray-700">Refund Amount:</span>
 							<span class="text-2xl font-bold text-red-600">
 								{{ formatCurrency(returnTotal) }}
+								<!-- <span v-if="taxCategory" class="text-sm font-normal text-gray-500 ml-2">({{ taxCategory }})</span> -->
 							</span>
 						</div>
 					</div>
@@ -319,6 +328,7 @@ const returnItems = ref([])
 const returnReason = ref("")
 const refundPaymentMethod = ref("")
 const paymentMethods = ref([])
+const taxCategory = ref("")
 const invoiceList = ref([])
 const invoiceListFilter = ref("")
 const submitError = ref("")
@@ -361,7 +371,7 @@ const loadPaymentMethodsResource = createResource({
 		return {
 			doctype: "POS Profile",
 			name: props.posProfile,
-			fields: JSON.stringify(["name", "payments"]),
+			fields: JSON.stringify(["name", "payments", "tax_category"]),
 		}
 	},
 	auto: false,
@@ -372,6 +382,9 @@ const loadPaymentMethodsResource = createResource({
 			if (data.payments.length > 0) {
 				refundPaymentMethod.value = data.payments[0].name
 			}
+		}
+		if (data && data.tax_category) {
+			taxCategory.value = data.tax_category
 		}
 	},
 	onError(error) {
@@ -421,16 +434,24 @@ const fetchInvoiceResource = createResource({
 			}
 
 			originalInvoice.value = data
+			
+			// Calculate tax multiplier to include taxes in item amounts
+			// grand_total = net_total + total_taxes_and_charges
+			const netTotal = data.net_total || data.total || 0
+			const grandTotal = data.grand_total || 0
+			const taxMultiplier = netTotal > 0 ? grandTotal / netTotal : 1
+			
 			returnItems.value = availableItems.map((item) => ({
 				...item,
 				selected: false,
 				return_qty: item.qty, // This will be the remaining qty after previous returns
 				original_qty: item.original_qty || item.qty, // Track original quantity
+				taxMultiplier: taxMultiplier, // Store tax multiplier for calculations
 			}))
 			returnItems.value.forEach(normalizeItemQty)
 
-			// Load payment methods if not already loaded
-			if (paymentMethods.value.length === 0 && props.posProfile) {
+			// Load payment methods and tax category if not already loaded
+			if (props.posProfile && (paymentMethods.value.length === 0 || !taxCategory.value)) {
 				loadPaymentMethodsResource.reload()
 			}
 		}
@@ -521,13 +542,23 @@ const createReturnResource = createResource({
 
 		// Open print view for the return invoice in a new tab
 		if (data && data.name) {
-			setTimeout(() => {
-				// printInvoiceByName(data.name,'POS Sales Invoice Print')
-				printInvoiceFromPrintView(data.name,'POS Sales Return Invoice Print')
-					.catch((error) => {
-						console.error("Error opening print view:", error)
+			setTimeout(async () => {
+				try {
+					// Pass invoice data as object with name property
+					await printInvoiceFromPrintView(
+						{ name: data.name, doctype: "Sales Invoice" },
+						'POS Sales Return Invoice Print'
+					)
+				} catch (error) {
+					console.error("Error opening print view:", error)
+					// Fallback to printInvoiceByName which fetches full invoice document
+					try {
+						await printInvoiceByName(data.name, 'POS Sales Return Invoice Print')
+					} catch (fallbackError) {
+						console.error("Error with fallback print:", fallbackError)
 						// Don't show error to user as the return was successful
-					})
+					}
+				}
 			}, 500) // Small delay to ensure invoice is fully processed
 		}
 	},
@@ -575,9 +606,22 @@ const selectedItems = computed(() => {
 	)
 })
 
+// Helper function to calculate item amount with tax
+function getItemAmountWithTax(item) {
+	const baseAmount = item.return_qty * item.rate
+	const taxMultiplier = item.taxMultiplier || 1
+	return baseAmount * taxMultiplier
+}
+
+// Helper function to calculate item rate with tax
+function getItemRateWithTax(item) {
+	const taxMultiplier = item.taxMultiplier || 1
+	return item.rate * taxMultiplier
+}
+
 const returnTotal = computed(() => {
 	return selectedItems.value.reduce((sum, item) => {
-		return sum + item.return_qty * item.rate
+		return sum + getItemAmountWithTax(item)
 	}, 0)
 })
 
@@ -768,6 +812,7 @@ function resetForm() {
 	returnItems.value = []
 	returnReason.value = ""
 	refundPaymentMethod.value = ""
+	taxCategory.value = ""
 	invoiceList.value = []
 	invoiceListFilter.value = ""
 	submitError.value = ""
@@ -787,10 +832,7 @@ function formatDate(dateStr) {
 }
 
 function formatCurrency(amount) {
-	return new Intl.NumberFormat("en-US", {
-		minimumFractionDigits: 2,
-		maximumFractionDigits: 2,
-	}).format(Number.parseFloat(amount || 0))
+	return Number.parseFloat(amount || 0).toFixed(1)
 }
 </script>
 
