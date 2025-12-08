@@ -190,7 +190,8 @@ doc_events = {
 		"on_cancel": "pos_next.realtime_events.emit_stock_update_event",
 		"before_save": "pos_next.api.pos_offers.auto_apply_any3for249",
         "validate": "pos_next.api.pos_offers.auto_apply_any3for249",
-		"after_insert": "pos_next.realtime_events.emit_invoice_created_event"
+		"after_insert": "pos_next.realtime_events.emit_invoice_created_event",
+		"before_print": "pos_next.api.barcode_gen.generate_sales_invoice_barcode"
 	}
 }
 
