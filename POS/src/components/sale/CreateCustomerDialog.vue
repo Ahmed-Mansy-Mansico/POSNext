@@ -779,7 +779,9 @@ function getFullMobileNumber() {
 	}
 	
 	// Combine country code with mobile number
-	return customerData.value.country_code + mobileNo
+	// return customerData.value.country_code + mobileNo
+	// return the mobile number without the country code
+	return mobileNo
 }
 
 // Create customer resource
